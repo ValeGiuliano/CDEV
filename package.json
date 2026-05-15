@@ -1,0 +1,19 @@
+{
+  "name": "experiencia-adulto-mayor-telefono",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "verify:3d": "node scripts/verify3d.mjs",
+    "verify:input": "node scripts/verify-input.mjs"
+  },
+  "dependencies": {
+    "vite": "^5.4.0",
+    "three": "^0.181.0",
+    "lucide": "^0.468.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}

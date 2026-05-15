@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Experiencia virtual - adulto mayor y telefono</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="experience" aria-label="Experiencia virtual 3D"></canvas>
+      <div id="visionOverlay" class="vision-overlay" aria-hidden="true"></div>
+      <div class="crosshair" aria-hidden="true"></div>
+      <div id="doorPrompt" class="door-prompt" aria-live="polite">E Abrir</div>
+      <section id="introOverlay" class="intro-overlay" aria-label="Escena inicial">
+        <p class="intro-kicker">Casa de Marta</p>
+        <h2 id="introTitle">Un regalo nuevo</h2>
+        <p id="introText">A Marta, su hijo le regaló un celular.</p>
+        <button id="skipIntro" class="skip-intro" type="button">Saltar</button>
+      </section>
+
+      <section class="topbar" aria-label="Estado de la experiencia">
+        <div>
+          <p class="eyebrow">Prototipo inmersivo</p>
+          <h1>Un dia con el telefono</h1>
+        </div>
+        <div class="risk-meter" aria-label="Nivel de riesgo">
+          <span>Riesgo</span>
+          <div class="meter-track"><div id="riskFill" class="meter-fill"></div></div>
+          <strong id="riskValue">12%</strong>
+        </div>
+      </section>
+
+      <aside class="phone-panel" aria-label="Telefono y evento activo">
+        <div class="phone-shell">
+          <div class="phone-speaker"></div>
+          <div id="phoneScreen" class="phone-screen">
+            <p id="screenLabel" class="screen-label">Inicio</p>
+            <strong id="screenTitle">Telefono en reposo</strong>
+            <span id="screenBody">La casa esta tranquila. Las notificaciones esperan en silencio.</span>
+          </div>
+        </div>
+        <div class="event-copy">
+          <p id="eventKicker">Hogar</p>
+          <h2 id="eventTitle">Rutina cotidiana</h2>
+          <p id="eventDescription">La experiencia muestra como llamadas, mensajes y tramites digitales pueden transformarse en presion, confusion o exposicion a fraudes.</p>
+        </div>
+        <div class="action-grid" aria-label="Eventos">
+          <button data-scenario="call" class="event-button">
+            <i data-lucide="phone-call"></i>
+            <span>Llamada</span>
+          </button>
+          <button data-scenario="sms" class="event-button">
+            <i data-lucide="message-square-warning"></i>
+            <span>SMS</span>
+          </button>
+          <button data-scenario="bank" class="event-button">
+            <i data-lucide="landmark"></i>
+            <span>Banco</span>
+          </button>
+          <button data-scenario="family" class="event-button">
+            <i data-lucide="users"></i>
+            <span>Familia</span>
+          </button>
+          <button data-scenario="street" class="event-button">
+            <i data-lucide="map-pin"></i>
+            <span>Barrio</span>
+          </button>
+          <button data-scenario="reset" class="event-button ghost">
+            <i data-lucide="rotate-ccw"></i>
+            <span>Calma</span>
+          </button>
+        </div>
+      </aside>
+
+      <section class="impact-strip" aria-label="Impactos observados">
+        <article>
+          <span id="pressureValue">Baja</span>
+          <p>Presion emocional</p>
+        </article>
+        <article>
+          <span id="privacyValue">Media</span>
+          <p>Privacidad</p>
+        </article>
+        <article>
+          <span id="trustValue">Alta</span>
+          <p>Confianza requerida</p>
+        </article>
+      </section>
+
+      <nav class="walk-pad" aria-label="Movimiento">
+        <button id="moveForward" class="walk-button forward" aria-label="Avanzar">
+          <i data-lucide="arrow-up"></i>
+        </button>
+        <button id="moveLeft" class="walk-button left" aria-label="Izquierda">
+          <i data-lucide="arrow-left"></i>
+        </button>
+        <button id="moveBack" class="walk-button back" aria-label="Retroceder">
+          <i data-lucide="arrow-down"></i>
+        </button>
+        <button id="moveRight" class="walk-button right" aria-label="Derecha">
+          <i data-lucide="arrow-right"></i>
+        </button>
+      </nav>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
