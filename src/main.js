@@ -1,19 +1,17 @@
 import './styles.css';
 import * as THREE from 'three';
-import { createIcons, PhoneCall, MessageSquareWarning, Landmark, Users, MapPin, RotateCcw, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide';
+import { createIcons, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, DollarSign, Smile, Wind, Eye } from 'lucide';
 
 createIcons({
   icons: {
-    PhoneCall,
-    MessageSquareWarning,
-    Landmark,
-    Users,
-    MapPin,
-    RotateCcw,
     ArrowUp,
     ArrowDown,
     ArrowLeft,
     ArrowRight,
+    DollarSign,
+    Smile,
+    Wind,
+    Eye,
   },
 });
 
@@ -31,28 +29,20 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x182323);
-scene.fog = new THREE.Fog(0x182323, 10, 32);
+scene.background = new THREE.Color(0xabe3f8);
+scene.fog = new THREE.Fog(0xabe3f8, 12, 45);
 
 const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 80);
 camera.position.set(-0.85, 1.58, 3.25);
 scene.add(camera);
 
 const clock = new THREE.Clock();
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
 const lookEuler = new THREE.Euler(-0.08, -0.28, 0, 'YXZ');
 const moveState = {
   forward: false,
   back: false,
   left: false,
   right: false,
-};
-const moveImpulseUntil = {
-  forward: 0,
-  back: 0,
-  left: 0,
-  right: 0,
 };
 const player = {
   velocity: new THREE.Vector3(),
@@ -61,135 +51,161 @@ const player = {
   lastX: 0,
   lastY: 0,
 };
+const phoneState = {
+  active: false,
+  progress: 0,
+  wakeTimer: 0,
+  sleepTimer: 0,
+};
 
-const state = {
-  scenario: 'reset',
-  risk: 12,
-  visualStress: 0.12,
-  targetVisualStress: 0.12,
-  phonePulse: 0,
-  phoneReveal: 0,
-  targetPhoneReveal: 0,
-  outdoor: false,
-  lastKey: null,
-  introActive: true,
-  introStartedAt: null,
-  introDone: false,
+const statsState = {
+  fatigue: 0,
+  money: 500,
+  happiness: 80,
+  calm: 75,
 };
 
 const ui = {
-  app: document.querySelector('#app'),
-  riskFill: document.querySelector('#riskFill'),
-  riskValue: document.querySelector('#riskValue'),
-  phoneScreen: document.querySelector('#phoneScreen'),
-  screenLabel: document.querySelector('#screenLabel'),
-  screenTitle: document.querySelector('#screenTitle'),
-  screenBody: document.querySelector('#screenBody'),
-  eventKicker: document.querySelector('#eventKicker'),
-  eventTitle: document.querySelector('#eventTitle'),
-  eventDescription: document.querySelector('#eventDescription'),
-  pressureValue: document.querySelector('#pressureValue'),
-  privacyValue: document.querySelector('#privacyValue'),
-  trustValue: document.querySelector('#trustValue'),
   doorPrompt: document.querySelector('#doorPrompt'),
-  introOverlay: document.querySelector('#introOverlay'),
-  introTitle: document.querySelector('#introTitle'),
-  introText: document.querySelector('#introText'),
-  skipIntro: document.querySelector('#skipIntro'),
+  phonePrompt: document.querySelector('#phonePrompt'),
+  phoneUI: document.querySelector('#phoneUI'),
+  phoneViews: document.querySelectorAll('.phone-view'),
+  phoneAppBtns: document.querySelectorAll('.phone-app-btn'),
+  phoneBackBtns: document.querySelectorAll('.phone-back-btn'),
+  phoneHomeBar: document.querySelector('#phoneHomeBar'),
+  openMessagesBtn: document.querySelector('#openMessagesBtn'),
+  sendReplyBtn: document.querySelector('#sendReplyBtn'),
+  replyBubble: document.querySelector('#replyBubble'),
+  fatigueValue: document.querySelector('#fatigueValue'),
+  fatigueFill: document.querySelector('#fatigueFill'),
+  moneyValue: document.querySelector('#moneyValue'),
+  happinessValue: document.querySelector('#happinessValue'),
+  happinessFill: document.querySelector('#happinessFill'),
+  calmValue: document.querySelector('#calmValue'),
+  calmFill: document.querySelector('#calmFill'),
+  dilemmaModal: document.querySelector('#dilemmaModal'),
+  dilemmaTitle: document.querySelector('#dilemmaTitle'),
+  dilemmaDesc: document.querySelector('#dilemmaDesc'),
+  optATitle: document.querySelector('#optATitle'),
+  optAPosDesc: document.querySelector('#optAPosDesc'),
+  optAPosImpact: document.querySelector('#optAPosImpact'),
+  optANegDesc: document.querySelector('#optANegDesc'),
+  optANegImpact: document.querySelector('#optANegImpact'),
+  btnSelectA: document.querySelector('#btnSelectA'),
+  optBTitle: document.querySelector('#optBTitle'),
+  optBPosDesc: document.querySelector('#optBPosDesc'),
+  optBPosImpact: document.querySelector('#optBPosImpact'),
+  optBNegDesc: document.querySelector('#optBNegDesc'),
+  optBNegImpact: document.querySelector('#optBNegImpact'),
+  btnSelectB: document.querySelector('#btnSelectB'),
+  outcomeModal: document.querySelector('#outcomeModal'),
+  outcomeDesc: document.querySelector('#outcomeDesc'),
+  outcomeImpact: document.querySelector('#outcomeImpact'),
+  btnConfirmOutcome: document.querySelector('#btnConfirmOutcome'),
+  experienceCanvas: document.querySelector('#experience'),
+  damageOverlay: document.querySelector('#damageOverlay'),
+  cinematicOverlay: document.querySelector('#cinematicOverlay'),
+  cinematicSpeaker: document.querySelector('#cinematicSpeaker'),
+  cinematicText: document.querySelector('#cinematicText'),
+  cinematicPrompt: document.querySelector('#cinematicPrompt'),
+  missionsContainer: document.querySelector('#missionsContainer'),
+  missionCard: document.querySelector('#missionCard'),
+  missionTitle: document.querySelector('#missionTitle'),
+  missionText: document.querySelector('#missionText'),
 };
 
-const scenarios = {
-  reset: {
-    risk: 12,
-    label: 'Inicio',
-    title: 'Telefono en reposo',
-    body: 'La casa esta tranquila. Las notificaciones esperan en silencio.',
-    kicker: 'Hogar',
-    eventTitle: 'Rutina cotidiana',
-    description: 'La experiencia muestra como llamadas, mensajes y tramites digitales pueden transformarse en presion, confusion o exposicion a fraudes.',
-    pressure: 'Baja',
-    privacy: 'Media',
-    trust: 'Alta',
-    colorA: '#183233',
-    colorB: '#1e2628',
-    warning: null,
-  },
-  call: {
-    risk: 74,
-    label: 'Llamada entrante',
-    title: 'Numero desconocido',
-    body: 'Una voz apura una decision: “hay un problema con su cuenta”. El tiempo se vuelve presion.',
-    kicker: 'Riesgo de fraude',
-    eventTitle: 'Urgencia fabricada',
-    description: 'El telefono invade el living con tono insistente, luces rojas y un mensaje que pide actuar antes de pensar.',
-    pressure: 'Alta',
-    privacy: 'Alta',
-    trust: 'Critica',
-    colorA: '#3a1818',
-    colorB: '#772b2a',
-    warning: 'NO COMPARTIR CODIGOS',
-  },
-  sms: {
-    risk: 68,
-    label: 'Mensaje',
-    title: 'Enlace sospechoso',
-    body: 'El SMS promete desbloquear una entrega. El enlace parece oficial, pero no lo es.',
-    kicker: 'Phishing',
-    eventTitle: 'Interfaz confusa',
-    description: 'La mesa se llena de papeles y claves: el entorno muestra como un mensaje breve puede pedir demasiada confianza.',
-    pressure: 'Media',
-    privacy: 'Alta',
-    trust: 'Alta',
-    colorA: '#223241',
-    colorB: '#76592a',
-    warning: 'ENLACE NO VERIFICADO',
-  },
-  bank: {
-    risk: 83,
-    label: 'Banco digital',
-    title: 'Codigo de seguridad',
-    body: 'La pantalla exige pasos, claves y confirmaciones. Un error puede exponer dinero o datos.',
-    kicker: 'Tramite sensible',
-    eventTitle: 'Sobrecarga de pasos',
-    description: 'El telefono proyecta paneles bancarios sobre la habitacion para representar contrasenas, tokens y decisiones dificiles.',
-    pressure: 'Alta',
-    privacy: 'Critica',
-    trust: 'Critica',
-    colorA: '#132f2b',
-    colorB: '#284d3f',
-    warning: 'DATOS SENSIBLES',
-  },
-  family: {
-    risk: 39,
-    label: 'Contacto',
-    title: 'Pedido de ayuda',
-    body: 'Un mensaje familiar puede ser real o una suplantacion. La confianza tambien necesita verificacion.',
-    kicker: 'Suplantacion',
-    eventTitle: 'Confianza emocional',
-    description: 'Retratos y recuerdos se iluminan: el riesgo no siempre parece tecnico, tambien puede parecer cercano.',
-    pressure: 'Media',
-    privacy: 'Media',
-    trust: 'Alta',
-    colorA: '#273042',
-    colorB: '#4d355f',
-    warning: 'VERIFICAR IDENTIDAD',
-  },
-  street: {
-    risk: 57,
-    label: 'Fuera de casa',
-    title: 'Telefono en la calle',
-    body: 'Ruido, brillo solar y apuro reducen la atencion. Las decisiones digitales salen del hogar.',
-    kicker: 'Mundo exterior',
-    eventTitle: 'Barrio y distracciones',
-    description: 'La pared se abre hacia la vereda: notificaciones, transito y carteles compiten por la atencion.',
-    pressure: 'Media',
-    privacy: 'Alta',
-    trust: 'Media',
-    colorA: '#1b3343',
-    colorB: '#4a633d',
-    warning: 'ATENCION DIVIDIDA',
-  },
+const missionsState = {
+  currentMissionId: null,
+  active: false,
+  completed: false,
+  doorbellTimer: 0,
 };
+
+function playDoorbellSound() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const t0 = audioCtx.currentTime;
+    const osc1 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(660, t0);
+    gain1.gain.setValueAtTime(0.25, t0);
+    gain1.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
+    osc1.connect(gain1); gain1.connect(audioCtx.destination);
+    osc1.start(t0); osc1.stop(t0 + 0.5);
+
+    const t1 = t0 + 0.4;
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(550, t1);
+    gain2.gain.setValueAtTime(0.25, t1);
+    gain2.gain.exponentialRampToValueAtTime(0.001, t1 + 0.7);
+    osc2.connect(gain2); gain2.connect(audioCtx.destination);
+    osc2.start(t1); osc2.stop(t1 + 0.7);
+  } catch (e) { }
+}
+
+function setMission(id, title, text) {
+  missionsState.currentMissionId = id;
+  missionsState.active = true;
+  missionsState.completed = false;
+  missionsState.doorbellTimer = 0;
+
+  if (ui.missionsContainer) {
+    ui.missionsContainer.setAttribute('aria-hidden', 'false');
+    if (ui.missionTitle) ui.missionTitle.textContent = title;
+    if (ui.missionText) ui.missionText.textContent = text;
+    if (ui.missionCard) ui.missionCard.classList.remove('is-completed');
+  }
+
+  if (id === 'doorbell') {
+    playDoorbellSound();
+  }
+}
+
+function completeMission(id) {
+  if (missionsState.currentMissionId !== id || missionsState.completed) return;
+  missionsState.completed = true;
+
+  if (ui.missionCard) {
+    ui.missionCard.classList.add('is-completed');
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const t0 = audioCtx.currentTime;
+      [440, 554, 659, 880].forEach((f, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, t0 + i * 0.1);
+        gain.gain.setValueAtTime(0.12, t0 + i * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + i * 0.1 + 0.3);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(t0 + i * 0.1); osc.stop(t0 + i * 0.1 + 0.3);
+      });
+    } catch (e) { }
+
+    setTimeout(() => {
+      if (missionsState.currentMissionId === id && ui.missionsContainer) {
+        ui.missionsContainer.setAttribute('aria-hidden', 'true');
+        missionsState.active = false;
+      }
+    }, 4000);
+  }
+}
+
+function updateMissions(dt) {
+  if (missionsState.active && !missionsState.completed && missionsState.currentMissionId === 'doorbell') {
+    missionsState.doorbellTimer += dt;
+    if (missionsState.doorbellTimer >= 6.0) {
+      missionsState.doorbellTimer = 0;
+      playDoorbellSound();
+    }
+  }
+}
 
 function makeCanvasTexture(draw, size = 512) {
   const c = document.createElement('canvas');
@@ -216,6 +232,20 @@ function noise(ctx, size, alpha = 0.08) {
     data[i + 3] = 255;
   }
   ctx.putImageData(image, 0, 0);
+}
+
+function drawRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 const textures = {
@@ -310,6 +340,61 @@ const textures = {
     ctx.fillRect(s - 130, 26, 84, 84);
     noise(ctx, s, 0.045);
   }),
+  phoneScreen: makeCanvasTexture((ctx, s) => {
+    const grad = ctx.createLinearGradient(0, 0, 0, s);
+    grad.addColorStop(0, '#111827');
+    grad.addColorStop(1, '#1f2937');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, s, s);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px Inter, sans-serif';
+    ctx.fillText('12:45', 40, 38);
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(s - 65, 22, 32, 16);
+    ctx.fillRect(s - 61, 25, 24, 10);
+    ctx.fillRect(s - 32, 27, 4, 6);
+
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 72px Inter, sans-serif';
+    ctx.fillText('12:45', s / 2, 160);
+    ctx.font = '24px Inter, sans-serif';
+    ctx.fillStyle = '#9ca3af';
+    ctx.fillText('Sábado, 16 de Mayo', s / 2, 210);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    drawRoundRect(ctx, 32, 260, s - 64, 115, 20);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#60a5fa';
+    ctx.font = 'bold 20px Inter, sans-serif';
+    ctx.fillText('MENSAJE NUEVO', 56, 295);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px Inter, sans-serif';
+    ctx.fillText('Hijo', 56, 328);
+    ctx.fillStyle = '#d1d5db';
+    ctx.font = '20px Inter, sans-serif';
+    ctx.fillText('Hola mamá, ¿cómo estás?', 56, 355);
+
+    const iconColors = ['#10b981', '#3b82f6', '#f59e0b', '#ec4899'];
+    const iconSpace = (s - 64 - 4 * 70) / 3;
+    for (let i = 0; i < 4; i++) {
+      const x = 32 + i * (70 + iconSpace);
+      ctx.fillStyle = iconColors[i];
+      drawRoundRect(ctx, x, s - 120, 70, 70, 18);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(x + 35, s - 85, 16, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }),
   street: makeCanvasTexture((ctx, s) => {
     ctx.fillStyle = '#657177';
     ctx.fillRect(0, 0, s, s);
@@ -338,23 +423,20 @@ const materials = {
   dark: new THREE.MeshStandardMaterial({ color: 0x15191a, roughness: 0.55 }),
   metal: new THREE.MeshStandardMaterial({ color: 0xa6a19b, metalness: 0.35, roughness: 0.32 }),
   paper: new THREE.MeshStandardMaterial({ map: textures.paper, roughness: 0.8 }),
+  phoneScreen: new THREE.MeshBasicMaterial({ map: textures.phoneScreen, side: THREE.DoubleSide }),
+  phoneScreenOff: new THREE.MeshStandardMaterial({ color: 0x080a0c, roughness: 0.18, metalness: 0.8 }),
+  phoneCase: new THREE.MeshStandardMaterial({ color: 0x3a4248, metalness: 0.55, roughness: 0.45 }),
   warmLight: new THREE.MeshStandardMaterial({ color: 0xffc46e, emissive: 0xffa83d, emissiveIntensity: 1.1 }),
-  warning: new THREE.MeshStandardMaterial({ color: 0xff6b5f, emissive: 0xff2d2d, emissiveIntensity: 0.8, transparent: true, opacity: 0 }),
   street: new THREE.MeshStandardMaterial({ map: textures.street, roughness: 0.84 }),
   plaster: new THREE.MeshStandardMaterial({ color: 0xcbd7d0, roughness: 0.86, side: THREE.DoubleSide }),
   tile: new THREE.MeshStandardMaterial({ color: 0xb8c5bd, roughness: 0.82 }),
   cabinet: new THREE.MeshStandardMaterial({ color: 0x53675d, roughness: 0.72 }),
-  skin: new THREE.MeshStandardMaterial({ color: 0xc9926e, roughness: 0.72 }),
-  hair: new THREE.MeshStandardMaterial({ color: 0x6d6b65, roughness: 0.85 }),
-  sonShirt: new THREE.MeshStandardMaterial({ color: 0x2f5d7c, roughness: 0.78 }),
-  martaDress: new THREE.MeshStandardMaterial({ color: 0x7d536a, roughness: 0.82 }),
 };
 
 const room = new THREE.Group();
-const alerts = new THREE.Group();
 const outdoor = new THREE.Group();
 const exterior = new THREE.Group();
-scene.add(room, alerts, outdoor, exterior);
+scene.add(room, outdoor, exterior);
 
 function mesh(geometry, material, position, rotation = [0, 0, 0], cast = true, receive = true) {
   const m = new THREE.Mesh(geometry, material);
@@ -363,6 +445,23 @@ function mesh(geometry, material, position, rotation = [0, 0, 0], cast = true, r
   m.castShadow = cast;
   m.receiveShadow = receive;
   return m;
+}
+
+function createCutoutWall(width, height, position, material, totalWidth = 12, totalHeight = 4.2, startX = -6, startY = 0) {
+  const geom = new THREE.PlaneGeometry(width, height);
+  const posArr = geom.attributes.position.array;
+  const uvArr = geom.attributes.uv.array;
+  const numVerts = uvArr.length / 2;
+  for (let k = 0; k < numVerts; k++) {
+    const localX = posArr[k * 3];
+    const localY = posArr[k * 3 + 1];
+    const worldX = position[0] + localX;
+    const worldY = position[1] + localY;
+    uvArr[k * 2] = (worldX - startX) / totalWidth;
+    uvArr[k * 2 + 1] = (worldY - startY) / totalHeight;
+  }
+  geom.attributes.uv.needsUpdate = true;
+  return mesh(geom, material, position, [0, 0, 0], false);
 }
 
 function addBox(parent, size, material, position, rotation = [0, 0, 0]) {
@@ -378,75 +477,114 @@ function addRoundedCylinder(parent, radius, height, material, position, rotation
 }
 
 room.add(mesh(new THREE.PlaneGeometry(12, 12), materials.floor, [0, 0, 0], [-Math.PI / 2, 0, 0], false));
-room.add(mesh(new THREE.PlaneGeometry(4.1, 7.2), materials.floor, [3.95, 0.004, -7.5], [-Math.PI / 2, 0, 0], false));
 room.add(mesh(new THREE.PlaneGeometry(12, 12), materials.plaster, [0, 4.18, 0], [Math.PI / 2, 0, 0], false, false));
-room.add(mesh(new THREE.PlaneGeometry(4.1, 7.2), materials.plaster, [3.95, 4.18, -7.5], [Math.PI / 2, 0, 0], false, false));
-room.add(mesh(new THREE.PlaneGeometry(5.4, 4.2), materials.wall, [-3.3, 2.1, -6], [0, 0, 0], false));
-room.add(mesh(new THREE.PlaneGeometry(0.66, 4.2), materials.wall, [2.63, 2.1, -6], [0, 0, 0], false));
-room.add(mesh(new THREE.PlaneGeometry(0.34, 4.2), materials.wall, [5.83, 2.1, -6], [0, 0, 0], false));
-room.add(mesh(new THREE.PlaneGeometry(2.86, 1.24), materials.wall, [4.35, 0.62, -6], [0, 0, 0], false));
-room.add(mesh(new THREE.PlaneGeometry(2.86, 0.58), materials.wall, [4.35, 3.91, -6], [0, 0, 0], false));
+room.add(createCutoutWall(5.89, 4.2, [-3.055, 2.1, -6], materials.wall));
+room.add(createCutoutWall(1.41, 4.2, [2.255, 2.1, -6], materials.wall));
+room.add(createCutoutWall(1.66, 1.96, [0.72, 3.22, -6], materials.wall));
+room.add(createCutoutWall(0.34, 4.2, [5.83, 2.1, -6], materials.wall));
+room.add(createCutoutWall(2.86, 1.24, [4.35, 0.62, -6], materials.wall));
+room.add(createCutoutWall(2.86, 0.58, [4.35, 3.91, -6], materials.wall));
 room.add(mesh(new THREE.PlaneGeometry(12, 4.2), materials.wall, [-6, 2.1, 0], [0, Math.PI / 2, 0], false));
 room.add(mesh(new THREE.PlaneGeometry(12, 4.2), materials.wall, [6, 2.1, 0], [0, -Math.PI / 2, 0], false));
-room.add(mesh(new THREE.PlaneGeometry(4.1, 4.2), materials.plaster, [1.9, 2.1, -11.1], [0, 0, 0], false));
-room.add(mesh(new THREE.PlaneGeometry(7.2, 4.2), materials.plaster, [5.98, 2.1, -7.5], [0, -Math.PI / 2, 0], false));
-room.add(mesh(new THREE.PlaneGeometry(5.1, 4.2), materials.plaster, [1.9, 2.1, -8.55], [0, Math.PI / 2, 0], false));
-const windowGlass = mesh(new THREE.PlaneGeometry(2.8, 2.2), new THREE.MeshStandardMaterial({ color: 0xdff6ff, emissive: 0x7fb4d6, emissiveIntensity: 0.08, roughness: 0.18, transparent: true, opacity: 0.22, depthWrite: false }), [4.35, 2.45, -5.98], [0, 0, 0], false, false);
+const windowGlass = mesh(new THREE.PlaneGeometry(2.8, 2.2), new THREE.MeshStandardMaterial({ color: 0xdff6ff, emissive: 0x7fb4d6, emissiveIntensity: 0.12, roughness: 0.15, transparent: true, opacity: 0.25, depthWrite: false }), [4.35, 2.45, -5.98], [0, 0, 0], false, false);
 room.add(windowGlass);
-addBox(room, [2.95, 0.08, 0.08], materials.wood, [4.35, 3.58, -5.94]);
-addBox(room, [2.95, 0.08, 0.08], materials.wood, [4.35, 1.32, -5.94]);
-addBox(room, [0.08, 2.28, 0.08], materials.wood, [2.86, 2.45, -5.94]);
-addBox(room, [0.08, 2.28, 0.08], materials.wood, [5.84, 2.45, -5.94]);
-addBox(room, [0.06, 2.16, 0.06], materials.wood, [4.35, 2.45, -5.93]);
-addBox(room, [2.78, 0.06, 0.06], materials.wood, [4.35, 2.45, -5.93]);
+// Alféizar inferior (Sill) robusto que sobresale levemente
+addBox(room, [2.96, 0.12, 0.26], materials.wood, [4.35, 1.28, -5.91]);
+// Marco superior (Header)
+addBox(room, [2.96, 0.12, 0.18], materials.wood, [4.35, 3.60, -5.95]);
+// Jambas laterales (Left & Right jambs)
+addBox(room, [0.12, 2.24, 0.18], materials.wood, [2.93, 2.44, -5.95]);
+addBox(room, [0.12, 2.24, 0.18], materials.wood, [5.77, 2.44, -5.95]);
+// Parteluz y travesaño central (Mullions)
+addBox(room, [0.06, 2.24, 0.14], materials.wood, [4.35, 2.44, -5.95]);
+addBox(room, [2.72, 0.06, 0.14], materials.wood, [4.35, 2.44, -5.95]);
 const sunPatch = mesh(new THREE.PlaneGeometry(2.5, 4.2), new THREE.MeshBasicMaterial({ color: 0xffe7a8, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }), [3.35, 0.026, -1.45], [-Math.PI / 2, 0, 0.24], false, false);
 room.add(sunPatch);
 
-const skyMaterial = new THREE.MeshBasicMaterial({ color: 0x9fd0ec, side: THREE.DoubleSide });
-exterior.add(mesh(new THREE.PlaneGeometry(14, 7), skyMaterial, [4.3, 3.1, -14], [0, 0, 0], false, false));
-exterior.add(mesh(new THREE.PlaneGeometry(12, 8), new THREE.MeshStandardMaterial({ color: 0x4f7d55, roughness: 0.9 }), [4.2, -0.015, -9.7], [-Math.PI / 2, 0, 0], false));
-exterior.add(mesh(new THREE.PlaneGeometry(8, 1.1), new THREE.MeshStandardMaterial({ color: 0x8b8f8e, roughness: 0.8 }), [4.25, 0.005, -7.45], [-Math.PI / 2, 0, 0], false));
-exterior.add(mesh(new THREE.PlaneGeometry(8, 0.42), new THREE.MeshStandardMaterial({ color: 0xd4d0be, roughness: 0.75 }), [4.25, 0.01, -6.72], [-Math.PI / 2, 0, 0], false));
-for (let i = 0; i < 6; i += 1) {
-  addBox(exterior, [0.55, 0.025, 0.08], new THREE.MeshBasicMaterial({ color: 0xf1e6b0 }), [1.6 + i * 1.05, 0.026, -7.45]);
+// --- NUEVO ENTORNO EXTERIOR (LOW POLY) ---
+// Vereda (Sidewalk)
+materials.sidewalk = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.85 });
+outdoor.add(mesh(new THREE.PlaneGeometry(40, 4.5), materials.sidewalk, [0, 0.015, -8.28], [-Math.PI / 2, 0, 0], false));
+
+// Calle (Street)
+materials.asphalt = new THREE.MeshStandardMaterial({ color: 0x2b323c, roughness: 0.9 });
+outdoor.add(mesh(new THREE.PlaneGeometry(40, 8.0), materials.asphalt, [0, 0.01, -14.53], [-Math.PI / 2, 0, 0], false));
+
+// Línea amarilla central de la calle
+const lineGeom = new THREE.PlaneGeometry(1.2, 0.15);
+const lineMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+for (let x = -18; x <= 18; x += 3) {
+  outdoor.add(mesh(lineGeom, lineMat, [x, 0.016, -14.53], [-Math.PI / 2, 0, 0], false, false));
 }
-exterior.add(mesh(new THREE.PlaneGeometry(3.8, 1.2), new THREE.MeshBasicMaterial({ color: 0xddefff, transparent: true, opacity: 0.75, side: THREE.DoubleSide }), [1.2, 4.15, -13.9], [0, 0, -0.08], false, false));
-exterior.add(mesh(new THREE.PlaneGeometry(2.8, 0.85), new THREE.MeshBasicMaterial({ color: 0xf5fbff, transparent: true, opacity: 0.68, side: THREE.DoubleSide }), [6.1, 3.75, -13.85], [0, 0, 0.04], false, false));
-for (let i = 0; i < 5; i += 1) {
-  const tree = new THREE.Group();
-  tree.position.set(1.4 + i * 1.35, 0, -8.8 - (i % 2) * 1.1);
-  exterior.add(tree);
-  addRoundedCylinder(tree, 0.07, 0.85, new THREE.MeshStandardMaterial({ color: 0x5b3f2b, roughness: 0.86 }), [0, 0.42, 0], [0, 0, 0], 12);
-  addRoundedCylinder(tree, 0.42 + (i % 2) * 0.08, 0.9, new THREE.MeshStandardMaterial({ color: [0x315f3e, 0x3f7552, 0x557a3f][i % 3], roughness: 0.92 }), [0, 1.13, 0], [0, 0, 0], 18);
+
+// Vereda Opuesta
+outdoor.add(mesh(new THREE.PlaneGeometry(40, 3.0), materials.sidewalk, [0, 0.015, -20.03], [-Math.PI / 2, 0, 0], false));
+
+// Árboles Low Poly a lo largo de las veredas
+for (const x of [-14, -10, -6, -2, 4, 8, 12, 16]) {
+  // Vereda cercana (evitando la puerta y ventana)
+  if (x < -2 || x > 6) {
+    const tree1 = new THREE.Group(); tree1.position.set(x, 0, -7.5); outdoor.add(tree1);
+    addRoundedCylinder(tree1, 0.15, 1.5, materials.wood, [0, 0.75, 0], [0, 0, 0], 12);
+    addRoundedCylinder(tree1, 1.1, 2.2, new THREE.MeshStandardMaterial({ color: 0x2f6f45, roughness: 0.9 }), [0, 2.2, 0], [0, 0, 0], 16);
+  }
+  // Vereda opuesta
+  const tree2 = new THREE.Group(); tree2.position.set(x + 1, 0, -19.5); outdoor.add(tree2);
+  addRoundedCylinder(tree2, 0.18, 1.8, materials.wood, [0, 0.9, 0], [0, 0, 0], 12);
+  addRoundedCylinder(tree2, 1.4, 2.6, new THREE.MeshStandardMaterial({ color: 0x3a7d44, roughness: 0.9 }), [0, 2.5, 0], [0, 0, 0], 18);
 }
-for (let i = 0; i < 3; i += 1) {
-  const house = addBox(exterior, [1.45, 1.05, 0.7], new THREE.MeshStandardMaterial({ color: [0xb9c8c1, 0xc6b39b, 0xa7bac3][i], roughness: 0.82 }), [1.7 + i * 2.4, 0.52, -12.4]);
-  addBox(house, [1.58, 0.18, 0.82], new THREE.MeshStandardMaterial({ color: 0x684737, roughness: 0.75 }), [0, 0.62, 0]);
-  addBox(house, [0.26, 0.24, 0.02], new THREE.MeshBasicMaterial({ color: 0xffdf91 }), [-0.34, 0.12, 0.36]);
-  addBox(house, [0.26, 0.24, 0.02], new THREE.MeshBasicMaterial({ color: 0xffdf91 }), [0.34, 0.12, 0.36]);
+
+// Casas en frente (Low Poly)
+const houseColors = [0x8aa1a7, 0xd99b66, 0x6d8b78, 0xe5c158, 0xa97363, 0x7b9095];
+for (let i = 0; i < 6; i++) {
+  const houseGroup = new THREE.Group();
+  houseGroup.position.set(-15 + i * 6.0, 0, -23.5);
+  outdoor.add(houseGroup);
+
+  // Cuerpo de la casa
+  const houseMat = new THREE.MeshStandardMaterial({ color: houseColors[i], roughness: 0.8 });
+  addBox(houseGroup, [4.8, 4.0, 4.0], houseMat, [0, 2.0, 0]);
+
+  // Techo a dos aguas (Prisma / Cono de 4 segmentos)
+  const roofGeom = new THREE.CylinderGeometry(0.01, 3.5, 2.0, 4);
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x5a3d31, roughness: 0.7 });
+  const roof = mesh(roofGeom, roofMat, [0, 5.0, 0], [0, Math.PI / 4, 0]);
+  houseGroup.add(roof);
+
+  // Puerta
+  addBox(houseGroup, [0.9, 2.0, 0.1], materials.wood, [0, 1.0, 2.01]);
+
+  // Ventanas
+  const winMat = new THREE.MeshStandardMaterial({ color: 0xf4cf86, emissive: 0xf2b75e, emissiveIntensity: 0.3 });
+  addBox(houseGroup, [1.0, 1.0, 0.1], winMat, [-1.4, 1.5, 2.01]);
+  addBox(houseGroup, [1.0, 1.0, 0.1], winMat, [1.4, 1.5, 2.01]);
+  addBox(houseGroup, [1.2, 1.0, 0.1], winMat, [0, 3.0, 2.01]);
 }
-const featureTree = new THREE.Group();
-featureTree.position.set(4.95, 0, -7.05);
-exterior.add(featureTree);
-addRoundedCylinder(featureTree, 0.09, 1.2, new THREE.MeshStandardMaterial({ color: 0x6b4a32, roughness: 0.82 }), [0, 0.6, 0], [0, 0, 0], 14);
-addRoundedCylinder(featureTree, 0.58, 1.0, new THREE.MeshStandardMaterial({ color: 0x2f6f45, roughness: 0.9 }), [0, 1.45, 0], [0, 0, 0], 22);
-const featureHouse = addBox(exterior, [1.9, 1.25, 0.7], new THREE.MeshStandardMaterial({ color: 0xd0c2a6, roughness: 0.8 }), [3.45, 0.62, -9.3]);
-addBox(featureHouse, [2.05, 0.22, 0.82], new THREE.MeshStandardMaterial({ color: 0x744332, roughness: 0.75 }), [0, 0.73, 0]);
-addBox(featureHouse, [0.32, 0.28, 0.02], new THREE.MeshBasicMaterial({ color: 0xffe29b }), [-0.46, 0.18, 0.36]);
-addBox(featureHouse, [0.32, 0.28, 0.02], new THREE.MeshBasicMaterial({ color: 0xffe29b }), [0.46, 0.18, 0.36]);
-addBox(room, [0.08, 4.2, 0.1], materials.wood, [2.28, 2.1, -5.94]);
-addBox(room, [0.08, 4.2, 0.1], materials.wood, [6.0, 2.1, -5.94]);
-addBox(room, [3.72, 0.08, 0.1], materials.wood, [4.14, 4.18, -5.94]);
-addBox(room, [3.72, 0.08, 0.1], materials.wood, [4.14, 0.04, -5.94]);
+
+// Fondo de cielo
+const skyPlane = mesh(new THREE.PlaneGeometry(120, 50), new THREE.MeshBasicMaterial({ color: 0xabe3f8 }), [0, 18, -35], [0, 0, 0], false, false);
+outdoor.add(skyPlane);
+
+const cinematicGroup = new THREE.Group();
+outdoor.add(cinematicGroup);
+
+const sonMesh = mesh(new THREE.SphereGeometry(0.3, 32, 32), new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.4 }), [1.1, 1.3, -11.4]);
+const oldWomanMesh = mesh(new THREE.SphereGeometry(0.28, 32, 32), new THREE.MeshStandardMaterial({ color: 0xd946ef, roughness: 0.5 }), [1.5, 1.25, -11.9]);
+const phoneProp = mesh(new THREE.BoxGeometry(0.18, 0.02, 0.35), materials.phoneCase, [1.15, 1.25, -11.5]);
+
+sonMesh.visible = false;
+oldWomanMesh.visible = false;
+phoneProp.visible = false;
+cinematicGroup.add(sonMesh, oldWomanMesh, phoneProp);
 
 const livingDoorGroup = new THREE.Group();
 livingDoorGroup.position.set(-0.04, 0, -6.03);
 room.add(livingDoorGroup);
-addBox(livingDoorGroup, [1.35, 2.1, 0.13], materials.wood, [0.675, 1.05, 0]);
-addBox(livingDoorGroup, [0.05, 0.05, 0.04], materials.metal, [1.18, 1.03, 0.08]);
+addBox(livingDoorGroup, [1.52, 2.1, 0.13], materials.wood, [0.76, 1.05, 0]);
+addBox(livingDoorGroup, [0.05, 0.05, 0.04], materials.metal, [1.35, 1.03, 0.08]);
 addBox(room, [0.14, 2.1, 0.16], materials.wood, [1.48, 1.05, -6.03]);
 addBox(room, [0.14, 2.1, 0.16], materials.wood, [-0.04, 1.05, -6.03]);
-addBox(room, [1.5, 0.14, 0.16], materials.wood, [0.72, 2.08, -6.03]);
+addBox(room, [1.66, 0.14, 0.16], materials.wood, [0.72, 2.17, -6.03]);
 
 const rug = mesh(new THREE.PlaneGeometry(4.7, 3.4), materials.rug, [0.2, 0.012, 0.5], [-Math.PI / 2, 0, 0], false);
 room.add(rug);
@@ -470,35 +608,42 @@ addBox(room, [0.32, 0.025, 0.22], new THREE.MeshStandardMaterial({ color: 0x4a28
 addRoundedCylinder(room, 0.08, 0.06, materials.metal, [-0.42, 0.59, 0.31]);
 addRoundedCylinder(room, 0.045, 0.05, materials.metal, [-0.27, 0.59, 0.31]);
 
-const phoneGroup = new THREE.Group();
-phoneGroup.position.set(0.92, 0.96, 0.08);
-phoneGroup.rotation.set(-0.12, -0.45, 0.05);
-phoneGroup.name = 'Telefono';
-phoneGroup.visible = false;
-room.add(phoneGroup);
-addBox(phoneGroup, [0.48, 0.065, 0.86], materials.dark, [0, 0, 0]);
-const phoneGlow = addBox(phoneGroup, [0.4, 0.071, 0.68], new THREE.MeshStandardMaterial({ color: 0x1d4446, emissive: 0x2cc7c0, emissiveIntensity: 0.22, roughness: 0.45 }), [0, 0.006, 0]);
-phoneGlow.name = 'PantallaTelefono';
+const tablePhoneGroup = new THREE.Group();
+tablePhoneGroup.position.set(0.35, 0.565, 0.28);
+tablePhoneGroup.rotation.set(0, -0.25, 0);
+room.add(tablePhoneGroup);
+const tablePhoneBody = addBox(tablePhoneGroup, [0.24, 0.024, 0.46], materials.phoneCase, [0, 0, 0]);
+tablePhoneBody.frustumCulled = false;
+const tablePhoneScreen = mesh(
+  new THREE.PlaneGeometry(0.22, 0.44),
+  materials.phoneScreenOff,
+  [0, 0.013, 0],
+  [-Math.PI / 2, 0, 0],
+  false,
+  false
+);
+tablePhoneScreen.frustumCulled = false;
+tablePhoneGroup.add(tablePhoneScreen);
 
-const handPhone = new THREE.Group();
-handPhone.position.set(0, -0.18, -0.72);
-handPhone.rotation.set(-0.52, -0.18, 0.08);
-handPhone.scale.setScalar(0.56);
-handPhone.visible = false;
-scene.add(handPhone);
-const hand = addBox(handPhone, [0.32, 0.16, 0.18], new THREE.MeshStandardMaterial({ color: 0xc9926e, roughness: 0.76 }), [-0.08, -0.04, 0.08]);
-hand.rotation.z = -0.18;
-addBox(handPhone, [0.38, 0.055, 0.68], materials.dark, [0.08, 0.06, -0.08], [-0.08, 0, 0]);
-const handPhoneGlow = addBox(handPhone, [0.31, 0.059, 0.54], new THREE.MeshStandardMaterial({ color: 0x183233, emissive: 0x2cc7c0, emissiveIntensity: 0.85, roughness: 0.46 }), [0.08, 0.064, -0.08], [-0.08, 0, 0]);
-const heldPhoneFace = mesh(new THREE.PlaneGeometry(0.46, 0.74), new THREE.MeshBasicMaterial({ color: 0x0b0f10, side: THREE.DoubleSide }), [0.08, 0.11, 0.18], [0, 0, 0], false, false);
-const heldPhoneScreen = mesh(new THREE.PlaneGeometry(0.35, 0.56), new THREE.MeshBasicMaterial({ color: 0x2cc7c0, side: THREE.DoubleSide }), [0.08, 0.11, 0.19], [0, 0, 0], false, false);
-handPhone.add(heldPhoneFace, heldPhoneScreen);
+const heldPhoneGroup = new THREE.Group();
+heldPhoneGroup.visible = false;
+camera.add(heldPhoneGroup);
+const heldPhoneBody = addBox(heldPhoneGroup, [0.24, 0.46, 0.024], materials.phoneCase, [0, 0, 0]);
+heldPhoneBody.frustumCulled = false;
+const heldPhoneScreen = mesh(
+  new THREE.PlaneGeometry(0.22, 0.44),
+  materials.phoneScreenOff,
+  [0, 0, 0.013],
+  [0, 0, 0],
+  false,
+  false
+);
+heldPhoneScreen.frustumCulled = false;
+heldPhoneGroup.add(heldPhoneScreen);
 
 for (let i = 0; i < 3; i++) {
-  const frame = addBox(room, [0.72, 0.52, 0.045], materials.wood, [-5.97, 1.55 + i * 0.62, -2.7 + i * 0.62], [0, Math.PI / 2, 0]);
-  const photo = addBox(room, [0.58, 0.38, 0.05], new THREE.MeshStandardMaterial({ color: [0x7e9caa, 0x9f8262, 0x8f668a][i], roughness: 0.7 }), [-5.94, 1.55 + i * 0.62, -2.7 + i * 0.62], [0, Math.PI / 2, 0]);
-  photo.userData.baseEmissive = 0;
-  frame.userData.familyAsset = true;
+  addBox(room, [0.72, 0.52, 0.045], materials.wood, [-5.97, 1.55 + i * 0.62, -2.7 + i * 0.62], [0, Math.PI / 2, 0]);
+  addBox(room, [0.58, 0.38, 0.05], new THREE.MeshStandardMaterial({ color: [0x7e9caa, 0x9f8262, 0x8f668a][i], roughness: 0.7 }), [-5.94, 1.55 + i * 0.62, -2.7 + i * 0.62], [0, Math.PI / 2, 0]);
 }
 
 const lamp = new THREE.Group();
@@ -507,30 +652,6 @@ room.add(lamp);
 addRoundedCylinder(lamp, 0.18, 0.08, materials.metal, [0, 0.06, 0]);
 addRoundedCylinder(lamp, 0.045, 1.25, materials.metal, [0, 0.68, 0]);
 addRoundedCylinder(lamp, 0.36, 0.45, materials.warmLight, [0, 1.38, 0], [0, 0, 0], 36);
-
-const kitchen = new THREE.Group();
-kitchen.position.set(3.95, 0, -8.25);
-room.add(kitchen);
-addBox(kitchen, [1.85, 0.78, 0.55], materials.cabinet, [0.05, 0.39, -0.88]);
-addBox(kitchen, [1.95, 0.08, 0.62], materials.metal, [0.05, 0.82, -0.88]);
-addBox(kitchen, [0.48, 0.09, 0.36], new THREE.MeshStandardMaterial({ color: 0x27383a, metalness: 0.2, roughness: 0.34 }), [-0.45, 0.88, -0.88]);
-addRoundedCylinder(kitchen, 0.055, 0.42, materials.metal, [-0.58, 1.08, -0.9], [0.65, 0, 0], 18);
-addBox(kitchen, [0.78, 1.35, 0.62], new THREE.MeshStandardMaterial({ color: 0xd6ddd8, roughness: 0.48 }), [1.45, 0.68, -0.92]);
-addBox(kitchen, [0.72, 0.04, 0.58], materials.metal, [1.45, 1.22, -0.58]);
-addBox(kitchen, [1.62, 0.34, 0.28], materials.wood, [-0.1, 1.42, -0.92]);
-for (let i = 0; i < 4; i++) {
-  addBox(kitchen, [0.18, 0.24, 0.18], new THREE.MeshStandardMaterial({ color: [0xa63d40, 0x3d746c, 0xd8b86d, 0x6d8b78][i], roughness: 0.72 }), [-0.78 + i * 0.32, 1.07, -1.08]);
-}
-
-const entry = new THREE.Group();
-entry.position.set(1.4, 0, -10.55);
-room.add(entry);
-const entryDoorGroup = new THREE.Group();
-entryDoorGroup.position.set(-0.56, 0, 0);
-entry.add(entryDoorGroup);
-addBox(entryDoorGroup, [1.05, 2.0, 0.14], new THREE.MeshStandardMaterial({ color: 0x4a3829, roughness: 0.62 }), [0.525, 1, 0]);
-addRoundedCylinder(entryDoorGroup, 0.045, 0.055, materials.metal, [0.88, 1.03, 0.08], [Math.PI / 2, 0, 0], 18);
-addBox(entry, [1.2, 0.06, 0.5], materials.rug, [0, 0.035, 0.62]);
 
 const sideTable = new THREE.Group();
 sideTable.position.set(-4.85, 0, 2.25);
@@ -542,143 +663,6 @@ addBox(sideTable, [0.28, 0.08, 0.18], new THREE.MeshStandardMaterial({ color: 0x
 for (let i = 0; i < 5; i++) {
   addRoundedCylinder(sideTable, 0.035, 0.055, new THREE.MeshStandardMaterial({ color: [0xef6f6c, 0xf7b267, 0x6bc7b8][i % 3], roughness: 0.45 }), [0.18 + i * 0.055, 0.62, -0.08], [Math.PI / 2, 0, 0], 14);
 }
-
-function createPerson({ shirt, hair, skirt = false }) {
-  const person = new THREE.Group();
-  const body = addRoundedCylinder(person, 0.22, 0.7, shirt, [0, 0.95, 0], [0, 0, 0], 22);
-  body.scale.x = skirt ? 1.18 : 1;
-  addRoundedCylinder(person, 0.18, 0.24, materials.skin, [0, 1.42, 0], [0, 0, 0], 22);
-  addRoundedCylinder(person, 0.19, 0.12, hair, [0, 1.57, 0], [0, 0, 0], 22);
-  const leftArm = addRoundedCylinder(person, 0.045, 0.56, materials.skin, [-0.28, 0.98, 0.02], [0.2, 0, 0.24], 12);
-  const rightArm = addRoundedCylinder(person, 0.045, 0.56, materials.skin, [0.28, 0.98, 0.02], [0.2, 0, -0.24], 12);
-  addRoundedCylinder(person, 0.055, 0.64, new THREE.MeshStandardMaterial({ color: 0x343638, roughness: 0.8 }), [-0.09, 0.35, 0], [0, 0, 0], 12);
-  addRoundedCylinder(person, 0.055, 0.64, new THREE.MeshStandardMaterial({ color: 0x343638, roughness: 0.8 }), [0.09, 0.35, 0], [0, 0, 0], 12);
-  person.userData = { leftArm, rightArm };
-  return person;
-}
-
-const introGroup = new THREE.Group();
-scene.add(introGroup);
-
-const introSon = createPerson({ shirt: materials.sonShirt, hair: new THREE.MeshStandardMaterial({ color: 0x30241f, roughness: 0.85 }) });
-introSon.position.set(0.78, 0, -6.95);
-introSon.rotation.y = 0;
-introGroup.add(introSon);
-
-const introMarta = createPerson({ shirt: materials.martaDress, hair: materials.hair, skirt: true });
-introMarta.position.set(-1.7, 0, -4.25);
-introMarta.rotation.y = -0.15;
-introMarta.visible = false;
-introGroup.add(introMarta);
-
-const doorbell = new THREE.Group();
-doorbell.position.set(1.72, 1.28, -5.86);
-introGroup.add(doorbell);
-addBox(doorbell, [0.16, 0.22, 0.05], new THREE.MeshStandardMaterial({ color: 0x222829, roughness: 0.45 }), [0, 0, 0]);
-const doorbellLight = addRoundedCylinder(doorbell, 0.04, 0.02, new THREE.MeshStandardMaterial({ color: 0xf8d56b, emissive: 0xf8d56b, emissiveIntensity: 0.8 }), [0, 0, 0.04], [Math.PI / 2, 0, 0], 18);
-
-const introGiftPhone = new THREE.Group();
-introGroup.add(introGiftPhone);
-addBox(introGiftPhone, [0.24, 0.42, 0.04], materials.dark, [0, 0, 0], [0, 0, 0]);
-const introGiftScreen = addBox(introGiftPhone, [0.19, 0.32, 0.045], new THREE.MeshBasicMaterial({ color: 0x2cc7c0 }), [0, 0, 0.004]);
-
-const introHands = new THREE.Group();
-introHands.visible = false;
-camera.add(introHands);
-const introLeftHand = addRoundedCylinder(introHands, 0.032, 0.44, materials.skin, [-0.2, -0.48, -0.92], [1.0, 0, -0.48], 12);
-const introRightHand = addRoundedCylinder(introHands, 0.032, 0.44, materials.skin, [0.2, -0.48, -0.92], [1.0, 0, 0.48], 12);
-const introHeldPhone = new THREE.Group();
-introHeldPhone.position.set(0, -0.36, -1.16);
-introHeldPhone.rotation.set(-0.08, 0, 0);
-introHands.add(introHeldPhone);
-addBox(introHeldPhone, [0.25, 0.42, 0.045], materials.dark, [0, 0, 0]);
-const introHeldScreen = addBox(introHeldPhone, [0.2, 0.33, 0.05], new THREE.MeshBasicMaterial({ color: 0x6bc7b8 }), [0, 0, 0.004]);
-
-const introTextSteps = [
-  { at: 0, title: 'Un regalo nuevo', text: 'A Marta, su hijo le regaló un celular.' },
-  { at: 2.3, title: 'El timbre', text: 'Una tarde, su hijo llega a casa y toca el timbre.' },
-  { at: 5.3, title: 'La puerta', text: 'Marta abre. Él trae el teléfono preparado para ella.' },
-  { at: 8.3, title: 'Primer contacto', text: 'Marta recibe el celular. Desde ahora, ese objeto también trae decisiones, dudas y riesgos.' },
-];
-
-function makeTextSprite(text, options = {}) {
-  const size = 512;
-  const c = document.createElement('canvas');
-  c.width = size;
-  c.height = size / 2;
-  const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, c.width, c.height);
-  ctx.fillStyle = options.background || 'rgba(20,24,24,.86)';
-  ctx.roundRect(12, 34, c.width - 24, c.height - 68, 22);
-  ctx.fill();
-  ctx.strokeStyle = options.border || 'rgba(255,255,255,.18)';
-  ctx.lineWidth = 4;
-  ctx.stroke();
-  ctx.fillStyle = options.color || '#f4efe7';
-  ctx.font = 'bold 34px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const words = text.split(' ');
-  const lines = [];
-  let line = '';
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word;
-    if (ctx.measureText(test).width > c.width - 96 && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = test;
-    }
-  }
-  lines.push(line);
-  lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, c.width / 2, c.height / 2 - (lines.length - 1) * 22 + i * 44));
-  const texture = new THREE.CanvasTexture(c);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0 });
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(2.8, 1.4, 1);
-  sprite.userData.targetOpacity = 0;
-  return sprite;
-}
-
-const warningSprites = [
-  makeTextSprite('NO COMPARTIR CODIGOS', { background: 'rgba(90,20,20,.88)', border: 'rgba(255,110,96,.75)' }),
-  makeTextSprite('ENLACE NO VERIFICADO', { background: 'rgba(81,61,22,.9)', border: 'rgba(247,178,103,.8)' }),
-  makeTextSprite('DATOS SENSIBLES', { background: 'rgba(13,62,57,.9)', border: 'rgba(107,199,184,.8)' }),
-  makeTextSprite('VERIFICAR IDENTIDAD', { background: 'rgba(56,38,77,.9)', border: 'rgba(206,158,255,.76)' }),
-  makeTextSprite('ATENCION DIVIDIDA', { background: 'rgba(27,55,78,.9)', border: 'rgba(117,190,240,.75)' }),
-];
-warningSprites.forEach((sprite, i) => {
-  sprite.position.set(-1.8 + i * 0.9, 2.2 + (i % 2) * 0.24, -1.45 - i * 0.32);
-  alerts.add(sprite);
-});
-
-const alertRings = [];
-for (let i = 0; i < 5; i++) {
-  const ring = mesh(new THREE.TorusGeometry(0.48 + i * 0.18, 0.012, 12, 72), materials.warning.clone(), [0.92, 1.02 + i * 0.02, 0.08], [-Math.PI / 2, 0, 0], false, false);
-  ring.userData.phase = i * 0.18;
-  alertRings.push(ring);
-  alerts.add(ring);
-}
-
-const codeBlocks = [];
-for (let i = 0; i < 10; i++) {
-  const block = addBox(alerts, [0.1 + Math.random() * 0.18, 0.04, 0.04], materials.warning.clone(), [1.6 + Math.random() * 1.7, 0.95 + Math.random() * 1.4, -0.7 + Math.random() * 1.8], [0, Math.random() * Math.PI, 0]);
-  block.material.opacity = 0;
-  block.userData.home = block.position.clone();
-  codeBlocks.push(block);
-}
-
-outdoor.visible = false;
-outdoor.add(mesh(new THREE.PlaneGeometry(12, 10), materials.street, [3.2, 0.018, -7.4], [-Math.PI / 2, 0, 0], false));
-for (let i = 0; i < 5; i++) {
-  const building = addBox(outdoor, [1.2 + Math.random() * 1.2, 2.2 + Math.random() * 1.8, 0.9], new THREE.MeshStandardMaterial({ color: [0x8aa1a7, 0xa88d6a, 0x6d8b78, 0xa97363][i % 4], roughness: 0.86 }), [-2.6 + i * 1.45, 1.1, -9.5]);
-  for (let w = 0; w < 3; w++) {
-    addBox(building, [0.18, 0.22, 0.02], new THREE.MeshStandardMaterial({ color: 0xf4cf86, emissive: 0xf2b75e, emissiveIntensity: 0.28 }), [-0.32 + w * 0.32, 0.36, 0.47]);
-  }
-}
-addBox(outdoor, [0.12, 2.1, 0.12], materials.metal, [4.7, 1.05, -5.7]);
-addBox(outdoor, [0.96, 0.48, 0.08], new THREE.MeshStandardMaterial({ color: 0x2d5267, roughness: 0.5, emissive: 0x16303d, emissiveIntensity: 0.2 }), [4.7, 2.08, -5.7]);
 
 const ambient = new THREE.HemisphereLight(0xfff6e8, 0x3b4b48, 1.9);
 scene.add(ambient);
@@ -700,17 +684,8 @@ windowLight.position.set(4.35, 2.45, -5.55);
 windowLight.rotation.y = Math.PI;
 scene.add(windowLight);
 
-const phoneLight = new THREE.PointLight(0x37ddd2, 0.7, 5);
-phoneLight.position.set(0.9, 1.25, 0.1);
-scene.add(phoneLight);
-
-const dangerLight = new THREE.PointLight(0xff5750, 0, 7);
-dangerLight.position.set(0.5, 2.3, -1);
-scene.add(dangerLight);
-
 const doorState = {
-  living: { open: false, group: livingDoorGroup, position: new THREE.Vector3(0.72, 0, -6.03), label: 'puerta del pasillo' },
-  entry: { open: false, group: entryDoorGroup, position: new THREE.Vector3(1.4, 0, -10.55), label: 'puerta de entrada' },
+  living: { open: false, group: livingDoorGroup, position: new THREE.Vector3(0.72, 0, -6.03), label: 'puerta exterior' },
 };
 
 const playerRadius = 0.28;
@@ -721,8 +696,7 @@ function inRect(x, z, rect) {
 
 function isPositionAllowed(x, z) {
   const living = { minX: -5.65, maxX: 5.65, minZ: -5.78, maxZ: 5.65 };
-  const hall = { minX: -0.2, maxX: 5.65, minZ: -10.8, maxZ: -5.55 };
-  const outside = { minX: -5.45, maxX: 5.45, minZ: -14.2, maxZ: -10.12 };
+  const outside = { minX: -18.0, maxX: 18.0, minZ: -19.5, maxZ: -5.55 };
 
   if (inRect(x, z, living)) {
     if (z < -5.34 && x > -0.08 && x < 1.5) return doorState.living.open;
@@ -730,15 +704,7 @@ function isPositionAllowed(x, z) {
     return true;
   }
 
-  if (inRect(x, z, hall)) {
-    if (z > -5.98 && x > -0.08 && x < 1.5) return doorState.living.open;
-    if (z > -5.98 && (x <= -0.08 || x >= 1.5)) return false;
-    if (z < -10.18 && x > 0.84 && x < 1.95) return doorState.entry.open;
-    if (z < -10.18) return false;
-    return true;
-  }
-
-  if (state.outdoor && doorState.entry.open && inRect(x, z, outside)) return true;
+  if (doorState.living.open && inRect(x, z, outside)) return true;
   return false;
 }
 
@@ -756,34 +722,13 @@ function resolveMovement(nextX, nextZ) {
 
 function clampPlayerToBounds() {
   if (isPositionAllowed(camera.position.x, camera.position.z)) return;
-  const fallback = state.outdoor ? new THREE.Vector3(1.4, 1.58, -9.8) : new THREE.Vector3(-0.85, 1.58, 3.25);
+  const fallback = new THREE.Vector3(-0.85, 1.58, 3.25);
   camera.position.x = fallback.x;
   camera.position.z = fallback.z;
 }
 
 function setLookFromEuler() {
   camera.quaternion.setFromEuler(lookEuler);
-}
-
-function kickPlayerVelocity(direction, strength = 1.1) {
-  const forward = new THREE.Vector3(-Math.sin(lookEuler.y), 0, -Math.cos(lookEuler.y));
-  const right = new THREE.Vector3(Math.cos(lookEuler.y), 0, -Math.sin(lookEuler.y));
-  if (direction === 'forward') player.velocity.addScaledVector(forward, strength);
-  if (direction === 'back') player.velocity.addScaledVector(forward, -strength);
-  if (direction === 'right') player.velocity.addScaledVector(right, strength);
-  if (direction === 'left') player.velocity.addScaledVector(right, -strength);
-  player.velocity.clampLength(0, 2.2);
-}
-
-function nudgePlayer(direction, amount = 0.08) {
-  const forward = new THREE.Vector3(-Math.sin(lookEuler.y), 0, -Math.cos(lookEuler.y));
-  const right = new THREE.Vector3(Math.cos(lookEuler.y), 0, -Math.sin(lookEuler.y));
-  const next = camera.position.clone();
-  if (direction === 'forward') next.addScaledVector(forward, amount);
-  if (direction === 'back') next.addScaledVector(forward, -amount);
-  if (direction === 'right') next.addScaledVector(right, amount);
-  if (direction === 'left') next.addScaledVector(right, -amount);
-  resolveMovement(next.x, next.z);
 }
 
 function getNearbyDoor() {
@@ -799,19 +744,258 @@ function getNearbyDoor() {
   return nearest;
 }
 
+const cinematicState = {
+  active: false,
+  currentStep: 0,
+  timer: 0,
+  sequence: null,
+  playedLivingCutscene: false,
+  savedCamPos: new THREE.Vector3(),
+  savedCamQuat: new THREE.Quaternion(),
+  waitingForSpace: false,
+};
+
+let audioCtx = null;
+function playCinematicSound(cfg) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = cfg.type || 'sine';
+    osc.frequency.setValueAtTime(cfg.freq || 440, audioCtx.currentTime);
+
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (cfg.duration || 0.2));
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + (cfg.duration || 0.2));
+  } catch (e) { }
+}
+
+function startCinematic(sequence) {
+  cinematicState.active = true;
+  cinematicState.currentStep = 0;
+  cinematicState.timer = 0;
+  cinematicState.sequence = sequence;
+  cinematicState.waitingForSpace = false;
+
+  cinematicState.savedCamPos.copy(camera.position);
+  cinematicState.savedCamQuat.copy(camera.quaternion);
+
+  document.body.classList.add('cinematic-active');
+
+  if (ui.cinematicOverlay) {
+    ui.cinematicOverlay.setAttribute('aria-hidden', 'false');
+  }
+  if (ui.cinematicPrompt) {
+    ui.cinematicPrompt.classList.remove('is-visible');
+  }
+
+  const firstStep = sequence[0];
+  if (firstStep) {
+    if (firstStep.onStart) firstStep.onStart();
+    if (firstStep.dialogue) {
+      if (ui.cinematicSpeaker) ui.cinematicSpeaker.textContent = firstStep.dialogue.speaker;
+      if (ui.cinematicText) ui.cinematicText.textContent = firstStep.dialogue.text;
+    }
+    if (firstStep.sound) playCinematicSound(firstStep.sound);
+  }
+}
+
+function advanceCinematicStep() {
+  if (!cinematicState.active || !cinematicState.sequence) return;
+
+  const currentStepObj = cinematicState.sequence[cinematicState.currentStep];
+  if (currentStepObj && currentStepObj.action) {
+    currentStepObj.action(1.0, 0);
+  }
+
+  cinematicState.currentStep++;
+  cinematicState.timer = 0;
+  cinematicState.waitingForSpace = false;
+
+  const nextStep = cinematicState.sequence[cinematicState.currentStep];
+  if (nextStep) {
+    if (nextStep.onStart) nextStep.onStart();
+    if (nextStep.dialogue) {
+      if (ui.cinematicSpeaker) ui.cinematicSpeaker.textContent = nextStep.dialogue.speaker;
+      if (ui.cinematicText) ui.cinematicText.textContent = nextStep.dialogue.text;
+    }
+    if (nextStep.sound) playCinematicSound(nextStep.sound);
+    if (ui.cinematicPrompt) ui.cinematicPrompt.classList.remove('is-visible');
+  } else {
+    endCinematic();
+  }
+}
+
+function endCinematic() {
+  cinematicState.active = false;
+  cinematicState.waitingForSpace = false;
+  document.body.classList.remove('cinematic-active');
+  if (ui.cinematicOverlay) ui.cinematicOverlay.setAttribute('aria-hidden', 'true');
+  if (ui.cinematicPrompt) ui.cinematicPrompt.classList.remove('is-visible');
+
+  camera.position.copy(cinematicState.savedCamPos);
+  camera.quaternion.copy(cinematicState.savedCamQuat);
+
+  if (typeof sonMesh !== 'undefined') sonMesh.visible = false;
+  if (typeof oldWomanMesh !== 'undefined') oldWomanMesh.visible = false;
+  if (typeof phoneProp !== 'undefined') phoneProp.visible = false;
+
+  if (missionsState.currentMissionId === 'doorbell' && !missionsState.completed) {
+    setTimeout(() => {
+      completeMission('doorbell');
+    }, 1500);
+  }
+}
+
+function updateCinematic(dt) {
+  if (!cinematicState.active || !cinematicState.sequence) return;
+
+  const step = cinematicState.sequence[cinematicState.currentStep];
+  if (!step) {
+    endCinematic();
+    return;
+  }
+
+  if (!cinematicState.waitingForSpace) {
+    cinematicState.timer += dt;
+    const progress = Math.min(1, cinematicState.timer / step.duration);
+
+    if (step.action) step.action(progress, dt);
+
+    if (cinematicState.timer >= step.duration) {
+      cinematicState.waitingForSpace = true;
+      if (ui.cinematicPrompt) ui.cinematicPrompt.classList.add('is-visible');
+    }
+  }
+}
+
+const cutsceneEntry = [
+  {
+    duration: 2.5,
+    dialogue: { speaker: "Hijo", text: "Hola abuela, qué bueno verte. Te traje este teléfono para que estemos comunicados." },
+    sound: { freq: 520, type: 'triangle', duration: 0.25 },
+    onStart: () => {
+      sonMesh.visible = true;
+      oldWomanMesh.visible = true;
+      phoneProp.visible = true;
+
+      sonMesh.position.set(1.1, 1.3, -11.4);
+      oldWomanMesh.position.set(1.5, 1.25, -10.1);
+      phoneProp.position.set(1.15, 1.25, -11.3);
+
+      camera.position.set(2.2, 1.45, -8.5);
+      camera.lookAt(1.3, 1.25, -10.8);
+    },
+    action: (progress) => {
+      phoneProp.position.lerpVectors(
+        new THREE.Vector3(1.15, 1.25, -11.3),
+        new THREE.Vector3(1.4, 1.25, -10.5),
+        progress
+      );
+      camera.position.z = THREE.MathUtils.lerp(-8.5, -8.8, progress);
+      camera.lookAt(1.3, 1.25, -10.8);
+    }
+  },
+  {
+    duration: 3.5,
+    dialogue: { speaker: "Anciana", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
+    sound: { freq: 380, type: 'sine', duration: 0.3 },
+    action: (progress) => {
+      oldWomanMesh.position.z = -10.1 + Math.sin(progress * Math.PI) * 0.05;
+      camera.position.z = THREE.MathUtils.lerp(-8.8, -9.0, progress);
+      camera.lookAt(1.3, 1.25, -10.8);
+    }
+  },
+  {
+    duration: 3.0,
+    dialogue: { speaker: "Hijo", text: "Lo sé abuela, pero haz el esfuerzo. Me tengo que ir corriendo al trabajo, ¡hablamos luego!" },
+    sound: { freq: 550, type: 'triangle', duration: 0.2 },
+    action: (progress) => {
+      sonMesh.position.lerpVectors(
+        new THREE.Vector3(1.1, 1.3, -11.4),
+        new THREE.Vector3(4.5, 1.3, -15.5),
+        progress
+      );
+      camera.position.z = THREE.MathUtils.lerp(-9.0, -9.1, progress);
+      camera.lookAt(1.3, 1.25, -10.8);
+    }
+  }
+];
+
+const cutsceneLiving = [
+  {
+    duration: 2.5,
+    dialogue: { speaker: "Hijo", text: "Hola abuela, qué bueno verte. Te traje este teléfono para que estemos comunicados." },
+    sound: { freq: 520, type: 'triangle', duration: 0.25 },
+    onStart: () => {
+      sonMesh.visible = true;
+      oldWomanMesh.visible = true;
+      phoneProp.visible = true;
+
+      sonMesh.position.set(0.72, 1.3, -6.8);
+      oldWomanMesh.position.set(0.72, 1.25, -5.4);
+      phoneProp.position.set(0.72, 1.25, -6.4);
+
+      camera.position.set(2.2, 1.45, -5.2);
+      camera.lookAt(0.72, 1.25, -6.1);
+    },
+    action: (progress) => {
+      phoneProp.position.lerpVectors(
+        new THREE.Vector3(0.72, 1.25, -6.4),
+        new THREE.Vector3(0.72, 1.25, -5.7),
+        progress
+      );
+      camera.position.x = THREE.MathUtils.lerp(2.2, 2.0, progress);
+      camera.lookAt(0.72, 1.25, -6.1);
+    }
+  },
+  {
+    duration: 3.5,
+    dialogue: { speaker: "Anciana", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
+    sound: { freq: 380, type: 'sine', duration: 0.3 },
+    action: (progress) => {
+      oldWomanMesh.position.z = -5.4 + Math.sin(progress * Math.PI) * 0.05;
+      camera.position.x = THREE.MathUtils.lerp(2.0, 1.85, progress);
+      camera.lookAt(0.72, 1.25, -6.1);
+    }
+  },
+  {
+    duration: 3.0,
+    dialogue: { speaker: "Hijo", text: "Lo sé abuela, pero haz el esfuerzo. Me tengo que ir corriendo al trabajo, ¡hablamos luego!" },
+    sound: { freq: 550, type: 'triangle', duration: 0.2 },
+    action: (progress) => {
+      sonMesh.position.lerpVectors(
+        new THREE.Vector3(0.72, 1.3, -6.8),
+        new THREE.Vector3(1.4, 1.3, -10.2),
+        progress
+      );
+      camera.position.x = THREE.MathUtils.lerp(1.85, 1.75, progress);
+      camera.lookAt(0.72, 1.25, -6.1);
+    }
+  }
+];
+
 function toggleNearbyDoor() {
   const nearby = getNearbyDoor();
   if (!nearby) return;
   nearby.door.open = !nearby.door.open;
+
+  if (nearby.id === 'living' && nearby.door.open && missionsState.currentMissionId === 'doorbell' && !missionsState.completed) {
+    startCinematic(cutsceneLiving);
+  }
 }
 
 function updateDoors(dt) {
-  let livingTarget = 0;
-  if (state.introActive && getIntroTime() > 3.7) livingTarget = -Math.PI * 0.52;
-  else if (doorState.living.open) livingTarget = -Math.PI * 0.52;
+  let livingTarget = doorState.living.open ? -Math.PI * 0.52 : 0;
   doorState.living.group.rotation.y += (livingTarget - doorState.living.group.rotation.y) * Math.min(1, dt * 7);
-  const entryTarget = doorState.entry.open ? Math.PI * 0.52 : 0;
-  doorState.entry.group.rotation.y += (entryTarget - doorState.entry.group.rotation.y) * Math.min(1, dt * 7);
 
   const nearby = getNearbyDoor();
   if (nearby) {
@@ -822,212 +1006,34 @@ function updateDoors(dt) {
   }
 }
 
-function easeInOut(t) {
-  const clamped = THREE.MathUtils.clamp(t, 0, 1);
-  return clamped * clamped * (3 - 2 * clamped);
-}
-
-function getIntroTime() {
-  if (state.introStartedAt === null) return 0;
-  return clock.getElapsedTime() - state.introStartedAt;
-}
-
-function finishIntro() {
-  state.introActive = false;
-  state.introDone = true;
-  introGroup.visible = false;
-  introHands.visible = false;
-  livingDoorGroup.visible = true;
-  ui.introOverlay.classList.add('is-hidden');
-  ui.app.classList.remove('is-intro');
-  doorState.entry.open = false;
-  doorState.living.open = false;
-  camera.position.set(-0.85, 1.58, 3.25);
-  lookEuler.set(-0.08, -0.28, 0);
-  player.velocity.set(0, 0, 0);
-  setLookFromEuler();
-  document.body.focus();
-}
-
-function updateIntro(dt) {
-  if (!state.introActive) return;
-  const t = getIntroTime();
-
-  const currentStep = introTextSteps.reduce((active, step) => (t >= step.at ? step : active), introTextSteps[0]);
-  ui.introTitle.textContent = currentStep.title;
-  ui.introText.textContent = currentStep.text;
-  livingDoorGroup.visible = t < 4.65;
-
-  const camA = new THREE.Vector3(-1.1, 1.55, -3.88);
-  const camB = new THREE.Vector3(0.42, 1.52, -4.5);
-  const camC = new THREE.Vector3(1.48, 1.48, -5.12);
-  const introTargetA = new THREE.Vector3(0.58, 1.08, -6.62);
-  const introTargetB = new THREE.Vector3(0.74, 1.1, -6.92);
-  const introCameraTarget = new THREE.Vector3().lerpVectors(introTargetA, introTargetB, easeInOut((t - 4.2) / 3.2));
-  if (t < 4.5) {
-    camera.position.lerpVectors(camA, camB, easeInOut(t / 4.5));
-  } else {
-    camera.position.lerpVectors(camB, camC, easeInOut((t - 4.5) / 5.2));
-  }
-  camera.lookAt(introCameraTarget);
-  lookEuler.setFromQuaternion(camera.quaternion);
-
-  const bellPulse = t > 1.8 && t < 3.2 ? 1 + Math.sin(t * 18) * 0.55 : 0.45;
-  doorbellLight.material.emissiveIntensity = bellPulse;
-  introSon.userData.rightArm.rotation.set(0.95, 0.08, -1.2 + Math.sin(t * 18) * 0.14);
-
-  const martaWalk = easeInOut((t - 3.4) / 2.4);
-  introMarta.position.x = THREE.MathUtils.lerp(-1.7, -0.36, martaWalk);
-  introMarta.position.z = THREE.MathUtils.lerp(-4.25, -5.1, martaWalk);
-  introMarta.rotation.y = -0.05 + martaWalk * 0.12 + Math.sin(t * 0.8) * 0.04;
-
-  const offer = easeInOut((t - 6.6) / 2.2);
-  introSon.userData.leftArm.rotation.set(1.1, 0.08, 0.9 - offer * 1.35);
-  introMarta.userData.rightArm.rotation.set(0.85, 0, -0.24 - offer * 0.72);
-  const from = new THREE.Vector3(0.46, 1.12, -6.5);
-  const to = new THREE.Vector3(0.12, 1.08, -5.46);
-  introGiftPhone.position.lerpVectors(from, to, offer);
-  introGiftPhone.rotation.set(0.08, -0.12, Math.sin(t * 2) * 0.05);
-  introGiftScreen.material.color.set(t > 8.1 ? 0x6bc7b8 : 0x2cc7c0);
-  introGiftPhone.visible = t < 8.65;
-
-  const receive = easeInOut((t - 8.25) / 1.35);
-  introHands.visible = receive > 0.02;
-  introHands.position.y = THREE.MathUtils.lerp(0.32, 0, receive);
-  introHands.position.z = THREE.MathUtils.lerp(-0.22, 0, receive);
-  introHands.rotation.x = THREE.MathUtils.lerp(0.24, 0, receive);
-  introHands.scale.setScalar(THREE.MathUtils.lerp(0.82, 1, receive));
-  introLeftHand.rotation.z = -0.48 - receive * 0.14;
-  introRightHand.rotation.z = 0.48 + receive * 0.14;
-  introHeldScreen.material.color.set(t > 9.2 ? 0x8de8d9 : 0x6bc7b8);
-
-  if (t > 12.2) finishIntro();
-}
-
-function updateVisionStress(dt, elapsed) {
-  state.visualStress += (state.targetVisualStress - state.visualStress) * Math.min(1, dt * 2.4);
-  const stress = THREE.MathUtils.clamp(state.visualStress, 0, 1);
-  const riskPulse = state.risk / 100;
-
-  document.documentElement.style.setProperty('--vision-blur', `${(stress * 4.8).toFixed(2)}px`);
-  document.documentElement.style.setProperty('--vision-brightness', (1 - stress * 0.18).toFixed(3));
-  document.documentElement.style.setProperty('--vision-contrast', (1 + stress * 0.28).toFixed(3));
-  document.documentElement.style.setProperty('--vision-saturate', (1 - stress * 0.34).toFixed(3));
-  document.documentElement.style.setProperty('--vision-vignette', (0.12 + stress * 0.68).toFixed(3));
-  document.documentElement.style.setProperty('--vision-noise', (0.04 + stress * 0.34).toFixed(3));
-  document.documentElement.style.setProperty('--vision-alert', (riskPulse * stress).toFixed(3));
-
-  const targetFov = 52 - stress * 14;
-  if (Math.abs(camera.fov - targetFov) > 0.02) {
-    camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 2.2);
-    camera.updateProjectionMatrix();
-  }
-
-  scene.fog.near = 8 - stress * 4.3;
-  scene.fog.far = 28 - stress * 13.5;
-  renderer.toneMappingExposure = 1.05 - stress * 0.18 + Math.sin(elapsed * 11) * stress * riskPulse * 0.035;
-}
-
-function updateFirstPerson(dt, elapsed) {
-  if (state.introActive) {
-    player.velocity.set(0, 0, 0);
-    return;
-  }
+function updateFirstPerson(dt) {
+  if (cinematicState.active) return;
   const movement = new THREE.Vector3();
   const forward = new THREE.Vector3(-Math.sin(lookEuler.y), 0, -Math.cos(lookEuler.y));
   const right = new THREE.Vector3(Math.cos(lookEuler.y), 0, -Math.sin(lookEuler.y));
 
-  const now = performance.now();
-  if (moveState.forward || moveImpulseUntil.forward > now) movement.add(forward);
-  if (moveState.back || moveImpulseUntil.back > now) movement.sub(forward);
-  if (moveState.right || moveImpulseUntil.right > now) movement.add(right);
-  if (moveState.left || moveImpulseUntil.left > now) movement.sub(right);
+  if (moveState.forward) movement.add(forward);
+  if (moveState.back) movement.sub(forward);
+  if (moveState.right) movement.add(right);
+  if (moveState.left) movement.sub(right);
 
-  const stress = THREE.MathUtils.clamp(state.visualStress, 0, 1);
-  const speed = 2.45 - stress * 0.42;
+  const speed = 1.8;
   if (movement.lengthSq() > 0) {
     movement.normalize().multiplyScalar(speed);
-    player.velocity.lerp(movement, Math.min(1, dt * 5.5));
-    player.walkBob += dt * (6.2 - stress * 1.35);
+    player.velocity.lerp(movement, Math.min(1, dt * 8.0));
+    player.walkBob += dt * 5.0;
   } else {
-    player.velocity.lerp(new THREE.Vector3(0, 0, 0), Math.min(1, dt * 6.5));
+    player.velocity.lerp(new THREE.Vector3(0, 0, 0), Math.min(1, dt * 10.0));
   }
 
   const nextX = camera.position.x + player.velocity.x * dt;
   const nextZ = camera.position.z + player.velocity.z * dt;
   resolveMovement(nextX, nextZ);
 
-  const bob = Math.sin(player.walkBob) * Math.min(0.052, player.velocity.length() * 0.024);
-  const stressWobble = Math.sin(elapsed * 2.2) * stress * 0.018 + Math.sin(elapsed * 9.2) * stress * (state.risk / 100) * 0.006;
-  camera.position.y = 1.58 + bob + stressWobble;
-  lookEuler.z = Math.sin(elapsed * 3.1) * stress * 0.018;
+  const bob = Math.sin(player.walkBob) * Math.min(0.04, player.velocity.length() * 0.02);
+  camera.position.y = 1.58 + bob;
   setLookFromEuler();
 }
-
-function applyScenario(name) {
-  const data = scenarios[name] || scenarios.reset;
-  state.scenario = name;
-  state.risk = data.risk;
-  state.phonePulse = 1;
-  state.targetPhoneReveal = name === 'reset' ? 0 : 1;
-  state.phoneReveal = name === 'reset' ? Math.min(state.phoneReveal, 0.15) : Math.max(state.phoneReveal, 0.78);
-  state.outdoor = name === 'street';
-  outdoor.visible = state.outdoor;
-  const scenarioStress = data.risk / 100;
-  state.targetVisualStress = name === 'reset'
-    ? 0.12
-    : Math.min(1, Math.max(state.targetVisualStress, scenarioStress * 0.72) + 0.08);
-  if (name === 'reset') {
-    state.visualStress = Math.min(state.visualStress, 0.32);
-  } else {
-    state.visualStress = Math.min(state.targetVisualStress, state.visualStress + 0.2);
-  }
-  if (name === 'street' && camera.position.z > -3.6) {
-    camera.position.set(2.75, 1.58, -6.8);
-    lookEuler.y = 0.1;
-    lookEuler.x = -0.08;
-  }
-  if (name === 'reset' && camera.position.z < -10.7) {
-    camera.position.set(-0.85, 1.58, 3.25);
-    lookEuler.y = -0.28;
-    lookEuler.x = -0.13;
-  }
-  clampPlayerToBounds();
-
-  ui.riskFill.style.width = `${data.risk}%`;
-  ui.riskValue.textContent = `${data.risk}%`;
-  ui.screenLabel.textContent = data.label;
-  ui.screenTitle.textContent = data.title;
-  ui.screenBody.textContent = data.body;
-  ui.eventKicker.textContent = data.kicker;
-  ui.eventTitle.textContent = data.eventTitle;
-  ui.eventDescription.textContent = data.description;
-  ui.pressureValue.textContent = data.pressure;
-  ui.privacyValue.textContent = data.privacy;
-  ui.trustValue.textContent = data.trust;
-  ui.phoneScreen.style.background = `linear-gradient(155deg, ${data.colorA}, ${data.colorB})`;
-
-  warningSprites.forEach((sprite) => {
-    sprite.userData.targetOpacity = sprite.material.map ? 0 : 0;
-    sprite.material.opacity = 0;
-  });
-
-  const warningIndex = ['call', 'sms', 'bank', 'family', 'street'].indexOf(name);
-  if (warningIndex >= 0) warningSprites[warningIndex].userData.targetOpacity = 1;
-
-  const danger = Math.max(0, (data.risk - 20) / 80);
-  dangerLight.intensity = danger * 2.4;
-  phoneGlow.material.emissive.set(name === 'reset' ? 0x2cc7c0 : 0xff7b5e);
-  phoneGlow.material.emissiveIntensity = 0.25 + danger * 1.15;
-  handPhoneGlow.material.color.set(data.colorA);
-  handPhoneGlow.material.emissive.set(name === 'reset' ? 0x2cc7c0 : 0xff7b5e);
-  handPhoneGlow.material.emissiveIntensity = 0.85 + danger * 2.1;
-  heldPhoneScreen.material.color.set(name === 'reset' ? 0x2cc7c0 : data.colorB);
-}
-
-document.querySelectorAll('[data-scenario]').forEach((button) => {
-  button.addEventListener('click', () => applyScenario(button.dataset.scenario));
-});
 
 const keyMap = {
   KeyW: 'forward',
@@ -1057,12 +1063,26 @@ function getMoveDirection(event) {
 }
 
 function handleMoveKey(event, active) {
-  state.lastKey = {
-    code: event.code,
-    key: event.key,
-    active,
-  };
+  if (cinematicState.active) {
+    if (active && (event.code === 'Space' || event.key === ' ')) {
+      if (event.repeat) return;
+      event.preventDefault();
+      advanceCinematicStep();
+    }
+    return;
+  }
+  if (active && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
+    if (event.repeat) return;
+    event.preventDefault();
+    phoneState.active = !phoneState.active;
+    if (ui.phonePrompt) {
+      ui.phonePrompt.textContent = phoneState.active ? 'T Guardar teléfono' : 'T Coger teléfono';
+      ui.phonePrompt.classList.toggle('is-active', phoneState.active);
+    }
+    return;
+  }
   if (active && isDoorKey(event)) {
+    if (event.repeat) return;
     event.preventDefault();
     toggleNearbyDoor();
     return;
@@ -1071,27 +1091,15 @@ function handleMoveKey(event, active) {
   if (!key) return;
   event.preventDefault();
   moveState[key] = active;
-  if (active) {
-    moveImpulseUntil[key] = performance.now() + 900;
-    kickPlayerVelocity(key);
-    nudgePlayer(key);
-  }
 }
 
 document.addEventListener('keydown', (event) => handleMoveKey(event, true), { capture: true });
 document.addEventListener('keyup', (event) => handleMoveKey(event, false), { capture: true });
-window.addEventListener('keydown', (event) => handleMoveKey(event, true), { capture: true });
-window.addEventListener('keyup', (event) => handleMoveKey(event, false), { capture: true });
 
 function bindWalkButton(id, direction) {
   const button = document.querySelector(`#${id}`);
   const setActive = (active) => {
     moveState[direction] = active;
-    if (active) {
-      moveImpulseUntil[direction] = performance.now() + 900;
-      kickPlayerVelocity(direction);
-      nudgePlayer(direction);
-    }
     button.classList.toggle('is-active', active);
   };
   button.addEventListener('pointerdown', (event) => {
@@ -1129,22 +1137,11 @@ function updateLook(deltaX, deltaY) {
 }
 
 canvas.addEventListener('pointerdown', (event) => {
-  if (state.introActive) return;
   canvas.focus();
-  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(pointer, camera);
-  const hit = raycaster.intersectObjects(phoneGroup.children, true)[0];
-  if (hit) {
-    const next = state.scenario === 'call' ? 'sms' : state.scenario === 'sms' ? 'bank' : 'call';
-    applyScenario(next);
-  }
   player.dragging = true;
   player.lastX = event.clientX;
   player.lastY = event.clientY;
 });
-
-ui.skipIntro.addEventListener('click', finishIntro);
 
 window.addEventListener('pointermove', (event) => {
   if (!player.dragging) return;
@@ -1169,101 +1166,295 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-applyScenario('reset');
-state.introStartedAt = clock.getElapsedTime();
-ui.app.classList.add('is-intro');
-window.__experienceDebug = {
-  finishIntro,
-  setMove: (direction, active) => {
-    if (direction in moveState) moveState[direction] = active;
+clampPlayerToBounds();
+setLookFromEuler();
+
+function updatePhoneAnimation(dt) {
+  let target = 0;
+
+  if (phoneState.active) {
+    phoneState.sleepTimer = 0;
+    target = 1;
+    if (phoneState.progress > 0.95) {
+      phoneState.wakeTimer += dt;
+    }
+  } else {
+    phoneState.wakeTimer = 0;
+    if (phoneState.progress > 0.05) {
+      phoneState.sleepTimer += dt;
+    }
+    if (phoneState.sleepTimer < 0.2 && phoneState.progress > 0.9) {
+      target = 1;
+    } else {
+      target = 0;
+    }
+  }
+
+  const speed = 4.5;
+  phoneState.progress += (target - phoneState.progress) * Math.min(1, dt * speed);
+
+  if (phoneState.progress < 0.01 && !phoneState.active) {
+    tablePhoneGroup.visible = true;
+    heldPhoneGroup.visible = false;
+    if (ui.phoneUI) {
+      ui.phoneUI.classList.remove('is-visible');
+      ui.phoneUI.setAttribute('aria-hidden', 'true');
+    }
+    return;
+  }
+
+  tablePhoneGroup.visible = false;
+  heldPhoneGroup.visible = true;
+
+  const startPos = new THREE.Vector3(0, -0.6, -0.4);
+  const startRot = new THREE.Euler(-Math.PI * 0.4, 0, 0);
+
+  const endPos = new THREE.Vector3(0, -0.02, -0.65);
+  const endRot = new THREE.Euler(0, 0, 0);
+
+  const t = phoneState.progress;
+  const ease = t * t * (3 - 2 * t);
+
+  heldPhoneGroup.position.lerpVectors(startPos, endPos, ease);
+
+  heldPhoneGroup.rotation.x = THREE.MathUtils.lerp(startRot.x, endRot.x, ease);
+  heldPhoneGroup.rotation.y = THREE.MathUtils.lerp(startRot.y, endRot.y, ease);
+  heldPhoneGroup.rotation.z = THREE.MathUtils.lerp(startRot.z, endRot.z, ease);
+
+  if (ui.phoneUI) {
+    const showUI = phoneState.active && phoneState.wakeTimer > 0.25;
+    ui.phoneUI.classList.toggle('is-visible', showUI);
+    ui.phoneUI.setAttribute('aria-hidden', !showUI);
+  }
+}
+
+function switchPhoneView(viewId) {
+  if (!ui.phoneViews) return;
+  ui.phoneViews.forEach((view) => {
+    view.classList.toggle('is-active', view.id === viewId);
+  });
+}
+
+if (ui.phoneAppBtns) {
+  ui.phoneAppBtns.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const app = btn.getAttribute('data-app');
+      if (app === 'messages') switchPhoneView('phoneMessagesView');
+      if (app === 'map') switchPhoneView('phoneMapView');
+      if (app === 'settings') switchPhoneView('phoneSettingsView');
+    });
+  });
+}
+
+if (ui.openMessagesBtn) {
+  ui.openMessagesBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    switchPhoneView('phoneMessagesView');
+  });
+}
+
+if (ui.phoneBackBtns) {
+  ui.phoneBackBtns.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      switchPhoneView('phoneHomeView');
+    });
+  });
+}
+
+if (ui.phoneHomeBar) {
+  ui.phoneHomeBar.addEventListener('click', (e) => {
+    e.stopPropagation();
+    switchPhoneView('phoneHomeView');
+  });
+}
+
+const dilemmaInvest = {
+  title: "Dilema: Préstamo Familiar",
+  description: "Tu hijo te pide $200 para invertir en un negocio de tecnología de alto riesgo.",
+  optionA: {
+    label: "Prestarle los $200",
+    successRate: 0,
+    positive: {
+      description: "El negocio despega rápidamente y tu hijo te devuelve el dinero con creces.",
+      effects: { money: 150, happiness: 25, calm: 10 }
+    },
+    negative: {
+      description: "El negocio fracasa ante la competencia. Pierdes el dinero y hay tensión familiar.",
+      effects: { money: -200, happiness: -20, calm: -35 }
+    }
   },
-  walkFor: (seconds = 0.7) => {
-    moveState.forward = true;
-    const steps = Math.max(1, Math.round(seconds * 60));
-    for (let i = 0; i < steps; i += 1) updateFirstPerson(1 / 60, performance.now() / 1000 + i / 60);
-    moveState.forward = false;
-  },
-  getState: () => ({
-    scenario: state.scenario,
-    introActive: state.introActive,
-    introTime: getIntroTime(),
-    risk: state.risk,
-    visualStress: state.visualStress,
-    targetVisualStress: state.targetVisualStress,
-    phoneReveal: state.phoneReveal,
-    phoneVisible: handPhone.visible,
-    phoneProjection: handPhone.position.clone().project(camera),
-    lastKey: state.lastKey,
-    doors: {
-      living: doorState.living.open,
-      entry: doorState.entry.open,
+  optionB: {
+    label: "Negarle el préstamo",
+    successRate: 0.8,
+    positive: {
+      description: "Tu hijo entiende tus motivos y busca otro inversor. Proteges tus ahorros intactos.",
+      effects: { money: 0, happiness: -5, calm: 15 }
     },
-    camera: {
-      x: camera.position.x,
-      y: camera.position.y,
-      z: camera.position.z,
-    },
-    look: {
-      x: lookEuler.x,
-      y: lookEuler.y,
-    },
-    move: { ...moveState },
-  }),
+    negative: {
+      description: "Tu hijo se ofende profundamente por la falta de apoyo y deja de hablarte por unas semanas.",
+      effects: { money: 0, happiness: -30, calm: -20 }
+    }
+  }
 };
 
-function animate() {
-  const elapsed = clock.getElapsedTime();
-  const dt = clock.getDelta();
-  updateIntro(dt);
-  updateVisionStress(dt, elapsed);
-  updateFirstPerson(dt, elapsed);
-  updateDoors(dt);
+function renderImpactBadges(container, effects) {
+  if (!container) return;
+  container.innerHTML = '';
+  if (effects.money) {
+    const b = document.createElement('span');
+    b.className = `impact-badge ${effects.money > 0 ? 'pos' : 'neg'}`;
+    b.textContent = `Dinero ${effects.money > 0 ? '+$' : '-$'}${Math.abs(effects.money)}`;
+    container.appendChild(b);
+  }
+  if (effects.happiness) {
+    const b = document.createElement('span');
+    b.className = `impact-badge ${effects.happiness > 0 ? 'pos' : 'neg'}`;
+    b.textContent = `Felicidad ${effects.happiness > 0 ? '+' : ''}${effects.happiness}%`;
+    container.appendChild(b);
+  }
+  if (effects.calm) {
+    const b = document.createElement('span');
+    b.className = `impact-badge ${effects.calm > 0 ? 'pos' : 'neg'}`;
+    b.textContent = `Calma ${effects.calm > 0 ? '+' : ''}${effects.calm}%`;
+    container.appendChild(b);
+  }
+}
 
-  state.phonePulse = Math.max(0, state.phonePulse - dt * 0.85);
-  const riskPulse = state.risk / 100;
-  state.phoneReveal += (state.targetPhoneReveal - state.phoneReveal) * Math.min(1, dt * 5.2);
-  handPhone.visible = state.phoneReveal > 0.025;
-  camera.updateMatrixWorld(true);
-  const handOffset = new THREE.Vector3(0.16, -0.34 + state.phoneReveal * 0.24 + Math.sin(elapsed * 7) * 0.008 * riskPulse, -1.18);
-  handPhone.position.copy(camera.localToWorld(handOffset));
-  const handRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.6 + state.phoneReveal * 0.18, -0.18 + Math.sin(elapsed * 2) * 0.012 * riskPulse, 0.08, 'XYZ'));
-  handPhone.quaternion.copy(camera.quaternion).multiply(handRotation);
+function applyEffects(effects) {
+  if (effects.money) statsState.money = Math.max(0, statsState.money + effects.money);
+  if (effects.happiness) statsState.happiness = Math.max(0, Math.min(100, statsState.happiness + effects.happiness));
+  if (effects.calm) statsState.calm = Math.max(0, Math.min(100, statsState.calm + effects.calm));
+}
 
-  const phoneWorld = new THREE.Vector3();
-  handPhone.getWorldPosition(phoneWorld);
-  phoneLight.position.copy(phoneWorld);
-  phoneLight.intensity = state.phoneReveal * (0.45 + riskPulse * 1.15 + Math.sin(elapsed * 8) * 0.12 * riskPulse);
+let activeDilemmaResolve = null;
 
-  alertRings.forEach((ring) => {
-    const wave = (elapsed * 0.38 + ring.userData.phase) % 1;
-    const scale = 0.5 + wave * (1.6 + riskPulse);
-    ring.position.copy(phoneWorld);
-    ring.position.y += 0.08;
-    ring.scale.setScalar(scale);
-    ring.material.opacity = state.scenario === 'reset' ? 0 : (1 - wave) * riskPulse * 0.56;
-    ring.rotation.set(camera.rotation.x - Math.PI / 2, camera.rotation.y, ring.rotation.z + dt * (0.4 + riskPulse));
-  });
+function showDilemma(config, onResolve) {
+  activeDilemmaResolve = onResolve;
+  if (!ui.dilemmaModal) return;
 
-  codeBlocks.forEach((block, i) => {
-    block.position.y = block.userData.home.y + Math.sin(elapsed * 1.5 + i) * 0.12;
-    block.rotation.y += dt * (0.25 + riskPulse);
-    block.material.opacity = ['sms', 'bank'].includes(state.scenario) ? 0.18 + riskPulse * 0.44 : 0;
-  });
+  if (ui.dilemmaTitle) ui.dilemmaTitle.textContent = config.title;
+  if (ui.dilemmaDesc) ui.dilemmaDesc.textContent = config.description;
 
-  warningSprites.forEach((sprite, i) => {
-    sprite.material.opacity += (sprite.userData.targetOpacity - sprite.material.opacity) * Math.min(1, dt * 5);
-    sprite.position.y += Math.sin(elapsed * 1.2 + i) * 0.0009;
-  });
+  if (ui.optATitle) ui.optATitle.textContent = config.optionA.label;
+  if (ui.optAPosDesc) ui.optAPosDesc.textContent = config.optionA.positive.description;
+  renderImpactBadges(ui.optAPosImpact, config.optionA.positive.effects);
+  if (ui.optANegDesc) ui.optANegDesc.textContent = config.optionA.negative.description;
+  renderImpactBadges(ui.optANegImpact, config.optionA.negative.effects);
 
-  const familyGlow = state.scenario === 'family' ? 0.45 + Math.sin(elapsed * 3) * 0.2 : 0;
-  room.traverse((child) => {
-    if (child.isMesh && child.material && child.material.color && child.geometry.type === 'BoxGeometry') {
-      if (child.userData.familyAsset) child.material.emissiveIntensity = familyGlow;
+  if (ui.optBTitle) ui.optBTitle.textContent = config.optionB.label;
+  if (ui.optBPosDesc) ui.optBPosDesc.textContent = config.optionB.positive.description;
+  renderImpactBadges(ui.optBPosImpact, config.optionB.positive.effects);
+  if (ui.optBNegDesc) ui.optBNegDesc.textContent = config.optionB.negative.description;
+  renderImpactBadges(ui.optBNegImpact, config.optionB.negative.effects);
+
+  if (ui.btnSelectA) ui.btnSelectA.onclick = () => selectDilemmaOption(config.optionA);
+  if (ui.btnSelectB) ui.btnSelectB.onclick = () => selectDilemmaOption(config.optionB);
+
+  ui.dilemmaModal.setAttribute('aria-hidden', 'false');
+}
+
+function selectDilemmaOption(option) {
+  if (ui.dilemmaModal) ui.dilemmaModal.setAttribute('aria-hidden', 'true');
+
+  const isSuccess = Math.random() < option.successRate;
+  const outcome = isSuccess ? option.positive : option.negative;
+
+  applyEffects(outcome.effects);
+
+  if (!isSuccess && ui.damageOverlay) {
+    ui.damageOverlay.classList.remove('is-active');
+    void ui.damageOverlay.offsetWidth;
+    ui.damageOverlay.classList.add('is-active');
+  }
+
+  if (ui.outcomeModal) {
+    if (ui.outcomeDesc) ui.outcomeDesc.textContent = outcome.description;
+    renderImpactBadges(ui.outcomeImpact, outcome.effects);
+    if (ui.btnConfirmOutcome) {
+      ui.btnConfirmOutcome.onclick = () => {
+        ui.outcomeModal.setAttribute('aria-hidden', 'true');
+        if (activeDilemmaResolve) activeDilemmaResolve();
+      };
     }
-  });
+    ui.outcomeModal.setAttribute('aria-hidden', 'false');
+  } else {
+    if (activeDilemmaResolve) activeDilemmaResolve();
+  }
+}
 
+if (ui.sendReplyBtn && ui.replyBubble) {
+  ui.sendReplyBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showDilemma(dilemmaInvest, () => {
+      ui.replyBubble.classList.remove('is-hidden');
+      ui.sendReplyBtn.textContent = '✓ Decisión tomada';
+      ui.sendReplyBtn.disabled = true;
+      ui.sendReplyBtn.style.opacity = '0.5';
+    });
+  });
+}
+
+if (ui.phoneUI) {
+  ui.phoneUI.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+  });
+  ui.phoneUI.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+  });
+  ui.phoneUI.addEventListener('touchstart', (e) => {
+    e.stopPropagation();
+  });
+}
+
+function updateStats(dt) {
+  if (phoneState.active) {
+    statsState.fatigue += dt;
+    statsState.fatigue = Math.min(60, statsState.fatigue);
+  } else {
+    statsState.fatigue -= dt * 2;
+    statsState.fatigue = Math.max(0, statsState.fatigue);
+  }
+
+  const percentage = (statsState.fatigue / 60) * 100;
+  if (ui.fatigueValue) {
+    ui.fatigueValue.textContent = Math.round(percentage) + '%';
+    if (percentage > 75) ui.fatigueValue.style.color = '#ef4444';
+    else if (percentage > 40) ui.fatigueValue.style.color = '#f59e0b';
+    else ui.fatigueValue.style.color = '#3b82f6';
+  }
+  if (ui.fatigueFill) {
+    ui.fatigueFill.style.width = percentage + '%';
+  }
+
+  if (ui.moneyValue) ui.moneyValue.textContent = '$' + statsState.money;
+  if (ui.happinessValue) ui.happinessValue.textContent = Math.round(statsState.happiness) + '%';
+  if (ui.happinessFill) ui.happinessFill.style.width = statsState.happiness + '%';
+  if (ui.calmValue) ui.calmValue.textContent = Math.round(statsState.calm) + '%';
+  if (ui.calmFill) ui.calmFill.style.width = statsState.calm + '%';
+
+  const t = statsState.fatigue / 60;
+  const blurFactor = t * t * 10;
+  const filterVal = blurFactor > 0.05 ? `blur(${blurFactor.toFixed(2)}px)` : 'none';
+  if (ui.experienceCanvas) ui.experienceCanvas.style.filter = filterVal;
+  if (ui.phoneUI) ui.phoneUI.style.filter = filterVal;
+}
+
+function animate() {
+  const dt = clock.getDelta();
+  updateFirstPerson(dt);
+  updateDoors(dt);
+  updatePhoneAnimation(dt);
+  updateStats(dt);
+  updateMissions(dt);
+  updateCinematic(dt);
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
+
+setTimeout(() => {
+  setMission('doorbell', 'Atiende la puerta', 'Alguien toca el timbre. Ve a abrir la puerta de entrada.');
+}, 1000);
 
 animate();

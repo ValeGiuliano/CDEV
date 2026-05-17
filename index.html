@@ -1,107 +1,278 @@
 <!doctype html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Experiencia virtual - adulto mayor y telefono</title>
-  </head>
-  <body>
-    <div id="app">
-      <canvas id="experience" aria-label="Experiencia virtual 3D"></canvas>
-      <div id="visionOverlay" class="vision-overlay" aria-hidden="true"></div>
-      <div class="crosshair" aria-hidden="true"></div>
-      <div id="doorPrompt" class="door-prompt" aria-live="polite">E Abrir</div>
-      <section id="introOverlay" class="intro-overlay" aria-label="Escena inicial">
-        <p class="intro-kicker">Casa de Marta</p>
-        <h2 id="introTitle">Un regalo nuevo</h2>
-        <p id="introText">A Marta, su hijo le regaló un celular.</p>
-        <button id="skipIntro" class="skip-intro" type="button">Saltar</button>
-      </section>
 
-      <section class="topbar" aria-label="Estado de la experiencia">
-        <div>
-          <p class="eyebrow">Prototipo inmersivo</p>
-          <h1>Un dia con el telefono</h1>
-        </div>
-        <div class="risk-meter" aria-label="Nivel de riesgo">
-          <span>Riesgo</span>
-          <div class="meter-track"><div id="riskFill" class="meter-fill"></div></div>
-          <strong id="riskValue">12%</strong>
-        </div>
-      </section>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entorno Virtual 3D</title>
+</head>
 
-      <aside class="phone-panel" aria-label="Telefono y evento activo">
-        <div class="phone-shell">
-          <div class="phone-speaker"></div>
-          <div id="phoneScreen" class="phone-screen">
-            <p id="screenLabel" class="screen-label">Inicio</p>
-            <strong id="screenTitle">Telefono en reposo</strong>
-            <span id="screenBody">La casa esta tranquila. Las notificaciones esperan en silencio.</span>
+<body>
+  <div id="app">
+    <canvas id="experience" aria-label="Experiencia virtual 3D"></canvas>
+    <div class="crosshair" aria-hidden="true"></div>
+    <div id="damageOverlay" class="damage-overlay" aria-hidden="true"></div>
+    <div id="missionsContainer" class="missions-container" aria-hidden="true">
+      <div class="mission-card" id="missionCard">
+        <div class="mission-header">
+          <div class="mission-status-icon" id="missionStatusIcon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <span class="mission-title" id="missionTitle">Objetivo</span>
+        </div>
+        <p class="mission-text" id="missionText">Atiende la puerta de entrada</p>
+      </div>
+    </div>
+    <div id="cinematicOverlay" class="cinematic-overlay" aria-hidden="true">
+      <div class="letterbox letterbox-top"></div>
+      <div class="letterbox letterbox-bottom"></div>
+      <div class="cinematic-dialogue">
+        <span class="cinematic-speaker" id="cinematicSpeaker">Hijo</span>
+        <p class="cinematic-text" id="cinematicText">Diálogo de prueba</p>
+        <div class="cinematic-prompt" id="cinematicPrompt">[Espacio] Continuar</div>
+      </div>
+    </div>
+    <div id="doorPrompt" class="door-prompt" aria-live="polite">E Abrir</div>
+    <div id="phonePrompt" class="phone-prompt" aria-live="polite">T Coger teléfono</div>
+
+    <div id="phoneUI" class="phone-ui" aria-hidden="true">
+      <div class="phone-status-bar">
+        <span class="phone-time">12:45</span>
+        <div class="phone-status-icons">
+          <svg class="phone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+            <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+            <line x1="12" y1="20" x2="12.01" y2="20"></line>
+          </svg>
+          <svg class="phone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="16" height="10" rx="2" ry="2"></rect>
+            <line x1="22" y1="11" x2="22" y2="13"></line>
+          </svg>
+        </div>
+      </div>
+
+      <div id="phoneHomeView" class="phone-view is-active">
+        <div class="phone-header">
+          <h2>Hola, Marta</h2>
+          <p>Sábado, 16 de Mayo</p>
+        </div>
+        <div class="phone-notification-card" id="openMessagesBtn">
+          <div class="notification-title">MENSAJE NUEVO</div>
+          <div class="notification-sender">Hijo</div>
+          <div class="notification-preview">Hola mamá, ¿cómo estás? Te dejé las llaves...</div>
+        </div>
+        <div class="phone-app-grid">
+          <button class="phone-app-btn" data-app="messages" aria-label="Mensajes">
+            <div class="app-icon bg-emerald"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg></div>
+            <span>Mensajes</span>
+          </button>
+          <button class="phone-app-btn" data-app="map" aria-label="Mapa">
+            <div class="app-icon bg-blue"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                <line x1="8" y1="2" x2="8" y2="18"></line>
+                <line x1="16" y1="6" x2="16" y2="22"></line>
+              </svg></div>
+            <span>Mapa</span>
+          </button>
+          <button class="phone-app-btn" data-app="settings" aria-label="Ajustes">
+            <div class="app-icon bg-amber"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                </path>
+              </svg></div>
+            <span>Ajustes</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="phoneMessagesView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span>Hijo</span>
+        </div>
+        <div class="phone-chat-container">
+          <div class="chat-bubble incoming">Hola, me surgió una oportunidad única para invertir en un negocio de
+            tecnología, pero necesito $200 hoy mismo. ¿Me los prestas? Te lo devuelvo con intereses si sale bien.</div>
+          <div id="replyBubble" class="chat-bubble outgoing is-hidden">Ya tomé una decisión sobre el dinero.</div>
+        </div>
+        <div class="phone-chat-reply-box">
+          <button id="sendReplyBtn" class="phone-reply-btn">Responder (Abrir Dilema)</button>
+        </div>
+      </div>
+
+      <div id="phoneMapView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span>Mapa de la Casa</span>
+        </div>
+        <div class="phone-map-container">
+          <div class="map-blueprint">
+            <div class="map-room living">Sala de Estar</div>
+            <div class="map-room kitchen">Cocina</div>
+            <div class="map-room garden">Jardín</div>
+            <div class="map-player-dot"></div>
+          </div>
+          <p class="map-status">Ubicación actual: Sala de Estar</p>
+        </div>
+      </div>
+
+      <div id="phoneSettingsView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span>Ajustes</span>
+        </div>
+        <div class="phone-settings-container">
+          <div class="setting-item">
+            <span>Notificaciones</span>
+            <input type="checkbox" id="settingNotif" checked />
+          </div>
+          <div class="setting-item">
+            <span>Vibración háptica</span>
+            <input type="checkbox" id="settingVib" checked />
+          </div>
+          <div class="setting-item">
+            <span>Ahorro de batería</span>
+            <input type="checkbox" id="settingBat" />
           </div>
         </div>
-        <div class="event-copy">
-          <p id="eventKicker">Hogar</p>
-          <h2 id="eventTitle">Rutina cotidiana</h2>
-          <p id="eventDescription">La experiencia muestra como llamadas, mensajes y tramites digitales pueden transformarse en presion, confusion o exposicion a fraudes.</p>
-        </div>
-        <div class="action-grid" aria-label="Eventos">
-          <button data-scenario="call" class="event-button">
-            <i data-lucide="phone-call"></i>
-            <span>Llamada</span>
-          </button>
-          <button data-scenario="sms" class="event-button">
-            <i data-lucide="message-square-warning"></i>
-            <span>SMS</span>
-          </button>
-          <button data-scenario="bank" class="event-button">
-            <i data-lucide="landmark"></i>
-            <span>Banco</span>
-          </button>
-          <button data-scenario="family" class="event-button">
-            <i data-lucide="users"></i>
-            <span>Familia</span>
-          </button>
-          <button data-scenario="street" class="event-button">
-            <i data-lucide="map-pin"></i>
-            <span>Barrio</span>
-          </button>
-          <button data-scenario="reset" class="event-button ghost">
-            <i data-lucide="rotate-ccw"></i>
-            <span>Calma</span>
-          </button>
-        </div>
-      </aside>
+      </div>
 
-      <section class="impact-strip" aria-label="Impactos observados">
-        <article>
-          <span id="pressureValue">Baja</span>
-          <p>Presion emocional</p>
-        </article>
-        <article>
-          <span id="privacyValue">Media</span>
-          <p>Privacidad</p>
-        </article>
-        <article>
-          <span id="trustValue">Alta</span>
-          <p>Confianza requerida</p>
-        </article>
-      </section>
-
-      <nav class="walk-pad" aria-label="Movimiento">
-        <button id="moveForward" class="walk-button forward" aria-label="Avanzar">
-          <i data-lucide="arrow-up"></i>
-        </button>
-        <button id="moveLeft" class="walk-button left" aria-label="Izquierda">
-          <i data-lucide="arrow-left"></i>
-        </button>
-        <button id="moveBack" class="walk-button back" aria-label="Retroceder">
-          <i data-lucide="arrow-down"></i>
-        </button>
-        <button id="moveRight" class="walk-button right" aria-label="Derecha">
-          <i data-lucide="arrow-right"></i>
-        </button>
-      </nav>
+      <div class="phone-home-bar" id="phoneHomeBar"></div>
     </div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+
+    <nav class="walk-pad" aria-label="Movimiento">
+      <button id="moveForward" class="walk-button forward" aria-label="Avanzar">
+        <i data-lucide="arrow-up"></i>
+      </button>
+      <button id="moveLeft" class="walk-button left" aria-label="Izquierda">
+        <i data-lucide="arrow-left"></i>
+      </button>
+      <button id="moveBack" class="walk-button back" aria-label="Retroceder">
+        <i data-lucide="arrow-down"></i>
+      </button>
+      <button id="moveRight" class="walk-button right" aria-label="Derecha">
+        <i data-lucide="arrow-right"></i>
+      </button>
+    </nav>
+
+    <div class="stats-container" aria-label="Estadísticas del jugador">
+      <div class="stat-grid">
+        <div class="stat-item">
+          <div class="stat-header">
+            <div class="stat-title-wrap">
+              <i data-lucide="dollar-sign" class="stat-icon text-yellow"></i>
+              <span class="stat-label">Dinero</span>
+            </div>
+            <span class="stat-value" id="moneyValue">$500</span>
+          </div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-header">
+            <div class="stat-title-wrap">
+              <i data-lucide="smile" class="stat-icon text-blue"></i>
+              <span class="stat-label">Felicidad</span>
+            </div>
+            <span class="stat-value" id="happinessValue">80%</span>
+          </div>
+          <div class="stat-bar">
+            <div class="stat-fill bg-blue" id="happinessFill" style="width: 80%;"></div>
+          </div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-header">
+            <div class="stat-title-wrap">
+              <i data-lucide="wind" class="stat-icon text-emerald"></i>
+              <span class="stat-label">Calma</span>
+            </div>
+            <span class="stat-value" id="calmValue">75%</span>
+          </div>
+          <div class="stat-bar">
+            <div class="stat-fill bg-emerald" id="calmFill" style="width: 75%;"></div>
+          </div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-header">
+            <div class="stat-title-wrap">
+              <i data-lucide="eye" class="stat-icon text-purple"></i>
+              <span class="stat-label">Fatiga Visual</span>
+            </div>
+            <span class="stat-value" id="fatigueValue">0%</span>
+          </div>
+          <div class="stat-bar">
+            <div class="stat-fill" id="fatigueFill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="dilemmaModal" class="dilemma-modal" aria-hidden="true">
+      <div class="dilemma-card">
+        <div class="dilemma-header">
+          <h2 id="dilemmaTitle">Dilema</h2>
+          <p id="dilemmaDesc">Descripción del dilema</p>
+        </div>
+        <div class="dilemma-options">
+          <div class="dilemma-option-card">
+            <h3 id="optATitle">Opción A</h3>
+            <div class="scenario-box positive">
+              <h4>Posible Escenario Positivo</h4>
+              <p id="optAPosDesc">Descripción positiva</p>
+              <div class="impact-badges" id="optAPosImpact"></div>
+            </div>
+            <div class="scenario-box negative">
+              <h4>Posible Escenario Negativo</h4>
+              <p id="optANegDesc">Descripción negativa</p>
+              <div class="impact-badges" id="optANegImpact"></div>
+            </div>
+            <button class="dilemma-btn" id="btnSelectA">Elegir Opción A</button>
+          </div>
+          <div class="dilemma-option-card">
+            <h3 id="optBTitle">Opción B</h3>
+            <div class="scenario-box positive">
+              <h4>Posible Escenario Positivo</h4>
+              <p id="optBPosDesc">Descripción positiva</p>
+              <div class="impact-badges" id="optBPosImpact"></div>
+            </div>
+            <div class="scenario-box negative">
+              <h4>Posible Escenario Negativo</h4>
+              <p id="optBNegDesc">Descripción negativa</p>
+              <div class="impact-badges" id="optBNegImpact"></div>
+            </div>
+            <button class="dilemma-btn" id="btnSelectB">Elegir Opción B</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="outcomeModal" class="dilemma-modal outcome" aria-hidden="true">
+      <div class="outcome-card">
+        <div class="outcome-header">
+          <h2>Resultado de tu Decisión</h2>
+        </div>
+        <div class="outcome-body">
+          <p id="outcomeDesc">Descripción del resultado</p>
+          <div class="impact-badges large" id="outcomeImpact"></div>
+        </div>
+        <button class="dilemma-btn confirm" id="btnConfirmOutcome">Continuar</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
 </html>
