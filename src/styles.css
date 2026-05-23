@@ -1125,3 +1125,161 @@ body.cinematic-active .missions-container {
   color: #9ca3af;
   text-decoration: line-through;
 }
+
+/* --- Intro Overlay --- */
+.intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: radial-gradient(ellipse at 50% 40%, #1a2332 0%, #0a0e14 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 1s ease;
+}
+
+.intro-overlay.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.intro-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: introReveal 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes introReveal {
+  0% { opacity: 0; transform: translateY(40px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.intro-eyebrow {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #6b7c96;
+  margin: 0;
+  animation: introFadeIn 2s ease forwards;
+  animation-delay: 0.3s;
+  opacity: 0;
+}
+
+@keyframes introFadeIn {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.intro-title {
+  font-size: 3.8rem;
+  font-weight: 900;
+  line-height: 1.05;
+  margin: 0;
+  background: linear-gradient(135deg, #f4efe7 0%, #a8b8c8 50%, #6b8aab 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+  animation: introFadeIn 2s ease forwards;
+  animation-delay: 0.6s;
+  opacity: 0;
+}
+
+.intro-description-card {
+  max-width: 580px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 24px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: introFadeIn 2s ease forwards;
+  animation-delay: 0.9s;
+  opacity: 0;
+}
+
+.intro-description {
+  font-size: 0.96rem;
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin: 0;
+  font-weight: 400;
+  text-align: justify;
+}
+
+.intro-description-highlight {
+  font-size: 0.96rem;
+  color: #f59e0b;
+  line-height: 1.6;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+.intro-start-btn {
+  margin-top: 12px;
+  padding: 16px 40px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  color: #f4efe7;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition: all 250ms ease;
+  animation: introFadeIn 2s ease forwards;
+  animation-delay: 1.4s;
+  opacity: 0;
+  letter-spacing: 0.02em;
+}
+
+.intro-start-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+.intro-start-btn:active {
+  transform: scale(0.97);
+}
+
+/* --- Intro Fade Transition --- */
+.intro-fade {
+  position: fixed;
+  inset: 0;
+  background: #f8f4ec;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 800ms ease;
+}
+
+.intro-fade.is-active {
+  opacity: 1;
+}
+
+/* --- Hide game HUD during intro --- */
+body.intro-active .crosshair,
+body.intro-active .door-prompt,
+body.intro-active .phone-prompt,
+body.intro-active .walk-pad,
+body.intro-active .stats-container,
+body.intro-active .missions-container {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 560px) {
+  .intro-title { font-size: 2.6rem; }
+  .intro-tagline { font-size: 0.9rem; }
+}
