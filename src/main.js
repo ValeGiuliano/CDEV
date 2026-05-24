@@ -1640,6 +1640,10 @@ function playCinematicSound(cfg) {
 }
 
 function startCinematic(sequence, onEnd) {
+  // Exit pointer lock if active
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
   cinematicState.active = true;
   cinematicState.currentStep = 0;
   cinematicState.timer = 0;
@@ -2309,6 +2313,17 @@ function handleMoveKey(event, active) {
     if (event.repeat) return;
     event.preventDefault();
     phoneState.active = !phoneState.active;
+    
+    // Release pointer lock to allow clicking on the phone screen,
+    // or request it back when putting the phone away.
+    if (phoneState.active) {
+      if (document.pointerLockElement === canvas) {
+        document.exitPointerLock();
+      }
+    } else {
+      canvas.requestPointerLock();
+    }
+
     if (ui.phonePrompt) {
       ui.phonePrompt.textContent = phoneState.active ? 'T Guardar teléfono' : 'T Coger teléfono';
       ui.phonePrompt.classList.toggle('is-active', phoneState.active);
@@ -2364,24 +2379,48 @@ bindWalkButton('moveLeft', 'left');
 bindWalkButton('moveRight', 'right');
 
 function updateLook(deltaX, deltaY) {
-  const sensitivity = 0.0022;
+  const sensitivity = 0.0022; // Adjust this value up or down to tune the feel
   lookEuler.y -= deltaX * sensitivity;
   lookEuler.x -= deltaY * sensitivity;
   lookEuler.x = THREE.MathUtils.clamp(lookEuler.x, -Math.PI * 0.45, Math.PI * 0.32);
 }
 
-canvas.addEventListener('pointerdown', (event) => {
-  canvas.focus();
-  player.dragging = true;
-  player.lastX = event.clientX;
-  player.lastY = event.clientY;
+// Request Pointer Lock when clicking the canvas
+canvas.addEventListener('click', () => {
+  // Do not lock pointer during cutscenes or when using the phone
+  if (!cinematicState.active && !phoneState.active) {
+    canvas.requestPointerLock();
+  }
 });
 
+// Track pointer lock status changes if needed
+document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement === canvas) {
+    player.dragging = false; // Disable drag-to-look flag when fully locked
+  }
+});
+
+// Update camera look using movement deltas
 window.addEventListener('pointermove', (event) => {
-  if (!player.dragging) return;
-  updateLook(event.clientX - player.lastX, event.clientY - player.lastY);
-  player.lastX = event.clientX;
-  player.lastY = event.clientY;
+  if (document.pointerLockElement === canvas) {
+    // When pointer is locked, use direct movement deltas
+    updateLook(event.movementX, event.movementY);
+  } else if (player.dragging) {
+    // Fallback to drag-to-look when not locked (original behavior)
+    updateLook(event.clientX - player.lastX, event.clientY - player.lastY);
+    player.lastX = event.clientX;
+    player.lastY = event.clientY;
+  }
+});
+
+// Retain pointerdown for the fallback drag system
+canvas.addEventListener('pointerdown', (event) => {
+  canvas.focus();
+  if (document.pointerLockElement !== canvas) {
+    player.dragging = true;
+    player.lastX = event.clientX;
+    player.lastY = event.clientY;
+  }
 });
 
 window.addEventListener('pointerup', () => {
