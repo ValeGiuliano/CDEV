@@ -40,6 +40,10 @@ scene.add(camera);
 const clock = new THREE.Clock();
 const lookEuler = new THREE.Euler(-0.08, -0.28, 0, 'YXZ');
 const gltfLoader = new GLTFLoader();
+let martaMixer = null;
+let martaLoadedModel = null;
+let sonMixer = null;
+let sonLoadedModel = null;
 const moveState = {
   forward: false,
   back: false,
@@ -513,6 +517,273 @@ martaModel.add(martaArmR);
 martaModel.visible = false;
 room.add(martaModel);
 
+// --- CARGA ASÍNCRONA DE MARTA EN 3D (CON FALLBACK PROCEDURAL) ---
+gltfLoader.load(
+  '/marta.glb',
+  (gltf) => {
+    const model = gltf.scene;
+    
+    // Habilitar sombras y asegurar que los materiales se vean de ambos lados
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) {
+          child.material.side = THREE.DoubleSide;
+        }
+      }
+    });
+
+    // Ocultar los placeholders procedimentales cilíndricos originales de Marta
+    martaSkirt.visible = false;
+    martaTorso.visible = false;
+    martaHead.visible = false;
+    martaHair.visible = false;
+    martaArmL.visible = false;
+    martaArmR.visible = false;
+
+    // Guardar referencia global e incorporar el modelo inmediatamente al nodo de escena
+    // Esto asegura que la jerarquía y el cálculo de matrices globales tengan contexto físico real
+    martaLoadedModel = model;
+    room.add(model);
+    model.updateMatrixWorld(true);
+
+    // --- AUTODETECTAR ESCALA Y ALINEACIÓN DE LA CAJA ENVOLVENTE (MALLAS GEOMÉTRICAS ÚNICAMENTE) ---
+    // Forzar la inicialización y actualización de matrices jerárquicas de mundo tanto en el modelo
+    // como en sus sub-mallas individuales. Esto evita factores de escala disparatados.
+    const box = new THREE.Box3();
+    let hasMeshes = false;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.updateMatrixWorld(true);
+        box.expandByObject(child);
+        hasMeshes = true;
+      }
+    });
+
+    if (!hasMeshes) {
+      box.setFromObject(model);
+    }
+
+    const size = box.getSize(new THREE.Vector3());
+    const min = box.min;
+    const center = box.getCenter(new THREE.Vector3());
+    
+    console.log("--- DEBUG MARTA GLB (SOLO MALLAS) ---");
+    console.log("Tamaño real del cuerpo de Marta:", size);
+    console.log("Centro real de Marta:", center);
+    console.log("Mínimo real:", min);
+    
+    // 1. Auto-escala relativa a la puerta (2.1 metros)
+    // Queremos que Marta mida aproximadamente el 77% de la altura de la puerta (1.62 metros de altura para que luzca proporcional)
+    const targetHeight = 2.1 * 0.77; 
+    const maxDim = Math.max(size.x, size.y, size.z); // Dimensión más larga de cabeza a pies
+    let scaleFactor = targetHeight / maxDim;
+    
+    console.log("Altura objetivo (77% de puerta de 2.1m):", targetHeight);
+    console.log("Factor de escala calculado:", scaleFactor);
+    model.scale.set(scaleFactor, scaleFactor, scaleFactor);
+    model.userData.scaleFactor = scaleFactor; // Almacenar escala original para evitar deformaciones en el loop
+
+    // 2. Colocar al personaje parado de pie sobre el suelo, libre del sillón, mirando hacia la TV
+    // El sillón y su apoyabrazos terminan en X = -1.43. La colocamos en X = -0.7 para que libre el sillón con soltura.
+    model.position.x = -0.7 - center.x * scaleFactor;
+    model.position.z = -2.3 - center.z * scaleFactor;
+    
+    // Asegurar que la base de sus pies (min Y) descanse exactamente sobre el piso (Y = 0)
+    model.position.y = 0 - min.y * scaleFactor;
+    
+    // Rotar para mirar hacia la televisión (+X)
+    model.rotation.set(0, Math.PI / 2, 0); 
+    
+    console.log("Posición local parada calculada (libre de sillón):", model.position);
+
+    // --- RELAJAR BRAZOS EN POSE EN T PROCEDURALMENTE POR HUESOS ---
+    // Recorremos el esqueleto de la abuela buscando los huesos de los hombros/brazos superiores
+    // para rotarlos hacia abajo y darles una posición relajada y natural por defecto.
+    model.traverse((child) => {
+      if (child.isBone) {
+        const name = child.name.toLowerCase();
+        if ((name.includes('upperarm') || name.includes('arm')) &&
+            !name.includes('forearm') && !name.includes('hand') && !name.includes('finger') && !name.includes('twist')) {
+          
+          if (name.includes('left') || name.includes('l_') || name.endsWith('l')) {
+            child.rotation.z = -1.25; // Bajar brazo izquierdo
+            child.rotation.x = 0.15;  // Desplazar ligeramente al frente
+            child.rotation.y = 0.10;
+          } else if (name.includes('right') || name.includes('r_') || name.endsWith('r')) {
+            child.rotation.z = 1.25;  // Bajar brazo derecho
+            child.rotation.x = 0.15;  // Desplazar ligeramente al frente
+            child.rotation.y = -0.10;
+          }
+        }
+      }
+    });
+
+    // --- LUZ DE RELLENO DEDICADA PARA EL ROSTRO DE MARTA ---
+    // Colocamos una luz PointLight física, cálida y de rebote sin sombras posicionada a 60cm
+    // adelante de su cara (en coordenadas locales +X ya que el modelo mira hacia +X en la escena).
+    // Esto garantiza que su rostro y hombros brillen maravillosamente en la cinemática
+    // sin crear sombras secundarias extrañas y se oculte de forma limpia en el gameplay.
+    const martaFillLight = new THREE.PointLight(0xfff1cf, 2.5, 3.5);
+    martaFillLight.position.set(0.6, 1.45, 0); // Localmente: 60cm adelante de su cara, altura de ojos
+    martaFillLight.castShadow = false;
+    model.add(martaFillLight);
+
+    // Guardar los ojos del modelo para el parpadeo procedural
+    const eyes = [];
+    model.traverse((child) => {
+      if (child.isMesh && (
+        child.name.toLowerCase().includes('eye') || 
+        child.name.toLowerCase().includes('ojo') || 
+        child.name.toLowerCase().includes('pupil') || 
+        child.name.toLowerCase().includes('pupila') ||
+        child.name.toLowerCase().includes('glance') ||
+        child.name.toLowerCase().includes('look')
+      )) {
+        eyes.push(child);
+      }
+    });
+    model.userData.eyes = eyes;
+
+    console.log("--- DEBUG PARPADEO MARTA ---");
+    console.log("Mallas de ojos detectadas en el modelo:", eyes.map(e => e.name));
+    if (eyes.length === 0) {
+      console.log("No se detectó ninguna malla de ojo compatible de forma automática. Nombres de todas las mallas en el modelo para referencia:");
+      model.traverse((child) => {
+        if (child.isMesh) {
+          console.log(` - Mesh: "${child.name}" (Visible: ${child.visible})`);
+        }
+      });
+    }
+
+    // Intentar registrar animaciones esqueléticas si vienen en el archivo GLB
+    const validAnimations = gltf.animations.filter(a => {
+      const name = a.name.toLowerCase();
+      return !name.includes('tpose') && 
+             !name.includes('t-pose') && 
+             !name.includes('bind') && 
+             !name.includes('default') && 
+             !name.includes('pose') &&
+             a.duration > 0.05; // Filtrar poses estáticas
+    });
+
+    if (gltf.animations && gltf.animations.length > 0 && validAnimations.length > 0) {
+      martaMixer = new THREE.AnimationMixer(model);
+      model.userData.animations = gltf.animations;
+
+      console.log("--- DEBUG ANIMACIONES MARTA ---");
+      console.log("Animaciones disponibles en Marta:", gltf.animations.map(a => a.name));
+
+      // Buscar una animación adecuada de hablar (conversar)
+      const talkClip = validAnimations.find(a => 
+        a.name.toLowerCase().includes('talk') || 
+        a.name.toLowerCase().includes('argue') || 
+        a.name.toLowerCase().includes('discut') ||
+        a.name.toLowerCase().includes('habla') ||
+        a.name.toLowerCase().includes('speech')
+      ) || validAnimations[0];
+
+      model.userData.talkClip = talkClip;
+      console.log(`Animación esquelética de diálogo registrada con éxito ("${talkClip.name}").`);
+    } else {
+      // Habilitar animación procedimental de respaldo (idle) si es un modelo estático
+      model.userData.proceduralIdle = true;
+      console.log("El modelo de la abuela cargó sin animaciones corporales. Se aplicará idle procedimental de respaldo.");
+    }
+  },
+  undefined,
+  (error) => {
+    console.warn("No se encontró o no se pudo cargar marta.glb en la carpeta public. Usando fallback procedural.", error);
+  }
+);
+
+// --- CARGA ASÍNCRONA DEL HIJO EN 3D (CON FALLBACK PROCEDURAL) ---
+gltfLoader.load(
+  '/hijo.glb',
+  (gltf) => {
+    const model = gltf.scene;
+    
+    // Habilitar sombras y asegurar que los materiales se vean de ambos lados
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) {
+          child.material.side = THREE.DoubleSide;
+        }
+      }
+    });
+
+    // Incorporar el modelo del hijo inmediatamente al nodo de escena para contextualizar matrices de mundo
+    sonLoadedModel = model;
+    room.add(model);
+    model.visible = false;
+    model.updateMatrixWorld(true);
+
+    // --- AUTODETECTAR ESCALA Y ALINEACIÓN DE LA CAJA ENVOLVENTE (MALLAS GEOMÉTRICAS ÚNICAMENTE) ---
+    // Asegurar inicialización y actualización de matrices jerárquicas en mallas del hijo
+    const box = new THREE.Box3();
+    let hasMeshes = false;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.updateMatrixWorld(true);
+        box.expandByObject(child);
+        hasMeshes = true;
+      }
+    });
+
+    if (!hasMeshes) {
+      box.setFromObject(model);
+    }
+
+    const size = box.getSize(new THREE.Vector3());
+    const min = box.min;
+    
+    console.log("--- DEBUG HIJO GLB ---");
+    console.log("Tamaño real del cuerpo del hijo:", size);
+    
+    // Auto-escala relativa a la puerta (2.1 metros)
+    // El hijo mide el 86% de la altura de la puerta (1.80 metros de altura, alto y gallardo)
+    const targetHeight = 2.1 * 0.86; 
+    const maxDim = Math.max(size.x, size.y, size.z);
+    let scaleFactor = targetHeight / maxDim;
+    
+    model.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+    // Calcular y guardar el offset vertical base para situarlo de pie sobre el suelo (Y = 0)
+    const baseOffset = 0 - min.y * scaleFactor;
+    model.userData.baseOffset = baseOffset;
+
+    console.log("El modelo hijo.glb cargó con éxito. Offset base Y:", baseOffset);
+
+    // Intentar reproducir animaciones esqueléticas si vienen en el archivo GLB
+    if (gltf.animations && gltf.animations.length > 0) {
+      sonMixer = new THREE.AnimationMixer(model);
+      model.userData.animations = gltf.animations;
+
+      console.log("--- DEBUG ANIMACIONES HIJO ---");
+      console.log("Animaciones disponibles en el Hijo:", gltf.animations.map(a => a.name));
+
+      // Buscar una animación adecuada de Idle o espera para iniciar
+      const idleClip = gltf.animations.find(a => 
+        a.name.toLowerCase().includes('idle') || 
+        a.name.toLowerCase().includes('wait') || 
+        a.name.toLowerCase().includes('espera') ||
+        a.name.toLowerCase().includes('stand')
+      ) || gltf.animations[0];
+
+      const action = sonMixer.clipAction(idleClip);
+      action.play();
+      console.log(`Animación esquelética iniciada para el hijo con éxito ("${idleClip.name}").`);
+    }
+  },
+  undefined,
+  (error) => {
+    console.warn("No se encontró o no se pudo cargar hijo.glb en la carpeta public. Usando fallback procedural cilíndrico.", error);
+  }
+);
+
 function mesh(geometry, material, position, rotation = [0, 0, 0], cast = true, receive = true) {
   const m = new THREE.Mesh(geometry, material);
   m.position.set(...position);
@@ -844,14 +1115,23 @@ addBox(room, [1.66, 0.14, 0.16], materials.wood, [0.72, 2.17, -6.03]);
 const rug = mesh(new THREE.PlaneGeometry(4.7, 3.4), materials.rug, [0.2, 0.012, 0.5], [-Math.PI / 2, 0, 0], false);
 room.add(rug);
 
-addBox(room, [2.22, 0.18, 1.05], materials.fabric, [-2.9, 0.18, -2.3]);
-addBox(room, [2.1, 0.35, 1.05], materials.fabric, [-2.9, 0.42, -2.3]);
-addBox(room, [2.35, 0.58, 0.42], materials.fabric, [-2.9, 0.72, -2.68]);
-addBox(room, [0.38, 0.66, 1.02], materials.fabric, [-4.18, 0.53, -2.28]);
-addBox(room, [0.38, 0.66, 1.02], materials.fabric, [-1.62, 0.53, -2.28]);
-for (const x of [-3.78, -2.02]) {
-  for (const z of [-2.7, -1.9]) addBox(room, [0.11, 0.18, 0.11], materials.wood, [x, 0.09, z]);
+// --- SILLÓN ESTILIZADO DE PROPORCIONES REALISTAS ---
+// Patas cortas de madera elegantes
+for (const x of [-3.7, -2.1]) {
+  for (const z of [-2.6, -2.0]) {
+    addBox(room, [0.08, 0.06, 0.08], materials.wood, [x, 0.03, z]);
+  }
 }
+// Base del sillón (delgada y sobria, de y=0.06 a y=0.18)
+addBox(room, [1.85, 0.12, 0.85], materials.fabric, [-2.9, 0.12, -2.3]);
+// Almohadón de asiento (proporcional y ergonómico, de y=0.18 a y=0.42)
+addBox(room, [1.75, 0.24, 0.85], materials.fabric, [-2.9, 0.30, -2.3]);
+// Respaldo de altura estándar (de y=0.36 a y=0.86)
+addBox(room, [1.95, 0.50, 0.20], materials.fabric, [-2.9, 0.61, -2.625]);
+// Apoyabrazos izquierdo (de y=0.12 a y=0.60)
+addBox(room, [0.20, 0.48, 0.82], materials.fabric, [-3.825, 0.36, -2.285]);
+// Apoyabrazos derecho (de y=0.12 a y=0.60)
+addBox(room, [0.20, 0.48, 0.82], materials.fabric, [-1.975, 0.36, -2.285]);
 
 addBox(room, [1.22, 0.12, 0.68], materials.wood, [0.15, 0.49, 0.2]);
 for (const x of [-0.42, 0.72]) {
@@ -1436,7 +1716,9 @@ function endCinematic() {
 
   // Default behavior for regular cinematics
   if (typeof sonMesh !== 'undefined') sonMesh.visible = false;
+  if (sonLoadedModel) sonLoadedModel.visible = false;
   if (typeof oldWomanMesh !== 'undefined') oldWomanMesh.visible = false;
+  if (martaLoadedModel) martaLoadedModel.visible = false;
   if (typeof phoneProp !== 'undefined') phoneProp.visible = false;
 
   if (missionsState.currentMissionId === 'doorbell' && !missionsState.completed) {
@@ -1478,21 +1760,61 @@ const cutsceneEntry = [
     dialogue: { speaker: "Hijo", text: "Hola abuela, qué bueno verte. Te traje este teléfono para que estemos comunicados." },
     sound: { freq: 520, type: 'triangle', duration: 0.25 },
     onStart: () => {
-      sonMesh.visible = true;
-      oldWomanMesh.visible = true;
       phoneProp.visible = true;
 
-      sonMesh.position.set(1.1, 1.3, -11.4);
-      oldWomanMesh.position.set(1.5, 1.25, -10.1);
-      phoneProp.position.set(1.15, 1.25, -11.3);
+      const sonX = 1.1;
+      const sonZ = -11.4;
+
+      if (sonLoadedModel) {
+        sonMesh.visible = false;
+        sonLoadedModel.visible = true;
+        const sonOffset = sonLoadedModel.userData.baseOffset || 0;
+        sonLoadedModel.position.set(sonX, sonOffset, sonZ);
+        // El hijo mira hacia Marta (X = 1.5, Z = -10.1)
+        const dX = 1.5 - sonX;
+        const dZ = -10.1 - sonZ;
+        sonLoadedModel.rotation.set(0, Math.atan2(dX, dZ), 0);
+
+        // Activar la animación de espera (Idle) al inicio de la cinemática
+        if (sonMixer && sonLoadedModel.userData.animations) {
+          const idleClip = sonLoadedModel.userData.animations.find(a => 
+            a.name.toLowerCase().includes('idle') || 
+            a.name.toLowerCase().includes('wait') || 
+            a.name.toLowerCase().includes('espera') ||
+            a.name.toLowerCase().includes('stand')
+          ) || sonLoadedModel.userData.animations[0];
+          sonMixer.stopAllAction();
+          sonMixer.clipAction(idleClip).play();
+        }
+      } else {
+        sonMesh.visible = true;
+        sonMesh.position.set(sonX, 1.3, sonZ);
+      }
+
+      phoneProp.position.set(1.15, 0.90, -11.3);
+
+      if (martaLoadedModel) {
+        oldWomanMesh.visible = false;
+        martaLoadedModel.visible = true;
+        const baseOffset = martaLoadedModel.position.y;
+        martaLoadedModel.position.set(1.5, baseOffset, -10.1);
+        const targetSonX = sonLoadedModel ? sonLoadedModel.position.x : sonX;
+        const targetSonZ = sonLoadedModel ? sonLoadedModel.position.z : sonZ;
+        const dX = targetSonX - 1.5;
+        const dZ = targetSonZ - (-10.1);
+        martaLoadedModel.rotation.set(0, Math.atan2(dX, dZ), 0);
+      } else {
+        oldWomanMesh.visible = true;
+        oldWomanMesh.position.set(1.5, 1.25, -10.1);
+      }
 
       camera.position.set(2.2, 1.45, -8.5);
       camera.lookAt(1.3, 1.25, -10.8);
     },
     action: (progress) => {
       phoneProp.position.lerpVectors(
-        new THREE.Vector3(1.15, 1.25, -11.3),
-        new THREE.Vector3(1.4, 1.25, -10.5),
+        new THREE.Vector3(1.15, 0.90, -11.3),
+        new THREE.Vector3(1.4, 0.90, -10.5),
         progress
       );
       camera.position.z = THREE.MathUtils.lerp(-8.5, -8.8, progress);
@@ -1503,8 +1825,20 @@ const cutsceneEntry = [
     duration: 3.5,
     dialogue: { speaker: "Anciana", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
     sound: { freq: 380, type: 'sine', duration: 0.3 },
+    onStart: () => {
+      // Activar la animación de conversación de Marta cuando habla
+      if (martaLoadedModel && martaMixer && martaLoadedModel.userData.talkClip) {
+        martaMixer.stopAllAction();
+        martaMixer.clipAction(martaLoadedModel.userData.talkClip).play();
+      }
+    },
     action: (progress) => {
-      oldWomanMesh.position.z = -10.1 + Math.sin(progress * Math.PI) * 0.05;
+      const zPos = -10.1 + Math.sin(progress * Math.PI) * 0.05;
+      if (martaLoadedModel) {
+        martaLoadedModel.position.z = zPos;
+      } else {
+        oldWomanMesh.position.z = zPos;
+      }
       camera.position.z = THREE.MathUtils.lerp(-8.8, -9.0, progress);
       camera.lookAt(1.3, 1.25, -10.8);
     }
@@ -1513,12 +1847,38 @@ const cutsceneEntry = [
     duration: 3.0,
     dialogue: { speaker: "Hijo", text: "Lo sé abuela, pero haz el esfuerzo. Me tengo que ir corriendo al trabajo, ¡hablamos luego!" },
     sound: { freq: 550, type: 'triangle', duration: 0.2 },
+    onStart: () => {
+      // Detener animación de conversación de Marta para que relaje los brazos inmediatamente
+      if (martaMixer) {
+        martaMixer.stopAllAction();
+      }
+      // Activar la animación de caminar al empezar a moverse
+      if (sonLoadedModel && sonMixer && sonLoadedModel.userData.animations) {
+        const walkClip = sonLoadedModel.userData.animations.find(a => 
+          a.name.toLowerCase().includes('walk') || 
+          a.name.toLowerCase().includes('caminar') || 
+          a.name.toLowerCase().includes('run') ||
+          a.name.toLowerCase().includes('step')
+        ) || sonLoadedModel.userData.animations[0];
+        sonMixer.stopAllAction();
+        sonMixer.clipAction(walkClip).play();
+      }
+    },
     action: (progress) => {
-      sonMesh.position.lerpVectors(
-        new THREE.Vector3(1.1, 1.3, -11.4),
-        new THREE.Vector3(4.5, 1.3, -15.5),
-        progress
-      );
+      const startPos = new THREE.Vector3(1.1, 0, -11.4);
+      const endPos = new THREE.Vector3(4.5, 0, -15.5);
+      const currentPos = new THREE.Vector3().lerpVectors(startPos, endPos, progress);
+
+      if (sonLoadedModel) {
+        const sonOffset = sonLoadedModel.userData.baseOffset || 0;
+        sonLoadedModel.position.set(currentPos.x, sonOffset, currentPos.z);
+        const dX = 4.5 - 1.1;
+        const dZ = -15.5 - (-11.4);
+        sonLoadedModel.rotation.set(0, Math.atan2(dX, dZ), 0);
+      } else {
+        sonMesh.position.set(currentPos.x, 1.3, currentPos.z);
+      }
+
       camera.position.z = THREE.MathUtils.lerp(-9.0, -9.1, progress);
       camera.lookAt(1.3, 1.25, -10.8);
     }
@@ -1531,21 +1891,54 @@ const cutsceneLiving = [
     dialogue: { speaker: "Hijo", text: "Hola abuela, qué bueno verte. Te traje este teléfono para que estemos comunicados." },
     sound: { freq: 520, type: 'triangle', duration: 0.25 },
     onStart: () => {
-      sonMesh.visible = true;
-      oldWomanMesh.visible = true;
       phoneProp.visible = true;
 
-      sonMesh.position.set(0.72, 1.3, -6.8);
-      oldWomanMesh.position.set(0.72, 1.25, -5.4);
-      phoneProp.position.set(0.72, 1.25, -6.4);
+      const sonX = 0.72;
+      const sonZ = -6.8;
+
+      if (sonLoadedModel) {
+        sonMesh.visible = false;
+        sonLoadedModel.visible = true;
+        const sonOffset = sonLoadedModel.userData.baseOffset || 0;
+        sonLoadedModel.position.set(sonX, sonOffset, sonZ);
+        sonLoadedModel.rotation.set(0, 0, 0); // Mirar de frente hacia Z positivo (hacia Marta)
+
+        // Activar la animación de espera (Idle) al inicio de la cinemática
+        if (sonMixer && sonLoadedModel.userData.animations) {
+          const idleClip = sonLoadedModel.userData.animations.find(a => 
+            a.name.toLowerCase().includes('idle') || 
+            a.name.toLowerCase().includes('wait') || 
+            a.name.toLowerCase().includes('espera') ||
+            a.name.toLowerCase().includes('stand')
+          ) || sonLoadedModel.userData.animations[0];
+          sonMixer.stopAllAction();
+          sonMixer.clipAction(idleClip).play();
+        }
+      } else {
+        sonMesh.visible = true;
+        sonMesh.position.set(sonX, 1.3, sonZ);
+      }
+
+      phoneProp.position.set(0.72, 0.90, -6.4);
+
+      if (martaLoadedModel) {
+        oldWomanMesh.visible = false;
+        martaLoadedModel.visible = true;
+        const baseOffset = martaLoadedModel.position.y;
+        martaLoadedModel.position.set(0.72, baseOffset, -5.4);
+        martaLoadedModel.rotation.set(0, Math.PI, 0); // Mirar hacia Z negativo (hacia el hijo)
+      } else {
+        oldWomanMesh.visible = true;
+        oldWomanMesh.position.set(0.72, 1.25, -5.4);
+      }
 
       camera.position.set(2.2, 1.45, -5.2);
       camera.lookAt(0.72, 1.25, -6.1);
     },
     action: (progress) => {
       phoneProp.position.lerpVectors(
-        new THREE.Vector3(0.72, 1.25, -6.4),
-        new THREE.Vector3(0.72, 1.25, -5.7),
+        new THREE.Vector3(0.72, 0.90, -6.4),
+        new THREE.Vector3(0.72, 0.90, -5.7),
         progress
       );
       camera.position.x = THREE.MathUtils.lerp(2.2, 2.0, progress);
@@ -1556,8 +1949,20 @@ const cutsceneLiving = [
     duration: 3.5,
     dialogue: { speaker: "Anciana", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
     sound: { freq: 380, type: 'sine', duration: 0.3 },
+    onStart: () => {
+      // Activar la animación de conversación de Marta cuando habla
+      if (martaLoadedModel && martaMixer && martaLoadedModel.userData.talkClip) {
+        martaMixer.stopAllAction();
+        martaMixer.clipAction(martaLoadedModel.userData.talkClip).play();
+      }
+    },
     action: (progress) => {
-      oldWomanMesh.position.z = -5.4 + Math.sin(progress * Math.PI) * 0.05;
+      const zPos = -5.4 + Math.sin(progress * Math.PI) * 0.05;
+      if (martaLoadedModel) {
+        martaLoadedModel.position.z = zPos;
+      } else {
+        oldWomanMesh.position.z = zPos;
+      }
       camera.position.x = THREE.MathUtils.lerp(2.0, 1.85, progress);
       camera.lookAt(0.72, 1.25, -6.1);
     }
@@ -1566,12 +1971,38 @@ const cutsceneLiving = [
     duration: 3.0,
     dialogue: { speaker: "Hijo", text: "Lo sé abuela, pero haz el esfuerzo. Me tengo que ir corriendo al trabajo, ¡hablamos luego!" },
     sound: { freq: 550, type: 'triangle', duration: 0.2 },
+    onStart: () => {
+      // Detener animación de conversación de Marta para que relaje los brazos inmediatamente
+      if (martaMixer) {
+        martaMixer.stopAllAction();
+      }
+      // Activar la animación de caminar al empezar a moverse
+      if (sonLoadedModel && sonMixer && sonLoadedModel.userData.animations) {
+        const walkClip = sonLoadedModel.userData.animations.find(a => 
+          a.name.toLowerCase().includes('walk') || 
+          a.name.toLowerCase().includes('caminar') || 
+          a.name.toLowerCase().includes('run') ||
+          a.name.toLowerCase().includes('step')
+        ) || sonLoadedModel.userData.animations[0];
+        sonMixer.stopAllAction();
+        sonMixer.clipAction(walkClip).play();
+      }
+    },
     action: (progress) => {
-      sonMesh.position.lerpVectors(
-        new THREE.Vector3(0.72, 1.3, -6.8),
-        new THREE.Vector3(1.4, 1.3, -10.2),
-        progress
-      );
+      const startPos = new THREE.Vector3(0.72, 0, -6.8);
+      const endPos = new THREE.Vector3(1.4, 0, -10.2);
+      const currentPos = new THREE.Vector3().lerpVectors(startPos, endPos, progress);
+
+      if (sonLoadedModel) {
+        const sonOffset = sonLoadedModel.userData.baseOffset || 0;
+        sonLoadedModel.position.set(currentPos.x, sonOffset, currentPos.z);
+        const dX = 1.4 - 0.72;
+        const dZ = -10.2 - (-6.8);
+        sonLoadedModel.rotation.set(0, Math.atan2(dX, dZ), 0);
+      } else {
+        sonMesh.position.set(currentPos.x, 1.3, currentPos.z);
+      }
+
       camera.position.x = THREE.MathUtils.lerp(1.85, 1.75, progress);
       camera.lookAt(0.72, 1.25, -6.1);
     }
@@ -1622,7 +2053,7 @@ const introSequence = [
       camera.lookAt(lookTarget);
     }
   },
-  // Step 3: Enter through the open door into the living room
+  // Step 3: Enter through the open door into the living room, looking towards standing Marta
   {
     duration: 4.0,
     autoAdvance: true,
@@ -1636,13 +2067,13 @@ const introSequence = [
       );
       const lookTarget = new THREE.Vector3().lerpVectors(
         new THREE.Vector3(0, 1.5, -3),
-        new THREE.Vector3(-2.9, 1.2, -2.0),
+        new THREE.Vector3(-0.7, 1.52, -2.3), // Enfocar la altura del rostro de Marta de pie (evita que el diálogo la tape)
         ease
       );
       camera.lookAt(lookTarget);
     }
   },
-  // Step 4: Orbit around Marta on the sofa
+  // Step 4: Orbit around standing Marta
   {
     duration: 5.5,
     autoAdvance: true,
@@ -1651,20 +2082,21 @@ const introSequence = [
       const ease = progress * progress * (3 - 2 * progress);
       const angle = -Math.PI * 0.4 + ease * Math.PI * 0.7;
       const radius = 2.8 - ease * 0.6;
-      const martaCenter = new THREE.Vector3(-2.9, 0, -2.0);
+      const martaCenter = new THREE.Vector3(-0.7, 0, -2.3); // Posición de pie de Marta
       camera.position.set(
         martaCenter.x + Math.sin(angle) * radius,
-        1.45 + Math.sin(ease * Math.PI) * 0.35,
+        1.55 + Math.sin(ease * Math.PI) * 0.35, // Altura de órbita elevada para personaje parado
         martaCenter.z + Math.cos(angle) * radius
       );
-      camera.lookAt(martaCenter.x, 1.2, martaCenter.z);
+      camera.lookAt(martaCenter.x, 1.52, martaCenter.z); // Apuntar a su rostro/ojos para mantenerla visible sobre el globo de texto
  
-      // Subtle Marta idle animation — gentle breathing
-      martaTorso.scale.y = 1.0 + Math.sin(Date.now() * 0.002) * 0.015;
-      martaHead.position.y = 1.42 + Math.sin(Date.now() * 0.0015) * 0.005;
+      if (martaSkirt.visible) {
+        martaTorso.scale.y = 1.0 + Math.sin(Date.now() * 0.002) * 0.015;
+        martaHead.position.y = 1.42 + Math.sin(Date.now() * 0.0015) * 0.005;
+      }
     }
   },
-  // Step 5: Close-up on Marta, then transition fade
+  // Step 5: Zoom directly into Marta's eyes for a seamless POV transition
   {
     duration: 4.0,
     autoAdvance: true,
@@ -1672,14 +2104,39 @@ const introSequence = [
     sound: { freq: 280, type: 'sine', duration: 0.6 },
     action: (progress) => {
       const ease = progress * progress * (3 - 2 * progress);
+      // La cámara viaja desde en frente a un lado hasta ubicarse exactamente en los ojos de Marta
       camera.position.lerpVectors(
-        new THREE.Vector3(-1.8, 1.55, -1.2),
-        new THREE.Vector3(-2.6, 1.58, -1.7),
+        new THREE.Vector3(0.6, 1.55, -1.8),  // Delante y a la derecha de Marta
+        new THREE.Vector3(-0.7, 1.48, -2.3), // Ojos de Marta (inicio del POV a nivel ergonómico de 1.48m)
         ease
       );
-      camera.lookAt(-2.9, 1.42, -2.0);
+      // La cámara gira desde enfocar su rostro hasta mirar al frente hacia el TV (+X)
+      const lookTarget = new THREE.Vector3().lerpVectors(
+        new THREE.Vector3(-0.7, 1.48, -2.3),
+        new THREE.Vector3(9.3, 1.48, -2.3),  // Dirección del televisor en X positivo a nivel de ojos
+        ease
+      );
+      camera.lookAt(lookTarget);
+
+      // Ocultar proactivamente el modelo de Marta en cuanto la cámara se acerque demasiado.
+      // Esto evita la penetración visual y los recortes poligonales grotescos dentro de su cabeza.
+      const shouldBeVisible = (progress < 0.35);
+      martaModel.visible = shouldBeVisible; // Desactivar visibilidad global en el render loop
+      if (martaLoadedModel) {
+        martaLoadedModel.visible = shouldBeVisible;
+      } else {
+        // Manipular visibilidad de placeholders procedimentales solo si el GLTF no cargó
+        if (martaSkirt) {
+          martaSkirt.visible = shouldBeVisible;
+          martaTorso.visible = shouldBeVisible;
+          martaHead.visible = shouldBeVisible;
+          martaHair.visible = shouldBeVisible;
+          martaArmL.visible = shouldBeVisible;
+          martaArmR.visible = shouldBeVisible;
+        }
+      }
  
-      // Fade to white for POV transition in last 30% of step
+      // Fade to white para la transición de POV en el último 30% del paso
       if (progress > 0.7) {
         const fadeProgress = (progress - 0.7) / 0.3;
         if (ui.introFade) {
@@ -1721,6 +2178,12 @@ function startIntro() {
       martaModel.visible = false;
       doorState.living.open = false;
 
+      // Situar la cámara de juego (POV) exactamente en los ojos de Marta de pie en X = -0.7, Z = -2.3
+      camera.position.set(-0.7, 1.48, -2.3); // Altura de ojos de 1.48m para una transición 100% fluida del zoom final
+      // Rotar la vista para mirar hacia la televisión en +X (Euler Y = -Math.PI / 2)
+      lookEuler.set(0, -Math.PI / 2, 0);
+      camera.quaternion.setFromEuler(lookEuler);
+
       // Fade from white back to scene
       if (ui.introFade) {
         ui.introFade.style.transition = 'opacity 1.2s ease';
@@ -1752,6 +2215,7 @@ function toggleNearbyDoor() {
       doorState.living.open = false;
       if (typeof sonMesh !== 'undefined') sonMesh.visible = false;
       if (typeof oldWomanMesh !== 'undefined') oldWomanMesh.visible = false;
+      if (martaLoadedModel) martaLoadedModel.visible = false;
       if (typeof phoneProp !== 'undefined') phoneProp.visible = false;
 
       if (missionsState.currentMissionId === 'doorbell' && !missionsState.completed) {
@@ -1801,7 +2265,7 @@ function updateFirstPerson(dt) {
   resolveMovement(nextX, nextZ);
 
   const bob = Math.sin(player.walkBob) * Math.min(0.04, player.velocity.length() * 0.02);
-  camera.position.y = 1.58 + bob;
+  camera.position.y = 1.48 + bob; // Altura de ojos de Marta (1.48m) en lugar de la altura de la frente/cabeza (1.58m)
   setLookFromEuler();
 }
 
@@ -2219,6 +2683,51 @@ function animate() {
   updateStats(dt);
   updateMissions(dt);
   updateCinematic(dt);
+
+  // Actualizar mezcladores de animación esquelética
+  if (martaMixer) {
+    martaMixer.update(dt);
+  }
+  if (sonMixer) {
+    sonMixer.update(dt);
+  }
+
+  // Sincronizar visibilidad y animar a Marta en 3D importada
+  if (martaLoadedModel) {
+    // Si martaModel es visible (ej. escena inicial de la intro), forzamos la visibilidad del modelo importado.
+    // Si martaModel NO es visible, ocultamos el modelo importado en el gameplay o durante el intro.
+    // Si hay otra cinemática activa (ej. la del hijo), respetamos su visibilidad manual ya asignada en esa secuencia.
+    if (martaModel.visible) {
+      martaLoadedModel.visible = true;
+    } else {
+      if (!cinematicState.active || (cinematicState.sequence && cinematicState.sequence === introSequence)) {
+        martaLoadedModel.visible = false;
+      }
+    }
+
+    const elapsed = clock.getElapsedTime();
+
+    // Animación procedimental en caso de ser modelo estático
+    if (martaLoadedModel.userData && martaLoadedModel.userData.proceduralIdle) {
+      const s = martaLoadedModel.userData.scaleFactor || 1.0;
+      // Respiración muy suave multiplicando por la escala base original para evitar deformar al personaje
+      martaLoadedModel.scale.y = s * (1.0 + Math.sin(elapsed * 1.6) * 0.012);
+      martaLoadedModel.scale.x = s * (1.0 + Math.cos(elapsed * 1.6) * 0.004);
+      martaLoadedModel.scale.z = s * (1.0 + Math.cos(elapsed * 1.6) * 0.004);
+      
+      // Cabeceo ligero
+      martaLoadedModel.rotation.x = Math.sin(elapsed * 0.8) * 0.012;
+    }
+
+    // Parpadeo procedimental (blink) continuo para Marta - funciona con o sin animación corporal esquelética
+    if (martaLoadedModel.userData && martaLoadedModel.userData.eyes && martaLoadedModel.userData.eyes.length > 0) {
+      const isBlinking = (Math.floor(elapsed) % 4 === 0) && (elapsed % 1 < 0.12);
+      martaLoadedModel.userData.eyes.forEach((eye) => {
+        eye.scale.y = isBlinking ? 0.05 : 1.0;
+      });
+    }
+  }
+
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
