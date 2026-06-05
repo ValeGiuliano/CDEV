@@ -91,6 +91,10 @@ button {
   transition: background 200ms ease, border-color 200ms ease;
 }
 
+.phone-prompt.is-visible {
+  opacity: 1;
+}
+
 .phone-prompt.is-active {
   background: rgba(44, 199, 192, 0.18);
   border-color: rgba(44, 199, 192, 0.62);
@@ -615,6 +619,35 @@ button {
   pointer-events: none;
 }
 
+.day-counter {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(17, 24, 39, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 10px 22px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #f3f4f6;
+  z-index: 10;
+  user-select: none;
+  transition: opacity 200ms ease;
+}
+
+.day-transition-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000000;
+  z-index: 300;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 100ms linear;
+}
+
 .stat-grid {
   display: flex;
   flex-direction: column;
@@ -719,7 +752,7 @@ button {
   inset: 0;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(16px);
-  z-index: 50;
+  z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -733,6 +766,11 @@ button {
 .dilemma-modal[aria-hidden="true"] {
   opacity: 0;
   pointer-events: none;
+}
+
+.dilemma-modal[aria-hidden="false"] {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .dilemma-card {
@@ -1021,7 +1059,8 @@ button {
 
 body.cinematic-active .walk-pad,
 body.cinematic-active .stats-container,
-body.cinematic-active .missions-container {
+body.cinematic-active .missions-container,
+body.cinematic-active .day-counter {
   opacity: 0;
   pointer-events: none;
   transform: translateY(20px);
@@ -1274,7 +1313,8 @@ body.intro-active .door-prompt,
 body.intro-active .phone-prompt,
 body.intro-active .walk-pad,
 body.intro-active .stats-container,
-body.intro-active .missions-container {
+body.intro-active .missions-container,
+body.intro-active .day-counter {
   opacity: 0 !important;
   pointer-events: none !important;
 }
@@ -1282,4 +1322,407 @@ body.intro-active .missions-container {
 @media (max-width: 560px) {
   .intro-title { font-size: 2.6rem; }
   .intro-tagline { font-size: 0.9rem; }
+}
+
+/* --- Days Blocked Modal --- */
+.days-blocked-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(16px);
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  opacity: 1;
+  transition: opacity 250ms ease;
+}
+
+.days-blocked-modal[aria-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.days-blocked-card {
+  background: #111827;
+  border: 2px solid #374151;
+  border-radius: 28px;
+  padding: 32px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #f3f4f6;
+}
+
+.days-blocked-card h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.days-blocked-card p {
+  font-size: 1rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.days-blocked-card button {
+  margin-top: 8px;
+  padding: 12px 24px;
+  background: #2563eb;
+  border: none;
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.days-blocked-card button:hover { background: #1d4ed8; }
+
+/* --- PlayStore --- */
+.playstore-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  margin: 12px 14px;
+}
+
+.playstore-search-box svg {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.playstore-search-box input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: #f3f4f6;
+  font-size: 0.9rem;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.playstore-search-box input::placeholder {
+  color: #6b7280;
+}
+
+.playstore-section {
+  padding: 8px 14px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.playstore-section h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: #f3f4f6;
+}
+
+.playstore-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.playstore-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.playstore-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.playstore-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.playstore-card-info h5 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0 0 2px;
+  color: #f3f4f6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playstore-card-info span {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.playstore-install-btn {
+  padding: 8px 14px;
+  background: #2563eb;
+  border: none;
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, transform 100ms ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.playstore-install-btn:hover { background: #1d4ed8; }
+.playstore-install-btn:active { transform: scale(0.96); }
+
+.playstore-install-btn.playstore-btn-downloading {
+  background: #1e40af;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 90px;
+}
+
+.playstore-install-btn.playstore-btn-installed {
+  background: #16a34a;
+  pointer-events: none;
+}
+
+.install-progress {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.install-fill {
+  height: 100%;
+  background: #60a5fa;
+  border-radius: 2px;
+  animation: installProgress 1.5s linear forwards;
+}
+
+@keyframes installProgress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+/* --- Toast --- */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #f3f4f6;
+  z-index: 300;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 250ms ease, transform 250ms ease;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* --- PlayStore icon colors --- */
+.bg-playstore { background: linear-gradient(135deg, #4285f4, #34a853, #fbbc05, #ea4335); }
+.bg-ml { background: #FFF600; }
+.bg-ml svg text { fill: #2d3277; }
+
+/* --- App button visibility --- */
+.phone-app-btn.is-hidden {
+  display: none;
+}
+
+/* --- MercadoLibre Ad View --- */
+.phone-ml-ad-view {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.ml-ad-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ml-ad-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-size: cover;
+  background-position: center;
+}
+
+.ml-ad-content .ad-x-btn {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 150ms ease, background 150ms ease;
+  z-index: 10;
+  line-height: 1;
+}
+
+.ml-ad-content .ad-x-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: scale(1.1);
+}
+
+.ml-ad-content .ad-x-btn.fake-x {
+  cursor: default;
+}
+
+.ml-ad-content .ad-x-btn.small-x {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  border-width: 1px;
+  transition: top 200ms ease, left 200ms ease, transform 150ms ease;
+}
+
+/* --- MercadoLibre Home View --- */
+.ml-home-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.ml-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f5f5f5;
+  border-radius: 10px;
+}
+
+.ml-search-bar svg {
+  color: #999;
+  flex-shrink: 0;
+}
+
+.ml-search-bar input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 0.9rem;
+  color: #333;
+  outline: none;
+}
+
+.ml-categories {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.ml-category {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 64px;
+  cursor: pointer;
+}
+
+.ml-category svg {
+  color: #3483fa;
+}
+
+.ml-category span {
+  font-size: 0.7rem;
+  color: #666;
+}
+
+.ml-products {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ml-product-card {
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.ml-product-img {
+  width: 60px;
+  height: 60px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.ml-product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ml-product-price {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.ml-product-title {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.ml-product-shipping {
+  font-size: 0.7rem;
+  color: #00a650;
+  font-weight: 600;
 }

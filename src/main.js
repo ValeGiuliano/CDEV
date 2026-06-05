@@ -60,6 +60,14 @@ const phoneState = {
   sleepTimer: 0,
 };
 
+const mlAdState = {
+  phase: 0,
+  ad2TrueIndex: -1,
+  ad3Clicks: 0,
+  ad3MaxClicks: 10,
+  ad3XPos: { top: '50%', left: '50%' },
+};
+
 const statsState = {
   fatigue: 0,
   money: 500,
@@ -70,6 +78,8 @@ const statsState = {
 const ui = {
   doorPrompt: document.querySelector('#doorPrompt'),
   phonePrompt: document.querySelector('#phonePrompt'),
+  bedPrompt: document.querySelector('#bedPrompt'),
+  dayCounter: document.querySelector('#dayCounter'),
   phoneUI: document.querySelector('#phoneUI'),
   phoneViews: document.querySelectorAll('.phone-view'),
   phoneAppBtns: document.querySelectorAll('.phone-app-btn'),
@@ -77,7 +87,6 @@ const ui = {
   phoneHomeBar: document.querySelector('#phoneHomeBar'),
   openMessagesBtn: document.querySelector('#openMessagesBtn'),
   sendReplyBtn: document.querySelector('#sendReplyBtn'),
-  replyBubble: document.querySelector('#replyBubble'),
   fatigueValue: document.querySelector('#fatigueValue'),
   fatigueFill: document.querySelector('#fatigueFill'),
   moneyValue: document.querySelector('#moneyValue'),
@@ -86,6 +95,7 @@ const ui = {
   calmValue: document.querySelector('#calmValue'),
   calmFill: document.querySelector('#calmFill'),
   dilemmaModal: document.querySelector('#dilemmaModal'),
+  daysBlockedModal: document.querySelector('#daysBlockedModal'),
   dilemmaTitle: document.querySelector('#dilemmaTitle'),
   dilemmaDesc: document.querySelector('#dilemmaDesc'),
   optATitle: document.querySelector('#optATitle'),
@@ -153,6 +163,26 @@ function playDoorbellSound() {
   } catch (e) { }
 }
 
+function playNotificationSound() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const t0 = audioCtx.currentTime;
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t0 + i * 0.12);
+      gain.gain.setValueAtTime(0.2, t0 + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + i * 0.12 + 0.15);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(t0 + i * 0.12); osc.stop(t0 + i * 0.12 + 0.15);
+    });
+  } catch (e) { }
+}
+
 function setMission(id, title, text) {
   missionsState.currentMissionId = id;
   missionsState.active = true;
@@ -168,6 +198,10 @@ function setMission(id, title, text) {
 
   if (id === 'doorbell') {
     playDoorbellSound();
+  }
+  if (id === 'tutorial') {
+    playNotificationSound();
+    addTutorialMessage();
   }
 }
 
@@ -1164,6 +1198,53 @@ addRoundedCylinder(tvModel, 0.015, 0.03, materials.dark, [0, 0.44, 0], [0, 0, 0]
 addRoundedCylinder(tvModel, 0.005, 0.42, materials.metal, [-0.06, 0.61, -0.12], [0, 0, -0.6], 8); // Antena L
 addRoundedCylinder(tvModel, 0.005, 0.42, materials.metal, [-0.06, 0.61, 0.12], [0, 0, 0.6], 8); // Antena R
 
+// 5b. Cama de Marta (Rincón del dormitorio)
+const bedGroup = new THREE.Group();
+bedGroup.position.set(4.2, 0, 4.2);
+room.add(bedGroup);
+
+// Base de la cama (estructura de madera)
+addBox(bedGroup, [1.6, 0.35, 2.1], materials.wood, [0, 0.175, 0]);
+// Colchón blanco
+addBox(bedGroup, [1.5, 0.22, 2.0], new THREE.MeshStandardMaterial({ color: 0xf0ece4, roughness: 0.95 }), [0, 0.46, 0]);
+// Sábana azul claro
+addBox(bedGroup, [1.48, 0.06, 1.9], new THREE.MeshStandardMaterial({ color: 0xa8c8e8, roughness: 0.9 }), [0, 0.6, 0]);
+// Almohada
+addBox(bedGroup, [0.55, 0.1, 0.35], new THREE.MeshStandardMaterial({ color: 0xfaf8f5, roughness: 0.95 }), [0, 0.62, -0.7]);
+// Cabecera de la cama
+addBox(bedGroup, [1.65, 0.85, 0.08], materials.wood, [0, 0.78, -1.02]);
+// Manta doblada al pie de la cama
+addBox(bedGroup, [1.3, 0.08, 0.5], new THREE.MeshStandardMaterial({ color: 0xc4786a, roughness: 0.85 }), [0, 0.64, 0.65]);
+
+const bedState = {
+  position: new THREE.Vector3(4.2, 0, 4.2),
+  label: 'cama',
+};
+
+let gameState = {
+  currentDay: 1,
+};
+
+const conversations = {
+  camilo: [],
+};
+
+const installedApps = {
+  messages: true,
+  map: true,
+  settings: true,
+  playstore: false,
+  mercadolibre: false,
+};
+
+const playstoreApps = [
+  { id: 'mercadolibre', name: 'MercadoLibre', dev: 'Mercado Libre', color: '#FFF600', label: 'ML' },
+  { id: 'whatsapp', name: 'WhatsApp', dev: 'Meta Platforms', color: '#25D366', label: 'WA' },
+  { id: 'instagram', name: 'Instagram', dev: 'Meta Platforms', color: '#E4405F', label: 'IG' },
+  { id: 'spotify', name: 'Spotify', dev: 'Spotify AB', color: '#1DB954', label: 'Sp' },
+  { id: 'netflix', name: 'Netflix', dev: 'Netflix, Inc.', color: '#E50914', label: 'N' },
+];
+
 // 6. Reloj de Pared Analógico (Fondo Comedor)
 const wallClock = new THREE.Group();
 wallClock.position.set(-1.20, 2.9, 5.94); // En la pared del fondo a la altura de los ojos
@@ -1323,6 +1404,11 @@ function getNearbyDoor() {
     }
   });
   return nearest;
+}
+
+function isNearBed() {
+  const distance = Math.hypot(camera.position.x - bedState.position.x, camera.position.z - bedState.position.z);
+  return distance < 1.8;
 }
 
 const cinematicState = {
@@ -1757,6 +1843,9 @@ function toggleNearbyDoor() {
       if (missionsState.currentMissionId === 'doorbell' && !missionsState.completed) {
         setTimeout(() => {
           completeMission('doorbell');
+          setTimeout(() => {
+            setMission('tutorial', 'Tutorial', 'Lee el mensaje de Camilo para aprender a jugar.');
+          }, 1000);
         }, 1500);
       }
     });
@@ -1773,6 +1862,97 @@ function updateDoors(dt) {
     ui.doorPrompt.classList.add('is-visible');
   } else {
     ui.doorPrompt.classList.remove('is-visible');
+  }
+}
+
+function updateBedPrompt(dt) {
+  if (ui.bedPrompt) {
+    if (isNearBed() && !getNearbyDoor()) {
+      ui.bedPrompt.textContent = 'E Dormir';
+      ui.bedPrompt.classList.add('is-visible');
+    } else {
+      ui.bedPrompt.classList.remove('is-visible');
+    }
+  }
+}
+
+let dayTransitionState = {
+  active: false,
+  progress: 0,
+  phase: 'fade-in', // 'fade-in' or 'fade-out'
+  onEnd: null,
+};
+
+function startDayTransition(onEnd) {
+  if (cinematicState.active) return;
+  if (!areAllMissionsComplete()) {
+    showDaysBlockedModal();
+    return;
+  }
+  dayTransitionState = {
+    active: true,
+    progress: 0,
+    phase: 'fade-in',
+    onEnd: onEnd,
+  };
+  cinematicState.active = true;
+}
+
+function showDaysBlockedModal() {
+  if (ui.daysBlockedModal) {
+    ui.daysBlockedModal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function hideDaysBlockedModal() {
+  if (ui.daysBlockedModal) {
+    ui.daysBlockedModal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function updateDayTransition(dt) {
+  if (!dayTransitionState.active) return;
+
+  const speed = 1.8;
+  dayTransitionState.progress += dt * speed;
+
+  if (dayTransitionState.phase === 'fade-in') {
+    if (dayTransitionState.progress >= 1) {
+      dayTransitionState.progress = 1;
+      // Execute the callback (advance day, reset fatigue)
+      if (dayTransitionState.onEnd) dayTransitionState.onEnd();
+      // Switch to fade-out
+      dayTransitionState.phase = 'fade-out';
+      dayTransitionState.progress = 0;
+    }
+  } else if (dayTransitionState.phase === 'fade-out') {
+    if (dayTransitionState.progress >= 1) {
+      dayTransitionState.progress = 1;
+      dayTransitionState.active = false;
+      cinematicState.active = false;
+    }
+  }
+}
+
+function getDayTransitionOpacity() {
+  if (!dayTransitionState.active) return 0;
+  if (dayTransitionState.phase === 'fade-in') {
+    return dayTransitionState.progress;
+  } else {
+    return 1 - dayTransitionState.progress;
+  }
+}
+
+function updatePhonePrompt(dt) {
+  // El teléfono solo está disponible después de completar la misión del timbre
+  const phoneAvailable = !missionsState.currentMissionId || missionsState.currentMissionId !== 'doorbell' || missionsState.completed;
+  
+  if (ui.phonePrompt) {
+    if (phoneAvailable) {
+      ui.phonePrompt.classList.add('is-visible');
+    } else {
+      ui.phonePrompt.classList.remove('is-visible');
+    }
   }
 }
 
@@ -1844,7 +2024,20 @@ function handleMoveKey(event, active) {
   if (active && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
     if (event.repeat) return;
     event.preventDefault();
+
+    // El teléfono solo está disponible después de completar la misión del timbre
+    if (missionsState.currentMissionId === 'doorbell' && !missionsState.completed) {
+      return;
+    }
+
     phoneState.active = !phoneState.active;
+    if (phoneState.active) {
+      if (document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+    } else {
+      canvas.requestPointerLock();
+    }
     if (ui.phonePrompt) {
       ui.phonePrompt.textContent = phoneState.active ? 'T Guardar teléfono' : 'T Coger teléfono';
       ui.phonePrompt.classList.toggle('is-active', phoneState.active);
@@ -1854,7 +2047,33 @@ function handleMoveKey(event, active) {
   if (active && isDoorKey(event)) {
     if (event.repeat) return;
     event.preventDefault();
-    toggleNearbyDoor();
+    if (getNearbyDoor()) {
+      toggleNearbyDoor();
+      return;
+    }
+    if (isNearBed()) {
+      startDayTransition(() => {
+        gameState.currentDay++;
+        statsState.fatigue = 0;
+        if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + gameState.currentDay;
+        missionsState.currentMissionId = null;
+        missionsState.active = false;
+        missionsState.completed = false;
+        if (gameState.currentDay === 2) {
+          installedApps.playstore = true;
+          updatePhoneHomeApps();
+          setTimeout(() => {
+            playNotificationSound();
+            startBirthdayMission();
+            switchPhoneView('phoneMessagesView');
+            setTimeout(() => {
+              startBirthdayFlow();
+            }, 500);
+          }, 2000);
+        }
+      });
+      return;
+    }
     return;
   }
   const key = getMoveDirection(event);
@@ -1906,22 +2125,24 @@ function updateLook(deltaX, deltaY) {
   lookEuler.x = THREE.MathUtils.clamp(lookEuler.x, -Math.PI * 0.45, Math.PI * 0.32);
 }
 
-canvas.addEventListener('pointerdown', (event) => {
-  canvas.focus();
-  player.dragging = true;
-  player.lastX = event.clientX;
-  player.lastY = event.clientY;
+window.addEventListener('mousemove', (event) => {
+  if (cinematicState.active) return;
+  if (phoneState.active) return;
+  if (!document.pointerLockElement) return;
+  updateLook(event.movementX, event.movementY);
 });
 
-window.addEventListener('pointermove', (event) => {
-  if (!player.dragging) return;
-  updateLook(event.clientX - player.lastX, event.clientY - player.lastY);
-  player.lastX = event.clientX;
-  player.lastY = event.clientY;
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement) {
+    player.dragging = false;
+  }
 });
 
-window.addEventListener('pointerup', () => {
-  player.dragging = false;
+canvas.addEventListener('click', () => {
+  if (phoneState.active) return;
+  if (!document.pointerLockElement) {
+    canvas.requestPointerLock();
+  }
 });
 
 window.addEventListener('blur', () => {
@@ -2005,6 +2226,299 @@ function switchPhoneView(viewId) {
   });
 }
 
+function addTutorialMessage() {
+  const container = document.querySelector('.phone-chat-container');
+  if (!container) return;
+
+  const tutorialBubble = document.createElement('div');
+  tutorialBubble.className = 'chat-bubble incoming tutorial-message';
+  tutorialBubble.innerHTML = `<strong>📱 ¡Bienvenida, Mamá! 📱</strong><br><br>
+Este celular es tuyo. Sé que al principio puede parecer complicado, pero vas a ver que no es tan difícil.<br><br>
+Te explico rápido:<br><br>
+😐 <strong>Fatiga:</strong> Usar el celular te cansa la vista y la cabeza. Si estás muy fatigada, la pantalla se pone borrosa. Descansá un rato y se te va a pasar.<br><br>
+💰 <strong>Dinero:</strong> Es lo que tenés guardado. Te va a servir para lo que necesites.<br><br>
+😊 <strong>Felicidad:</strong> Lo bien que te sentís. Cada decisión que tomes va a influir en cómo te sentís.<br><br>
+😌 <strong>Calma:</strong> Tu tranquilidad interior. Las situaciones difíciles pueden alterarte.<br><br>
+Las <strong>decisiones tienen consecuencias</strong>: cada cosa que elijas va a cambiar cómo te sentís y cómo le va a ir a la familia.<br><br>
+Entrá a <strong>Mensajes</strong> para ver qué te escribí. ¡Ah! Y recordá: no importa cuánto tiempo te lleve entender todo, estoy acá para ayudarte. Te quiero, mamá. ❤️<br><br>
+<em>PD: Presioná "Responder" cuando estés lista.</em>`;
+
+  const existing = container.querySelector('.tutorial-message');
+  if (existing) existing.remove();
+  container.appendChild(tutorialBubble);
+}
+
+let tutorialChoiceMade = false;
+
+function showMartaReplyTutorial(choice) {
+  const container = document.querySelector('.phone-chat-container');
+  if (!container) return;
+
+  const replyBubble = document.createElement('div');
+  replyBubble.className = 'chat-bubble outgoing';
+
+  if (choice === 'A') {
+    replyBubble.innerHTML = `Hijito, gracias por el celular y por tu mensaje tan bonito. Me emocionaste tanto que te mandé un regalito por correo. Te quiere mucho tu mamá. ❤️`;
+  } else {
+    replyBubble.innerHTML = `Camilito, gracias por el celular y por tu mensaje. Con tu cariño y tus palabras me alcanza y sobra. No necesito cosas materiales, con saber que estás bien me basta. Te quiero hijo. ❤️`;
+  }
+
+  container.appendChild(replyBubble);
+  tutorialChoiceMade = true;
+
+  const replyBox = document.querySelector('.phone-chat-reply-box');
+  if (replyBox) replyBox.classList.add('is-hidden');
+}
+
+function showCamiloBedMessage() {
+  const container = document.querySelector('.phone-chat-container');
+  if (!container) return;
+
+  const camiloBubble = document.createElement('div');
+  camiloBubble.className = 'chat-bubble incoming';
+  camiloBubble.innerHTML = `Mamá, me alegra que te haya gustado el celular. ¿Ves que no era tan difícil? 😄<br><br>Ah, y una cosa importante: la cama es para descansar entre día y día. Si no dormís bien, el tiempo no avanza. Es tu manera de recuperarte y empezar un nuevo día.<br><br>Bueno, ya te dejo descansar. Mañana seguimos hablando. Te quiere, Camilo. ❤️<br><br><em>PD: Cuando quieras terminar la noche, andá a la cama. Pero eso lo vemos después, por ahora disfrutá conocer el celular.</em>`;
+
+  container.appendChild(camiloBubble);
+
+  const replyBox = document.querySelector('.phone-chat-reply-box');
+  if (replyBox) {
+    replyBox.classList.remove('is-hidden');
+    replyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-tutorial-accept="true">Aceptar</button>`;
+  }
+}
+
+function areAllMissionsComplete() {
+  return missionsState.completed === true;
+}
+
+function addMessageToConversation(contact, type, html) {
+  if (!conversations[contact]) conversations[contact] = [];
+  conversations[contact].push({ type, html });
+  const container = document.querySelector('.phone-chat-container');
+  if (!container) return;
+  const bubble = document.createElement('div');
+  bubble.className = `chat-bubble ${type}`;
+  bubble.innerHTML = html;
+  container.appendChild(bubble);
+  container.scrollTop = container.scrollHeight;
+}
+
+function renderConversation(contact) {
+  const container = document.querySelector('.phone-chat-container');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!conversations[contact]) return;
+  conversations[contact].forEach((msg) => {
+    const bubble = document.createElement('div');
+    bubble.className = `chat-bubble ${msg.type}`;
+    bubble.innerHTML = msg.html;
+    container.appendChild(bubble);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+function showToast(text) {
+  let toast = document.querySelector('.toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = text;
+  toast.classList.add('is-visible');
+  setTimeout(() => {
+    toast.classList.remove('is-visible');
+  }, 2500);
+}
+
+function renderPlayStore(filterText) {
+  const list = document.getElementById('playstoreAppList');
+  if (!list) return;
+  list.innerHTML = '';
+  const query = (filterText || '').toLowerCase();
+  playstoreApps.forEach((app) => {
+    if (installedApps[app.id]) return;
+    if (query && !app.name.toLowerCase().includes(query)) return;
+    const card = document.createElement('div');
+    card.className = 'playstore-card';
+    card.innerHTML = `
+      <div class="playstore-icon" style="background:${app.color}"><span style="color:#fff;font-weight:800;font-size:0.85rem;">${app.label}</span></div>
+      <div class="playstore-card-info"><h5>${app.name}</h5><span>${app.dev}</span></div>
+      <button class="playstore-install-btn" data-install-btn="${app.id}">Instalar</button>
+    `;
+    list.appendChild(card);
+    const btn = card.querySelector('.playstore-install-btn');
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      installApp(app.id, btn);
+    });
+  });
+  if (list.children.length === 0) {
+    list.innerHTML = '<p style="color:#6b7280;text-align:center;padding:20px;font-size:0.85rem;">No se encontraron apps</p>';
+  }
+}
+
+function installApp(appId, btn) {
+  if (installedApps[appId]) return;
+  btn.innerHTML = '<div class="install-progress"><div class="install-fill"></div></div><span style="font-size:0.7rem;">Descargando...</span>';
+  btn.disabled = true;
+  btn.className = 'playstore-install-btn playstore-btn-downloading';
+  setTimeout(() => {
+    installedApps[appId] = true;
+    btn.innerHTML = '✓ Instalado';
+    btn.className = 'playstore-install-btn playstore-btn-installed';
+    const app = playstoreApps.find((a) => a.id === appId);
+    if (app) showToast(app.name + ' instalado');
+    updatePhoneHomeApps();
+    setTimeout(() => renderPlayStore(document.getElementById('playstoreSearchInput')?.value || ''), 500);
+  }, 1500);
+}
+
+function updatePhoneHomeApps() {
+  const psBtn = document.getElementById('playstoreAppBtn');
+  const mlBtn = document.getElementById('mercadolibreAppBtn');
+  if (psBtn) psBtn.style.display = installedApps.playstore ? '' : 'none';
+  if (mlBtn) mlBtn.style.display = installedApps.mercadolibre ? '' : 'none';
+}
+
+function renderMLAd() {
+  const container = document.getElementById('mlAdContent');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (mlAdState.phase === 1) {
+    container.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    container.innerHTML = `
+      <div style="color:#fff;text-align:center;padding:20px;">
+        <h2 style="font-size:1.8rem;margin-bottom:12px;">¡OFERTA IMPERDIBLE!</h2>
+        <p style="font-size:1.1rem;margin-bottom:8px;">Smart TV 50" 4K</p>
+        <p style="font-size:2rem;font-weight:800;">$299.999</p>
+        <p style="font-size:0.9rem;opacity:0.8;margin-top:8px;">Antes: $499.999</p>
+        <p style="font-size:0.8rem;opacity:0.6;margin-top:20px;">¡Solo por hoy!</p>
+      </div>
+      <button class="ad-x-btn" id="mlAd1X" style="top:12px;right:12px;">✕</button>
+    `;
+    const xBtn = document.getElementById('mlAd1X');
+    if (xBtn) {
+      xBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        mlAdState.phase = 2;
+        mlAdState.ad2TrueIndex = Math.floor(Math.random() * 8);
+        renderMLAd();
+      });
+    }
+  } else if (mlAdState.phase === 2) {
+    container.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+    container.innerHTML = `
+      <div style="color:#fff;text-align:center;padding:20px;">
+        <h2 style="font-size:1.6rem;margin-bottom:12px;">¡DESCUENTOS EXCLUSIVOS!</h2>
+        <p style="font-size:1rem;margin-bottom:8px;">Hasta 40% OFF en tecnología</p>
+        <p style="font-size:0.9rem;opacity:0.8;">Celulares, notebooks y más</p>
+      </div>
+    `;
+    const positions = [
+      { top: '15%', left: '15%' },
+      { top: '15%', left: '75%' },
+      { top: '50%', left: '15%' },
+      { top: '50%', left: '75%' },
+      { top: '80%', left: '15%' },
+      { top: '80%', left: '50%' },
+      { top: '80%', left: '75%' },
+      { top: '35%', left: '45%' },
+    ];
+    for (let i = 0; i < 8; i++) {
+      const xBtn = document.createElement('button');
+      xBtn.className = 'ad-x-btn';
+      xBtn.style.top = positions[i].top;
+      xBtn.style.left = positions[i].left;
+      xBtn.textContent = '✕';
+      if (i === mlAdState.ad2TrueIndex) {
+        xBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          mlAdState.phase = 3;
+          mlAdState.ad3Clicks = 0;
+          mlAdState.ad3XPos = { top: '50%', left: '50%' };
+          renderMLAd();
+        });
+      } else {
+        xBtn.classList.add('fake-x');
+        xBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+      }
+      container.appendChild(xBtn);
+    }
+  } else if (mlAdState.phase === 3) {
+    container.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+    container.innerHTML = `
+      <div style="color:#fff;text-align:center;padding:20px;">
+        <h2 style="font-size:1.4rem;margin-bottom:12px;">¡ÚLTIMA OPORTUNIDAD!</h2>
+        <p style="font-size:0.9rem;opacity:0.8;">No te pierdas estas ofertas</p>
+      </div>
+      <button class="ad-x-btn small-x" id="mlAd3X" style="top:${mlAdState.ad3XPos.top};left:${mlAdState.ad3XPos.left};">✕</button>
+    `;
+    const xBtn = document.getElementById('mlAd3X');
+    if (xBtn) {
+      xBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        mlAdState.ad3Clicks++;
+        if (mlAdState.ad3Clicks >= mlAdState.ad3MaxClicks) {
+          installedApps.mercadolibre = true;
+          updatePhoneHomeApps();
+          switchPhoneView('phoneMLHomeView');
+        } else {
+          mlAdState.ad3XPos = {
+            top: (10 + Math.random() * 75) + '%',
+            left: (10 + Math.random() * 75) + '%',
+          };
+          renderMLAd();
+        }
+      });
+    }
+  }
+}
+
+function startBirthdayMission() {
+  setMission('birthday', 'Cumple de Tomás', 'Tu hijo te mandó un mensaje importante.');
+  addMessageToConversation('camilo', 'incoming', `Mamá! ¿Cómo estás? 😊<br><br>Te escribo porque en unos días es el cumple de <strong>Tomás</strong> 🎂🎉 y quería saber si vos le podías preparar algo lindo.<br><br>¿Te animás a hacerle un regalito?`);
+}
+
+function startBirthdayFlow() {
+  const replyBox = document.querySelector('.phone-chat-reply-box');
+  if (replyBox) {
+    replyBox.classList.remove('is-hidden');
+    replyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-birthday-reply="true">Responder</button>`;
+    const btn = document.getElementById('sendReplyBtn');
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        addMessageToConversation('camilo', 'outgoing', `Hijito, me encantaría hacerle un regalo a Tomás! Pero... ¿cómo puedo hacer una compra online? No sé bien cómo funciona eso.`);
+        setTimeout(() => {
+          addMessageToConversation('camilo', 'incoming', `¡Genial, mamá! 🎁 Para comprar online podés usar <strong>MercadoLibre</strong>. Es como un shopping pero en el celular.<br><br>Primero tenés que ir a la <strong>Play Store</strong> (esa app con el triangulito de colores) y buscar "MercadoLibre". Le das a <strong>Instalar</strong> y esperás un ratito.<br><br>Después abrís la app, buscás lo que querés y listo! Es re fácil, vas a ver. 😄<br><br>Cualquier cosa me llamás y te ayudo! ❤️`);
+          setTimeout(() => {
+            if (replyBox) {
+              replyBox.classList.remove('is-hidden');
+              replyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-birthday-accept="true">Continuar</button>`;
+              const acceptBtn = document.getElementById('sendReplyBtn');
+              if (acceptBtn) {
+                acceptBtn.addEventListener('click', (e2) => {
+                  e2.stopPropagation();
+                  if (missionsState.currentMissionId === 'birthday' && !missionsState.completed) {
+                    completeMission('birthday');
+                  }
+                  switchPhoneView('phoneHomeView');
+                });
+              }
+            }
+          }, 1500);
+        }, 1500);
+      });
+    }
+  }
+}
+
 if (ui.phoneAppBtns) {
   ui.phoneAppBtns.forEach((btn) => {
     btn.addEventListener('click', (e) => {
@@ -2013,6 +2527,16 @@ if (ui.phoneAppBtns) {
       if (app === 'messages') switchPhoneView('phoneMessagesView');
       if (app === 'map') switchPhoneView('phoneMapView');
       if (app === 'settings') switchPhoneView('phoneSettingsView');
+      if (app === 'playstore') {
+        renderPlayStore();
+        switchPhoneView('phonePlayStoreView');
+      }
+      if (app === 'mercadolibre') {
+        mlAdState.phase = 1;
+        mlAdState.ad3Clicks = 0;
+        renderMLAd();
+        switchPhoneView('phoneMLAdView');
+      }
     });
   });
 }
@@ -2040,31 +2564,31 @@ if (ui.phoneHomeBar) {
   });
 }
 
-const dilemmaInvest = {
-  title: "Dilema: Préstamo Familiar",
-  description: "Tu hijo te pide $200 para invertir en un negocio de tecnología de alto riesgo.",
+const dilemmaTutorial = {
+  title: "Respuesta a Camilo",
+  description: "Tu hijo te mandó un mensaje tan bonito. ¿Qué le respondés?",
   optionA: {
-    label: "Prestarle los $200",
+    label: "Enviarle un regalito de agradecimiento",
     successRate: 0,
     positive: {
-      description: "El negocio despega rápidamente y tu hijo te devuelve el dinero con creces.",
-      effects: { money: 150, happiness: 25, calm: 10 }
+      description: "Le mandás un detallito por correo. A Camilo le llega y se emociona mucho.",
+      effects: { happiness: 20, money: -30, calm: 5 }
     },
     negative: {
-      description: "El negocio fracasa ante la competencia. Pierdes el dinero y hay tensión familiar.",
-      effects: { money: -200, happiness: -20, calm: -35 }
+      description: "Gastás un poco más de lo esperado en el regalo, pero la intención vale.",
+      effects: { happiness: 15, money: -50, calm: 5 }
     }
   },
   optionB: {
-    label: "Negarle el préstamo",
-    successRate: 0.8,
+    label: "Agradecerle con el corazón",
+    successRate: 0,
     positive: {
-      description: "Tu hijo entiende tus motivos y busca otro inversor. Proteges tus ahorros intactos.",
-      effects: { money: 0, happiness: -5, calm: 15 }
+      description: "Le contestás con palabras bonitas. Camilo sabe que tu cariño no tiene precio.",
+      effects: { happiness: 10, money: 0, calm: -5 }
     },
     negative: {
-      description: "Tu hijo se ofende profundamente por la falta de apoyo y deja de hablarte por unas semanas.",
-      effects: { money: 0, happiness: -30, calm: -20 }
+      description: "Tu tranquilidad se resiente un poco por no poder darle más.",
+      effects: { happiness: 5, money: 0, calm: -10 }
     }
   }
 };
@@ -2154,15 +2678,71 @@ function selectDilemmaOption(option) {
   }
 }
 
-if (ui.sendReplyBtn && ui.replyBubble) {
+if (ui.sendReplyBtn) {
   ui.sendReplyBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    showDilemma(dilemmaInvest, () => {
-      ui.replyBubble.classList.remove('is-hidden');
-      ui.sendReplyBtn.textContent = '✓ Decisión tomada';
-      ui.sendReplyBtn.disabled = true;
-      ui.sendReplyBtn.style.opacity = '0.5';
-    });
+    if (missionsState.currentMissionId !== 'tutorial' || missionsState.completed) return;
+
+    ui.sendReplyBtn.disabled = true;
+    ui.sendReplyBtn.style.opacity = '0.5';
+    ui.sendReplyBtn.textContent = 'Eligiendo...';
+    const replyBox = document.querySelector('.phone-chat-reply-box');
+    if (replyBox) replyBox.classList.add('is-hidden');
+
+    if (ui.dilemmaTitle) ui.dilemmaTitle.textContent = dilemmaTutorial.title;
+    if (ui.dilemmaDesc) ui.dilemmaDesc.textContent = dilemmaTutorial.description;
+    if (ui.optATitle) ui.optATitle.textContent = dilemmaTutorial.optionA.label;
+    if (ui.optAPosDesc) ui.optAPosDesc.textContent = dilemmaTutorial.optionA.positive.description;
+    renderImpactBadges(ui.optAPosImpact, dilemmaTutorial.optionA.positive.effects);
+    if (ui.optANegDesc) ui.optANegDesc.textContent = dilemmaTutorial.optionA.negative.description;
+    renderImpactBadges(ui.optANegImpact, dilemmaTutorial.optionA.negative.effects);
+    if (ui.optBTitle) ui.optBTitle.textContent = dilemmaTutorial.optionB.label;
+    if (ui.optBPosDesc) ui.optBPosDesc.textContent = dilemmaTutorial.optionB.positive.description;
+    renderImpactBadges(ui.optBPosImpact, dilemmaTutorial.optionB.positive.effects);
+    if (ui.optBNegDesc) ui.optBNegDesc.textContent = dilemmaTutorial.optionB.negative.description;
+    renderImpactBadges(ui.optBNegImpact, dilemmaTutorial.optionB.negative.effects);
+
+    ui.dilemmaModal.setAttribute('aria-hidden', 'false');
+
+    const btnA = document.getElementById('btnSelectA');
+    const btnB = document.getElementById('btnSelectB');
+
+    if (btnA) {
+      btnA.onclick = () => {
+        ui.dilemmaModal.setAttribute('aria-hidden', 'true');
+        applyEffects(dilemmaTutorial.optionA.positive.effects);
+        if (ui.outcomeDesc) ui.outcomeDesc.textContent = dilemmaTutorial.optionA.positive.description;
+        renderImpactBadges(ui.outcomeImpact, dilemmaTutorial.optionA.positive.effects);
+        if (ui.btnConfirmOutcome) {
+          ui.btnConfirmOutcome.onclick = () => {
+            ui.outcomeModal.setAttribute('aria-hidden', 'true');
+            setTimeout(() => {
+              showMartaReplyTutorial('A');
+              setTimeout(() => showCamiloBedMessage(), 1500);
+            }, 300);
+          };
+        }
+        ui.outcomeModal.setAttribute('aria-hidden', 'false');
+      };
+    }
+    if (btnB) {
+      btnB.onclick = () => {
+        ui.dilemmaModal.setAttribute('aria-hidden', 'true');
+        applyEffects(dilemmaTutorial.optionB.positive.effects);
+        if (ui.outcomeDesc) ui.outcomeDesc.textContent = dilemmaTutorial.optionB.positive.description;
+        renderImpactBadges(ui.outcomeImpact, dilemmaTutorial.optionB.positive.effects);
+        if (ui.btnConfirmOutcome) {
+          ui.btnConfirmOutcome.onclick = () => {
+            ui.outcomeModal.setAttribute('aria-hidden', 'true');
+            setTimeout(() => {
+              showMartaReplyTutorial('B');
+              setTimeout(() => showCamiloBedMessage(), 1500);
+            }, 300);
+          };
+        }
+        ui.outcomeModal.setAttribute('aria-hidden', 'false');
+      };
+    }
   });
 }
 
@@ -2215,11 +2795,22 @@ function animate() {
   const dt = clock.getDelta();
   updateFirstPerson(dt);
   updateDoors(dt);
+  updateBedPrompt(dt);
+  updateDayTransition(dt);
+  updatePhonePrompt(dt);
   updatePhoneAnimation(dt);
   updateStats(dt);
   updateMissions(dt);
   updateCinematic(dt);
   renderer.render(scene, camera);
+
+  const dayOverlay = document.getElementById('dayTransitionOverlay');
+  if (dayOverlay) {
+    const opacity = getDayTransitionOpacity();
+    dayOverlay.style.opacity = opacity;
+    dayOverlay.setAttribute('aria-hidden', opacity < 0.01 ? 'true' : 'false');
+  }
+
   requestAnimationFrame(animate);
 }
 
@@ -2232,6 +2823,34 @@ if (ui.startBtn) {
   ui.startBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     startIntro();
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (missionsState.currentMissionId === 'tutorial' && !missionsState.completed) {
+    if (e.target && e.target.matches('[data-tutorial-accept="true"]')) {
+      e.stopPropagation();
+      completeMission('tutorial');
+      switchPhoneView('phoneHomeView');
+    }
+  }
+});
+
+if (ui.daysBlockedModal) {
+  const btnAccept = document.getElementById('btnAcceptBlocked');
+  if (btnAccept) {
+    btnAccept.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hideDaysBlockedModal();
+    });
+  }
+}
+
+const playstoreSearchInput = document.getElementById('playstoreSearchInput');
+if (playstoreSearchInput) {
+  playstoreSearchInput.addEventListener('input', (e) => {
+    e.stopPropagation();
+    renderPlayStore(e.target.value);
   });
 }
 

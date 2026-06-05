@@ -52,6 +52,11 @@
     </div>
     <div id="doorPrompt" class="door-prompt" aria-live="polite">E Abrir</div>
     <div id="phonePrompt" class="phone-prompt" aria-live="polite">T Coger teléfono</div>
+    <div id="bedPrompt" class="door-prompt" aria-live="polite">E Dormir</div>
+
+    <div id="dayCounter" class="day-counter">Día 1</div>
+
+    <div id="dayTransitionOverlay" class="day-transition-overlay" aria-hidden="true"></div>
 
     <div id="phoneUI" class="phone-ui" aria-hidden="true">
       <div class="phone-status-bar">
@@ -104,6 +109,21 @@
               </svg></div>
             <span>Ajustes</span>
           </button>
+          <button class="phone-app-btn" data-app="playstore" aria-label="Play Store" id="playstoreAppBtn" style="display:none;">
+            <div class="app-icon bg-playstore"><svg viewBox="0 0 24 24" fill="white" stroke="none">
+                <polygon points="3,2 12,12 3,22" opacity="0.9"/>
+                <polygon points="12,12 21,7 15,2" opacity="0.7"/>
+                <polygon points="12,12 21,17 15,22" opacity="0.8"/>
+                <polygon points="3,2 12,12 21,7 15,2" opacity="0.6"/>
+              </svg></div>
+            <span>Play Store</span>
+          </button>
+          <button class="phone-app-btn" data-app="mercadolibre" aria-label="MercadoLibre" id="mercadolibreAppBtn" style="display:none;">
+            <div class="app-icon bg-ml"><svg viewBox="0 0 24 24" fill="white" stroke="none">
+                <text x="4" y="17" font-size="12" font-weight="bold" fill="white">ML</text>
+              </svg></div>
+            <span>MercadoLibre</span>
+          </button>
         </div>
       </div>
 
@@ -116,12 +136,9 @@
           <span>Hijo</span>
         </div>
         <div class="phone-chat-container">
-          <div class="chat-bubble incoming">Hola, me surgió una oportunidad única para invertir en un negocio de
-            tecnología, pero necesito $200 hoy mismo. ¿Me los prestas? Te lo devuelvo con intereses si sale bien.</div>
-          <div id="replyBubble" class="chat-bubble outgoing is-hidden">Ya tomé una decisión sobre el dinero.</div>
         </div>
         <div class="phone-chat-reply-box">
-          <button id="sendReplyBtn" class="phone-reply-btn">Responder (Abrir Dilema)</button>
+          <button id="sendReplyBtn" class="phone-reply-btn">Responder</button>
         </div>
       </div>
 
@@ -168,7 +185,105 @@
         </div>
       </div>
 
+      <div id="phonePlayStoreView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span>Play Store</span>
+        </div>
+        <div class="playstore-search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="playstoreSearchInput" placeholder="Buscar apps y juegos" />
+        </div>
+        <div class="playstore-section">
+          <h4>Apps destacadas</h4>
+          <div class="playstore-grid" id="playstoreAppList"></div>
+        </div>
+      </div>
+
+      <div id="phoneMLAdView" class="phone-view phone-ml-ad-view">
+        <div class="ml-ad-container" id="mlAdContainer">
+          <div class="ml-ad-content" id="mlAdContent"></div>
+        </div>
+      </div>
+
+      <div id="phoneMLHomeView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span>MercadoLibre</span>
+        </div>
+        <div class="ml-home-content">
+          <div class="ml-search-bar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" placeholder="Buscar productos, marcas y más..." />
+          </div>
+          <div class="ml-categories">
+            <div class="ml-category">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              <span>Ofertas</span>
+            </div>
+            <div class="ml-category">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+              <span>Compras</span>
+            </div>
+            <div class="ml-category">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+              <span>Favoritos</span>
+            </div>
+            <div class="ml-category">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+              <span>Categorías</span>
+            </div>
+          </div>
+          <div class="ml-products">
+            <div class="ml-product-card">
+              <div class="ml-product-img" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+              <div class="ml-product-info">
+                <span class="ml-product-price">$15.999</span>
+                <span class="ml-product-title">Smart TV 32"</span>
+                <span class="ml-product-shipping">Envío gratis</span>
+              </div>
+            </div>
+            <div class="ml-product-card">
+              <div class="ml-product-img" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+              <div class="ml-product-info">
+                <span class="ml-product-price">$8.499</span>
+                <span class="ml-product-title">Auriculares Bluetooth</span>
+                <span class="ml-product-shipping">Envío gratis</span>
+              </div>
+            </div>
+            <div class="ml-product-card">
+              <div class="ml-product-img" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+              <div class="ml-product-info">
+                <span class="ml-product-price">$22.999</span>
+                <span class="ml-product-title">Celular Samsung</span>
+                <span class="ml-product-shipping">Envío gratis</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="phone-home-bar" id="phoneHomeBar"></div>
+    </div>
+
+    <div id="daysBlockedModal" class="days-blocked-modal" aria-hidden="true">
+      <div class="days-blocked-card">
+        <h2>No podés dormir aún</h2>
+        <p>Tenés que completar las misiones antes de ir a dormir.</p>
+        <button id="btnAcceptBlocked">Aceptar</button>
+      </div>
     </div>
 
     <nav class="walk-pad" aria-label="Movimiento">
