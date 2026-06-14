@@ -110,6 +110,13 @@ const ui = {
   optBNegDesc: document.querySelector('#optBNegDesc'),
   optBNegImpact: document.querySelector('#optBNegImpact'),
   btnSelectB: document.querySelector('#btnSelectB'),
+  optCTitle: document.querySelector('#optCTitle'),
+  optCPosDesc: document.querySelector('#optCPosDesc'),
+  optCPosImpact: document.querySelector('#optCPosImpact'),
+  optCNegDesc: document.querySelector('#optCNegDesc'),
+  optCNegImpact: document.querySelector('#optCNegImpact'),
+  btnSelectC: document.querySelector('#btnSelectC'),
+  optCContainer: document.querySelector('#optCContainer'),
   outcomeModal: document.querySelector('#outcomeModal'),
   outcomeDesc: document.querySelector('#outcomeDesc'),
   outcomeImpact: document.querySelector('#outcomeImpact'),
@@ -2593,6 +2600,57 @@ const dilemmaTutorial = {
   }
 };
 
+const mlGiftsDilemma = {
+  title: "¡Día especial!",
+  description: "Es el cumpleaños de alguien especial. ¿Qué le regalás?",
+  optionA: {
+    label: "🎮 PlayStation 5",
+    successRate: 1,
+    positive: {
+      description: "¡Le gustó DEMASIADO! No para de agradecer. ¡Todos te admiran!",
+      effects: { happiness: 40, calm: -15, money: -200 }
+    },
+    negative: {
+      description: "Igual le gustó mucho, pero el bolsillo llora.",
+      effects: { happiness: 35, calm: -10, money: -200 }
+    }
+  },
+  optionB: {
+    label: "⚽ Pelota",
+    successRate: 1,
+    positive: {
+      description: "Un regalo sencillo pero con cariño. ¡Está feliz!",
+      effects: { happiness: 15, calm: 5, money: -30 }
+    },
+    negative: {
+      description: "No es lo que esperaba, pero la intención vale.",
+      effects: { happiness: 10, calm: 0, money: -30 }
+    }
+  },
+  optionC: {
+    label: "😢 Nada",
+    successRate: 1,
+    positive: {
+      description: "...se nota la situación. La persona entiende pero está muy triste.",
+      effects: { happiness: -30, calm: -5, money: 0 }
+    },
+    negative: {
+      description: "La persona se pone muy triste. La relación se enfría.",
+      effects: { happiness: -40, calm: -10, money: 0 }
+    }
+  }
+};
+
+function openMLGifts() {
+  switchPhoneView('phoneHomeView');
+  setTimeout(() => {
+    showDilemma(mlGiftsDilemma, () => {
+      updateStats(0);
+      switchPhoneView('phoneMLHomeView');
+    });
+  }, 300);
+}
+
 function renderImpactBadges(container, effects) {
   if (!container) return;
   container.innerHTML = '';
@@ -2642,6 +2700,18 @@ function showDilemma(config, onResolve) {
   renderImpactBadges(ui.optBPosImpact, config.optionB.positive.effects);
   if (ui.optBNegDesc) ui.optBNegDesc.textContent = config.optionB.negative.description;
   renderImpactBadges(ui.optBNegImpact, config.optionB.negative.effects);
+
+  if (config.optionC) {
+    if (ui.optCTitle) ui.optCTitle.textContent = config.optionC.label;
+    if (ui.optCPosDesc) ui.optCPosDesc.textContent = config.optionC.positive.description;
+    renderImpactBadges(ui.optCPosImpact, config.optionC.positive.effects);
+    if (ui.optCNegDesc) ui.optCNegDesc.textContent = config.optionC.negative.description;
+    renderImpactBadges(ui.optCNegImpact, config.optionC.negative.effects);
+    if (ui.optCContainer) ui.optCContainer.style.display = 'block';
+    if (ui.btnSelectC) ui.btnSelectC.onclick = () => selectDilemmaOption(config.optionC);
+  } else {
+    if (ui.optCContainer) ui.optCContainer.style.display = 'none';
+  }
 
   if (ui.btnSelectA) ui.btnSelectA.onclick = () => selectDilemmaOption(config.optionA);
   if (ui.btnSelectB) ui.btnSelectB.onclick = () => selectDilemmaOption(config.optionB);
