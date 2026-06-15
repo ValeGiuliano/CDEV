@@ -124,6 +124,12 @@
               </svg></div>
             <span>MercadoLibre</span>
           </button>
+          <button class="phone-app-btn" data-app="mercad0libre" aria-label="Mercad0Libre" id="mercad0libreAppBtn" style="display:none;">
+            <div class="app-icon bg-ml-fake"><svg viewBox="0 0 24 24" fill="white" stroke="none">
+                <text x="4" y="17" font-size="12" font-weight="bold" fill="white">M0</text>
+              </svg></div>
+            <span>Mercad0Libre</span>
+          </button>
         </div>
       </div>
 
@@ -133,11 +139,13 @@
               stroke-width="2">
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg></button>
-          <span>Hijo</span>
+          <span id="messagesTopbarTitle">Mensajes</span>
         </div>
-        <div class="phone-chat-container">
+        <div id="phoneContactsList" class="phone-contacts-list">
         </div>
-        <div class="phone-chat-reply-box">
+        <div id="phoneChatContainer" class="phone-chat-container" style="display:none;">
+        </div>
+        <div id="phoneChatReplyBox" class="phone-chat-reply-box" style="display:none;">
           <button id="sendReplyBtn" class="phone-reply-btn">Responder</button>
         </div>
       </div>
@@ -181,6 +189,10 @@
           <div class="setting-item">
             <span>Ahorro de batería</span>
             <input type="checkbox" id="settingBat" />
+          </div>
+          <div class="setting-item">
+            <span>Desactivar fatiga visual</span>
+            <input type="checkbox" id="settingFatigue" />
           </div>
         </div>
       </div>
@@ -279,6 +291,149 @@
         </div>
       </div>
 
+      <div id="phoneFakeMLView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#ffd700;font-weight:800;">Mercad0Libre</span>
+        </div>
+        <div class="fakeml-content">
+          <div class="fakeml-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" placeholder="Buscar en Mercad0Libre..." />
+          </div>
+          <h4 style="color:#ffd700;margin:12px 14px 8px;font-size:0.95rem;">Recomendados para vos</h4>
+          <div id="fakemlProducts" class="fakeml-products"></div>
+        </div>
+      </div>
+
+      <div id="phoneFakeMLCheckoutView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#ffd700;font-weight:800;">Finalizar compra</span>
+        </div>
+        <div class="fakeml-checkout-content">
+          <div class="fakeml-checkout-product">
+            <div class="fakeml-checkout-img" style="background: linear-gradient(135deg, #ff5e7e 0%, #ffd93d 100%);"></div>
+            <div>
+              <div style="font-weight:700;color:#fff;font-size:0.95rem;">Barbie futbolista edición mundial 2026</div>
+              <div style="color:#ffd700;font-weight:800;font-size:1.1rem;margin-top:4px;">$42.999</div>
+            </div>
+          </div>
+          <div class="fakeml-checkout-section">
+            <h4 style="color:#ffd700;margin:0 0 10px;font-size:0.9rem;">Datos de la tarjeta</h4>
+            <div class="fakeml-field">
+              <label>Número de tarjeta</label>
+              <input type="text" id="fakemlCardNumber" readonly placeholder="**** **** **** ****" />
+            </div>
+            <div class="fakeml-field">
+              <label>Nombre y apellido</label>
+              <input type="text" id="fakemlCardName" readonly placeholder="Como figura en la tarjeta" />
+            </div>
+            <div class="fakeml-field-row">
+              <div class="fakeml-field">
+                <label>Vencimiento</label>
+                <input type="text" id="fakemlCardExp" readonly placeholder="MM/AA" />
+              </div>
+              <div class="fakeml-field">
+                <label>Código de seguridad</label>
+                <input type="text" id="fakemlCardCvv" readonly placeholder="CVV" />
+              </div>
+            </div>
+            <button id="fakemlLoadCardBtn" class="fakeml-btn-secondary">Cargar datos de tarjeta</button>
+            <button id="fakemlConfirmBtn" class="fakeml-btn-primary">Confirmar compra</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="phoneMLProductsView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#ffd700;font-weight:800;">MercadoLibre</span>
+        </div>
+        <div class="fakeml-content">
+          <div class="fakeml-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" placeholder="Buscar en MercadoLibre..." />
+          </div>
+          <h4 style="color:#ffd700;margin:12px 14px 8px;font-size:0.95rem;">Recomendados para vos</h4>
+          <div id="mlProducts" class="fakeml-products"></div>
+        </div>
+      </div>
+
+      <div id="phoneMLCheckoutView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#ffd700;font-weight:800;">Finalizar compra</span>
+        </div>
+        <div class="fakeml-checkout-content">
+          <div class="fakeml-checkout-product">
+            <div class="fakeml-checkout-img" style="background: linear-gradient(135deg, #ff5e7e 0%, #ffd93d 100%);"></div>
+            <div>
+              <div style="font-weight:700;color:#fff;font-size:0.95rem;">Barbie futbolista edición mundial 2026</div>
+              <div style="color:#ffd700;font-weight:800;font-size:1.1rem;margin-top:4px;">$42.999</div>
+            </div>
+          </div>
+          <div class="fakeml-checkout-section">
+            <h4 style="color:#ffd700;margin:0 0 10px;font-size:0.9rem;">Datos de la tarjeta</h4>
+            <div class="fakeml-field">
+              <label>Número de tarjeta</label>
+              <input type="text" id="mlCardNumber" readonly placeholder="**** **** **** ****" />
+            </div>
+            <div class="fakeml-field">
+              <label>Nombre y apellido</label>
+              <input type="text" id="mlCardName" readonly placeholder="Como figura en la tarjeta" />
+            </div>
+            <div class="fakeml-field-row">
+              <div class="fakeml-field">
+                <label>Vencimiento</label>
+                <input type="text" id="mlCardExp" readonly placeholder="MM/AA" />
+              </div>
+              <div class="fakeml-field">
+                <label>Código de seguridad</label>
+                <input type="text" id="mlCardCvv" readonly placeholder="CVV" />
+              </div>
+            </div>
+            <button id="mlLoadCardBtn" class="fakeml-btn-secondary">Cargar datos de tarjeta</button>
+            <button id="mlConfirmBtn" class="fakeml-btn-primary">Confirmar compra</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="phoneMLSuccessView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#ffd700;font-weight:800;">MercadoLibre</span>
+        </div>
+        <div class="fakeml-checkout-content" style="align-items:center;justify-content:center;text-align:center;">
+          <div style="font-size:3.5rem;line-height:1;margin-bottom:8px;">✅</div>
+          <h2 style="color:#ffd700;font-size:1.4rem;font-weight:800;margin:0 0 12px;">¡Compra confirmada!</h2>
+          <p style="color:#fff;font-size:1rem;line-height:1.5;margin:0 0 8px;">Su pedido llega mañana.</p>
+          <p style="color:#9ca3af;font-size:0.85rem;line-height:1.4;margin:0 0 24px;">Gracias por confiar en MercadoLibre.</p>
+          <button id="mlSuccessBtn" class="fakeml-btn-primary">Aceptar</button>
+        </div>
+      </div>
+
       <div class="phone-home-bar" id="phoneHomeBar"></div>
     </div>
 
@@ -313,7 +468,7 @@
               <i data-lucide="dollar-sign" class="stat-icon text-yellow"></i>
               <span class="stat-label">Dinero</span>
             </div>
-            <span class="stat-value" id="moneyValue">$500</span>
+            <span class="stat-value" id="moneyValue">$100.000</span>
           </div>
         </div>
         <div class="stat-item">
@@ -418,6 +573,21 @@
           <div class="impact-badges large" id="outcomeImpact"></div>
         </div>
         <button class="dilemma-btn confirm" id="btnConfirmOutcome">Continuar</button>
+      </div>
+    </div>
+
+    <div id="fraudOverlay" class="fraud-overlay" aria-hidden="true"></div>
+
+    <div id="gameOverModal" class="game-over-modal" aria-hidden="true">
+      <div class="game-over-card">
+        <div class="game-over-icon">⚠️</div>
+        <h2>Final Malo: Aplicación Fraudulenta</h2>
+        <p>Instalaste y usaste <strong>Mercad0Libre</strong>, una app falsa que se hizo pasar por MercadoLibre. Tus datos y tu dinero fueron robados.</p>
+        <div class="impact-badges large">
+          <span class="impact-badge neg">Dinero -$100.000</span>
+          <span class="impact-badge neg">Calma -30%</span>
+        </div>
+        <button class="dilemma-btn" id="btnRewindGameOver">↩️ Volver atrás</button>
       </div>
     </div>
   </div>

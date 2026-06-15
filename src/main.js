@@ -66,18 +66,21 @@ const phoneState = {
 
 const mlAdState = {
   phase: 0,
+  adsCompleted: false,
   ad2TrueIndex: -1,
   ad3Clicks: 0,
-  ad3MaxClicks: 10,
+  ad3MaxClicks: 5,
   ad3XPos: { top: '50%', left: '50%' },
 };
 
 const statsState = {
   fatigue: 0,
-  money: 500,
+  money: 100000,
   happiness: 80,
   calm: 75,
 };
+
+let visualFatigueDisabled = false;
 
 const ui = {
   doorPrompt: document.querySelector('#doorPrompt'),
@@ -138,6 +141,30 @@ const ui = {
   introOverlay: document.querySelector('#introOverlay'),
   introFade: document.querySelector('#introFade'),
   startBtn: document.querySelector('#startBtn'),
+  messagesTopbarTitle: document.querySelector('#messagesTopbarTitle'),
+  phoneContactsList: document.querySelector('#phoneContactsList'),
+  phoneChatContainer: document.querySelector('#phoneChatContainer'),
+  phoneChatReplyBox: document.querySelector('#phoneChatReplyBox'),
+  mercad0libreAppBtn: document.querySelector('#mercad0libreAppBtn'),
+  settingFatigue: document.querySelector('#settingFatigue'),
+  fakemlProducts: document.querySelector('#fakemlProducts'),
+  fakemlCardNumber: document.querySelector('#fakemlCardNumber'),
+  fakemlCardName: document.querySelector('#fakemlCardName'),
+  fakemlCardExp: document.querySelector('#fakemlCardExp'),
+  fakemlCardCvv: document.querySelector('#fakemlCardCvv'),
+  fakemlLoadCardBtn: document.querySelector('#fakemlLoadCardBtn'),
+  fakemlConfirmBtn: document.querySelector('#fakemlConfirmBtn'),
+  mlProducts: document.querySelector('#mlProducts'),
+  mlCardNumber: document.querySelector('#mlCardNumber'),
+  mlCardName: document.querySelector('#mlCardName'),
+  mlCardExp: document.querySelector('#mlCardExp'),
+  mlCardCvv: document.querySelector('#mlCardCvv'),
+  mlLoadCardBtn: document.querySelector('#mlLoadCardBtn'),
+  mlConfirmBtn: document.querySelector('#mlConfirmBtn'),
+  mlSuccessBtn: document.querySelector('#mlSuccessBtn'),
+  fraudOverlay: document.querySelector('#fraudOverlay'),
+  gameOverModal: document.querySelector('#gameOverModal'),
+  btnRewindGameOver: document.querySelector('#btnRewindGameOver'),
 };
 
 const missionsState = {
@@ -1514,7 +1541,10 @@ let gameState = {
 
 const conversations = {
   camilo: [],
+  clara: [],
 };
+
+let currentContact = null;
 
 const installedApps = {
   messages: true,
@@ -1522,14 +1552,16 @@ const installedApps = {
   settings: true,
   playstore: false,
   mercadolibre: false,
+  mercad0libre: false,
 };
 
 const playstoreApps = [
-  { id: 'mercadolibre', name: 'MercadoLibre', dev: 'Mercado Libre', color: '#FFF600', label: 'ML' },
+  { id: 'mercad0libre', name: 'Mercad0Libre', dev: 'Mercado Libre', color: '#FFF600', label: 'M0' },
   { id: 'whatsapp', name: 'WhatsApp', dev: 'Meta Platforms', color: '#25D366', label: 'WA' },
   { id: 'instagram', name: 'Instagram', dev: 'Meta Platforms', color: '#E4405F', label: 'IG' },
   { id: 'spotify', name: 'Spotify', dev: 'Spotify AB', color: '#1DB954', label: 'Sp' },
   { id: 'netflix', name: 'Netflix', dev: 'Netflix, Inc.', color: '#E50914', label: 'N' },
+  { id: 'mercadolibre', name: 'MercadoLibre', dev: 'Mercado Libre', color: '#FFF600', label: 'ML' },
 ];
 
 // 6. Reloj de Pared Analógico (Fondo Comedor)
@@ -1729,6 +1761,28 @@ function playCinematicSound(cfg) {
 
     osc.start();
     osc.stop(audioCtx.currentTime + (cfg.duration || 0.2));
+  } catch (e) { }
+}
+
+function playAlertSound() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const t0 = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(880, t0);
+    osc.frequency.linearRampToValueAtTime(440, t0 + 0.15);
+    osc.frequency.linearRampToValueAtTime(880, t0 + 0.3);
+
+    gain.gain.setValueAtTime(0.18, t0);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
+
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0 + 0.5);
   } catch (e) { }
 }
 
@@ -2245,6 +2299,191 @@ const introSequence = [
   }
 ];
 
+// --- DAY 2 WAKE-UP SEQUENCE ---
+const day2WakeUpSequence = [
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Al día siguiente…' },
+    onStart: () => {
+      camera.position.set(4.2, 0.72, 3.45);
+      camera.lookAt(4.2, 2.5, 3.45);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.transition = 'none';
+        ui.dayTransitionOverlay.style.opacity = '1';
+        ui.dayTransitionOverlay.setAttribute('aria-hidden', 'false');
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(1 - ease * 0.7);
+      }
+      camera.position.y = THREE.MathUtils.lerp(0.72, 0.78, ease);
+    }
+  },
+  {
+    duration: 3.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Marta abre los ojos. La luz de la mañana entra por la ventana.' },
+    sound: { freq: 320, type: 'sine', duration: 0.4 },
+    onStart: () => {
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = '0.3';
+      }
+      if (dayRestarted && ui.cinematicText) {
+        ui.cinematicText.textContent = 'Qué horrible pesadilla…';
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(0.3 * (1 - ease));
+      }
+      // From looking up at ceiling to looking toward the window
+      const startTarget = new THREE.Vector3(4.2, 2.5, 3.45);
+      const endTarget = new THREE.Vector3(4.2, 1.4, 0);
+      const currentTarget = new THREE.Vector3().lerpVectors(startTarget, endTarget, ease);
+      camera.lookAt(currentTarget);
+      camera.position.y = THREE.MathUtils.lerp(0.78, 0.82, ease);
+    }
+  }
+];
+
+function restartCurrentDay() {
+  // Close game over modal
+  if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'true');
+  if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
+
+  // Reset stats to initial Day 2 values
+  statsState.fatigue = 0;
+  statsState.money = 100000;
+  statsState.happiness = 80;
+  statsState.calm = 75;
+  updateStats(0);
+
+  // Reset missions
+  missionsState.currentMissionId = null;
+  missionsState.active = false;
+  missionsState.completed = false;
+  if (ui.missionsContainer) ui.missionsContainer.setAttribute('aria-hidden', 'true');
+
+  // Reset conversations
+  conversations.camilo = [];
+  conversations.clara = [];
+
+  // Reset installed apps
+  installedApps.playstore = false;
+  installedApps.mercadolibre = false;
+  installedApps.mercad0libre = false;
+  updatePhoneHomeApps();
+
+  // Reset MercadoLibre ads state
+  mlAdState.phase = 0;
+  mlAdState.adsCompleted = false;
+  mlAdState.ad3Clicks = 0;
+  mlAdState.ad2TrueIndex = -1;
+  mlAdState.ad3XPos = { top: '50%', left: '50%' };
+
+  // Stop any active fraud drain
+  fraudDrainState.active = false;
+
+  // Close any open modals
+  if (ui.dilemmaModal) ui.dilemmaModal.setAttribute('aria-hidden', 'true');
+  if (ui.outcomeModal) ui.outcomeModal.setAttribute('aria-hidden', 'true');
+  if (ui.daysBlockedModal) ui.daysBlockedModal.setAttribute('aria-hidden', 'true');
+
+  // Put the phone away (save it) before starting the wake-up cinematic
+  phoneState.active = false;
+  phoneState.progress = 0;
+  phoneState.wakeTimer = 0;
+  phoneState.sleepTimer = 0;
+  switchPhoneView('phoneHomeView');
+  if (ui.phoneUI) {
+    ui.phoneUI.classList.remove('is-visible');
+    ui.phoneUI.setAttribute('aria-hidden', 'true');
+  }
+  if (ui.phonePrompt) {
+    ui.phonePrompt.textContent = 'T Coger teléfono';
+    ui.phonePrompt.classList.remove('is-active');
+  }
+  tablePhoneGroup.visible = true;
+  heldPhoneGroup.visible = false;
+  if (document.pointerLockElement === canvas) {
+    document.requestPointerLock();
+  }
+
+  // Flag for restarted day
+  dayRestarted = true;
+
+  // Position camera in bed and restart wake-up cinematic
+  camera.position.set(4.2, 0.72, 3.45);
+  lookEuler.set(0, 0, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  setTimeout(() => {
+    startDay2();
+  }, 400);
+}
+
+function startDay3() {
+  // Stub for Day 3: position player, show a short message via the missions container.
+  if (ui.missionsContainer) {
+    ui.missionsContainer.setAttribute('aria-hidden', 'false');
+    if (ui.missionTitle) ui.missionTitle.textContent = 'Fin del Día 2';
+    if (ui.missionText) ui.missionText.textContent = 'Marta se acuesta tranquila. La Barbie llegará mañana y Clara estará feliz. ❤️';
+    if (ui.missionCard) ui.missionCard.classList.add('is-completed');
+  }
+}
+
+function startDay2() {
+  // Position player in bed area for the wake-up cinematic
+  camera.position.set(4.2, 0.72, 3.45);
+  lookEuler.set(0, 0, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  // Wait for the day transition fade-out to finish before starting the cinematic
+  function waitForTransition() {
+    if (dayTransitionState.active) {
+      requestAnimationFrame(waitForTransition);
+      return;
+    }
+
+    startCinematic(day2WakeUpSequence, () => {
+      // After cinematic: give control back and wait 5 seconds for the message
+      camera.position.set(4.2, 1.48, 3.8);
+      lookEuler.set(0, Math.PI, 0);
+      camera.quaternion.setFromEuler(lookEuler);
+
+      // Reset dayRestarted flag now that the cinematic has played
+      dayRestarted = false;
+
+      setTimeout(() => {
+        playNotificationSound();
+        phoneState.active = true;
+        if (document.pointerLockElement === canvas) {
+          document.exitPointerLock();
+        }
+        if (ui.phonePrompt) {
+          ui.phonePrompt.textContent = 'T Guardar teléfono';
+          ui.phonePrompt.classList.add('is-active');
+        }
+        startClaraBirthdayMission();
+        switchPhoneView('phoneMessagesView');
+        setTimeout(() => {
+          renderContactList();
+          openContactChat('camilo');
+          setTimeout(() => {
+            startClaraBirthdayFlow();
+          }, 500);
+        }, 200);
+      }, 5000);
+    });
+  }
+
+  waitForTransition();
+}
+
 function startIntro() {
   document.body.classList.add('intro-active');
 
@@ -2532,22 +2771,14 @@ function handleMoveKey(event, active) {
     if (isNearBed()) {
       startDayTransition(() => {
         gameState.currentDay++;
-        statsState.fatigue = 0;
         if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + gameState.currentDay;
         missionsState.currentMissionId = null;
         missionsState.active = false;
         missionsState.completed = false;
         if (gameState.currentDay === 2) {
-          installedApps.playstore = true;
-          updatePhoneHomeApps();
-          setTimeout(() => {
-            playNotificationSound();
-            startBirthdayMission();
-            switchPhoneView('phoneMessagesView');
-            setTimeout(() => {
-              startBirthdayFlow();
-            }, 500);
-          }, 2000);
+          startDay2();
+        } else if (gameState.currentDay === 3) {
+          startDay3();
         }
       });
       return;
@@ -2730,12 +2961,7 @@ function switchPhoneView(viewId) {
 }
 
 function addTutorialMessage() {
-  const container = document.querySelector('.phone-chat-container');
-  if (!container) return;
-
-  const tutorialBubble = document.createElement('div');
-  tutorialBubble.className = 'chat-bubble incoming tutorial-message';
-  tutorialBubble.innerHTML = `<strong>📱 ¡Bienvenida, Mamá! 📱</strong><br><br>
+  const html = `<strong>📱 ¡Bienvenida, Mamá! 📱</strong><br><br>
 Este celular es tuyo. Sé que al principio puede parecer complicado, pero vas a ver que no es tan difícil.<br><br>
 Te explico rápido:<br><br>
 😐 <strong>Fatiga:</strong> Usar el celular te cansa la vista y la cabeza. Si estás muy fatigada, la pantalla se pone borrosa. Descansá un rato y se te va a pasar.<br><br>
@@ -2746,44 +2972,21 @@ Las <strong>decisiones tienen consecuencias</strong>: cada cosa que elijas va a 
 Entrá a <strong>Mensajes</strong> para ver qué te escribí. ¡Ah! Y recordá: no importa cuánto tiempo te lleve entender todo, estoy acá para ayudarte. Te quiero, mamá. ❤️<br><br>
 <em>PD: Presioná "Responder" cuando estés lista.</em>`;
 
-  const existing = container.querySelector('.tutorial-message');
-  if (existing) existing.remove();
-  container.appendChild(tutorialBubble);
+  // Remove any existing tutorial message to avoid duplicates
+  if (conversations.camilo) {
+    conversations.camilo = conversations.camilo.filter((msg) => !msg.html.includes('¡Bienvenida, Mamá!'));
+  }
+  addMessageToConversation('camilo', 'incoming', html);
 }
 
-let tutorialChoiceMade = false;
-
-function showMartaReplyTutorial(choice) {
-  const container = document.querySelector('.phone-chat-container');
-  if (!container) return;
-
-  const replyBubble = document.createElement('div');
-  replyBubble.className = 'chat-bubble outgoing';
-
-  if (choice === 'A') {
-    replyBubble.innerHTML = `Hijito, gracias por el celular y por tu mensaje tan bonito. Me emocionaste tanto que te mandé un regalito por correo. Te quiere mucho tu mamá. ❤️`;
-  } else {
-    replyBubble.innerHTML = `Camilito, gracias por el celular y por tu mensaje. Con tu cariño y tus palabras me alcanza y sobra. No necesito cosas materiales, con saber que estás bien me basta. Te quiero hijo. ❤️`;
-  }
-
-  container.appendChild(replyBubble);
-  tutorialChoiceMade = true;
-
-  const replyBox = document.querySelector('.phone-chat-reply-box');
-  if (replyBox) replyBox.classList.add('is-hidden');
+function showMartaReplyTutorial() {
+  addMessageToConversation('camilo', 'outgoing', `Camilito, gracias por el celular y por tu mensaje tan lindo. Con tu cariño me alcanza y sobra. Voy a tratar de aprender a usarlo, aunque me cueste. Te quiero mucho, hijo. ❤️`);
 }
 
 function showCamiloBedMessage() {
-  const container = document.querySelector('.phone-chat-container');
-  if (!container) return;
+  addMessageToConversation('camilo', 'incoming', `Mamá, me alegra que te haya gustado el celular. ¿Ves que no era tan difícil? 😄<br><br>Ah, y una cosa importante: la cama es para descansar entre día y día. Si no dormís bien, el tiempo no avanza. Es tu manera de recuperarte y empezar un nuevo día.<br><br>Bueno, ya te dejo descansar. Mañana seguimos hablando. Te quiere, Camilo. ❤️<br><br><em>PD: Cuando quieras terminar la noche, andá a la cama.</em>`);
 
-  const camiloBubble = document.createElement('div');
-  camiloBubble.className = 'chat-bubble incoming';
-  camiloBubble.innerHTML = `Mamá, me alegra que te haya gustado el celular. ¿Ves que no era tan difícil? 😄<br><br>Ah, y una cosa importante: la cama es para descansar entre día y día. Si no dormís bien, el tiempo no avanza. Es tu manera de recuperarte y empezar un nuevo día.<br><br>Bueno, ya te dejo descansar. Mañana seguimos hablando. Te quiere, Camilo. ❤️<br><br><em>PD: Cuando quieras terminar la noche, andá a la cama. Pero eso lo vemos después, por ahora disfrutá conocer el celular.</em>`;
-
-  container.appendChild(camiloBubble);
-
-  const replyBox = document.querySelector('.phone-chat-reply-box');
+  const replyBox = ui.phoneChatReplyBox;
   if (replyBox) {
     replyBox.classList.remove('is-hidden');
     replyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-tutorial-accept="true">Aceptar</button>`;
@@ -2794,20 +2997,83 @@ function areAllMissionsComplete() {
   return missionsState.completed === true;
 }
 
+function renderContactList() {
+  const list = ui.phoneContactsList;
+  if (!list) return;
+
+  list.innerHTML = '';
+  currentContact = null;
+
+  const contacts = [
+    { id: 'camilo', name: 'Camilo', avatar: '👨', preview: getLastPreview('camilo') },
+    { id: 'clara', name: 'Clara', avatar: '👧', preview: getLastPreview('clara') },
+  ];
+
+  contacts.forEach((contact) => {
+    const card = document.createElement('div');
+    card.className = 'contact-card';
+    card.innerHTML = `
+      <div class="contact-avatar" style="background:${contact.id === 'camilo' ? '#2563eb' : '#ec4899'}">${contact.avatar}</div>
+      <div class="contact-info">
+        <p class="contact-name">${contact.name}</p>
+        <p class="contact-preview">${contact.preview}</p>
+      </div>
+    `;
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openContactChat(contact.id);
+    });
+    list.appendChild(card);
+  });
+
+  if (ui.phoneChatContainer) ui.phoneChatContainer.style.display = 'none';
+  if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.style.display = 'none';
+  if (ui.phoneContactsList) ui.phoneContactsList.style.display = 'flex';
+  if (ui.messagesTopbarTitle) ui.messagesTopbarTitle.textContent = 'Mensajes';
+}
+
+function getLastPreview(contact) {
+  if (!conversations[contact] || conversations[contact].length === 0) return '';
+  const last = conversations[contact][conversations[contact].length - 1];
+  const text = last.html.replace(/<[^>]*>/g, ' ').trim();
+  return text.length > 40 ? text.slice(0, 40) + '…' : text;
+}
+
+function openContactChat(contact) {
+  currentContact = contact;
+
+  if (ui.phoneContactsList) ui.phoneContactsList.style.display = 'none';
+  if (ui.phoneChatContainer) ui.phoneChatContainer.style.display = 'flex';
+  if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.style.display = 'block';
+
+  const name = contact === 'camilo' ? 'Camilo' : 'Clara';
+  if (ui.messagesTopbarTitle) ui.messagesTopbarTitle.textContent = name;
+
+  renderConversation(contact);
+}
+
 function addMessageToConversation(contact, type, html) {
   if (!conversations[contact]) conversations[contact] = [];
   conversations[contact].push({ type, html });
-  const container = document.querySelector('.phone-chat-container');
-  if (!container) return;
-  const bubble = document.createElement('div');
-  bubble.className = `chat-bubble ${type}`;
-  bubble.innerHTML = html;
-  container.appendChild(bubble);
-  container.scrollTop = container.scrollHeight;
+
+  if (currentContact === contact) {
+    const container = ui.phoneChatContainer;
+    if (!container) return;
+    const bubble = document.createElement('div');
+    bubble.className = `chat-bubble ${type}`;
+    bubble.innerHTML = html;
+    container.appendChild(bubble);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  // Update preview if contact list is visible
+  if (currentContact === null && ui.phoneContactsList && ui.phoneContactsList.style.display !== 'none') {
+    renderContactList();
+  }
 }
 
 function renderConversation(contact) {
-  const container = document.querySelector('.phone-chat-container');
+  const container = ui.phoneChatContainer;
   if (!container) return;
   container.innerHTML = '';
   if (!conversations[contact]) return;
@@ -2873,6 +3139,12 @@ function installApp(appId, btn) {
     const app = playstoreApps.find((a) => a.id === appId);
     if (app) showToast(app.name + ' instalado');
     updatePhoneHomeApps();
+
+    if (appId === 'mercadolibre') {
+      // Installing the app no longer completes the mission:
+      // the player must perform a real purchase to finish the mission.
+    }
+
     setTimeout(() => renderPlayStore(document.getElementById('playstoreSearchInput')?.value || ''), 500);
   }, 1500);
 }
@@ -2880,8 +3152,10 @@ function installApp(appId, btn) {
 function updatePhoneHomeApps() {
   const psBtn = document.getElementById('playstoreAppBtn');
   const mlBtn = document.getElementById('mercadolibreAppBtn');
+  const fakeBtn = document.getElementById('mercad0libreAppBtn');
   if (psBtn) psBtn.style.display = installedApps.playstore ? '' : 'none';
   if (mlBtn) mlBtn.style.display = installedApps.mercadolibre ? '' : 'none';
+  if (fakeBtn) fakeBtn.style.display = installedApps.mercad0libre ? '' : 'none';
 }
 
 function renderMLAd() {
@@ -2960,66 +3234,306 @@ function renderMLAd() {
       </div>
       <button class="ad-x-btn small-x" id="mlAd3X" style="top:${mlAdState.ad3XPos.top};left:${mlAdState.ad3XPos.left};">✕</button>
     `;
-    const xBtn = document.getElementById('mlAd3X');
-    if (xBtn) {
-      xBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        mlAdState.ad3Clicks++;
-        if (mlAdState.ad3Clicks >= mlAdState.ad3MaxClicks) {
-          installedApps.mercadolibre = true;
-          updatePhoneHomeApps();
-          switchPhoneView('phoneMLHomeView');
-        } else {
-          mlAdState.ad3XPos = {
-            top: (10 + Math.random() * 75) + '%',
-            left: (10 + Math.random() * 75) + '%',
-          };
-          renderMLAd();
-        }
-      });
-    }
+      const xBtn = document.getElementById('mlAd3X');
+      if (xBtn) {
+        xBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          mlAdState.ad3Clicks++;
+          if (mlAdState.ad3Clicks >= mlAdState.ad3MaxClicks) {
+            installedApps.mercadolibre = true;
+            updatePhoneHomeApps();
+            mlAdState.adsCompleted = true;
+            mlAdState.phase = 4;
+            openMLProducts();
+          } else {
+            mlAdState.ad3XPos = {
+              top: (10 + Math.random() * 75) + '%',
+              left: (10 + Math.random() * 75) + '%',
+            };
+            renderMLAd();
+          }
+        });
+      }
   }
 }
 
-function startBirthdayMission() {
-  setMission('birthday', 'Cumple de Tomás', 'Tu hijo te mandó un mensaje importante.');
-  addMessageToConversation('camilo', 'incoming', `Mamá! ¿Cómo estás? 😊<br><br>Te escribo porque en unos días es el cumple de <strong>Tomás</strong> 🎂🎉 y quería saber si vos le podías preparar algo lindo.<br><br>¿Te animás a hacerle un regalito?`);
+function startClaraBirthdayMission() {
+  setMission('claraGift', 'Regalo de Clara', 'Averiguá qué le gustaría de regalo a tu nieta Clara.');
+  addMessageToConversation('camilo', 'incoming', `Hola mamá. ¿Cómo dormiste? 😊<br><br>Te escribo porque en 5 días es el cumpleaños de <strong>Clara</strong> 🎂 y quería recordarte que estás invitada a la casa para el festejo. ¿Ya sabés qué le regalarías?`);
 }
 
-function startBirthdayFlow() {
-  const replyBox = document.querySelector('.phone-chat-reply-box');
-  if (replyBox) {
-    replyBox.classList.remove('is-hidden');
-    replyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-birthday-reply="true">Responder</button>`;
-    const btn = document.getElementById('sendReplyBtn');
-    if (btn) {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
-        addMessageToConversation('camilo', 'outgoing', `Hijito, me encantaría hacerle un regalo a Tomás! Pero... ¿cómo puedo hacer una compra online? No sé bien cómo funciona eso.`);
+function startClaraBirthdayFlow() {
+  const replyBox = ui.phoneChatReplyBox;
+  if (!replyBox) return;
+
+  replyBox.classList.remove('is-hidden');
+  replyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-clara-reply="true">Responder</button>`;
+}
+
+function openClaraChat() {
+  openContactChat('clara');
+
+  setTimeout(() => {
+    addMessageToConversation('clara', 'outgoing', `Hola Clara, ¿cómo estás? Tu papá me dijo que tu cumpleaños se acerca y quería saber qué te gustaría de regalo.`);
+
+    setTimeout(() => {
+      addMessageToConversation('clara', 'incoming', `Hola abuela! 😊 Estoy re contenta. Sí, falta poquito. Me encantaría una <strong>Barbie futbolista edición mundial 2026</strong> ⚽💖`);
+
+      setTimeout(() => {
+        addMessageToConversation('clara', 'outgoing', `Qué lindo, mi amor. Voy a ver si la consigo. Te quiero mucho. ❤️`);
+
         setTimeout(() => {
-          addMessageToConversation('camilo', 'incoming', `¡Genial, mamá! 🎁 Para comprar online podés usar <strong>MercadoLibre</strong>. Es como un shopping pero en el celular.<br><br>Primero tenés que ir a la <strong>Play Store</strong> (esa app con el triangulito de colores) y buscar "MercadoLibre". Le das a <strong>Instalar</strong> y esperás un ratito.<br><br>Después abrís la app, buscás lo que querés y listo! Es re fácil, vas a ver. 😄<br><br>Cualquier cosa me llamás y te ayudo! ❤️`);
+          // Switch back to Camilo chat to receive the next instructions
+          addMessageToConversation('camilo', 'incoming', `Genial, mamá. Para comprar online podés usar <strong>MercadoLibre</strong>. Es como un shopping pero en el celular.<br><br>Primero tenés que ir a la <strong>Play Store</strong> y buscar "MercadoLibre". Le das a <strong>Instalar</strong> y esperás un ratito.<br><br>Cualquier cosa me llamás y te ayudo! ❤️`);
+
+          // Complete the claraGift mission and start the download mission
+          if (missionsState.currentMissionId === 'claraGift' && !missionsState.completed) {
+            completeMission('claraGift');
+          }
+
           setTimeout(() => {
-            if (replyBox) {
-              replyBox.classList.remove('is-hidden');
-              replyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-birthday-accept="true">Continuar</button>`;
-              const acceptBtn = document.getElementById('sendReplyBtn');
-              if (acceptBtn) {
-                acceptBtn.addEventListener('click', (e2) => {
-                  e2.stopPropagation();
-                  if (missionsState.currentMissionId === 'birthday' && !missionsState.completed) {
-                    completeMission('birthday');
-                  }
-                  switchPhoneView('phoneHomeView');
-                });
-              }
-            }
+            startDownloadMercadoLibreMission();
           }, 1500);
         }, 1500);
-      });
-    }
+      }, 1200);
+    }, 1800);
+  }, 800);
+}
+
+function startDownloadMercadoLibreMission() {
+  setMission('downloadMercadoLibre', 'Descargar MercadoLibre', 'Entrá a la Play Store y descargá la app oficial de MercadoLibre.');
+
+  installedApps.playstore = true;
+  updatePhoneHomeApps();
+
+  // Go back to Camilo chat and show button to open PlayStore
+  openContactChat('camilo');
+
+  if (ui.phoneChatReplyBox) {
+    ui.phoneChatReplyBox.classList.remove('is-hidden');
+    ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-open-playstore="true">Abrir Play Store</button>`;
   }
+}
+
+const mlProducts = [
+  { id: 'barbie', title: 'Barbie futbolista edición mundial 2026', price: 42999, gradient: 'linear-gradient(135deg, #ff5e7e 0%, #ffd93d 100%)' },
+  { id: 'tv', title: 'Smart TV 50" 4K', price: 289999, gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+  { id: 'headphones', title: 'Auriculares Bluetooth', price: 15999, gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
+];
+
+const fakeMLProducts = mlProducts;
+
+function renderFakeMLProducts() {
+  const list = ui.fakemlProducts;
+  if (!list) return;
+  list.innerHTML = '';
+
+  fakeMLProducts.forEach((product) => {
+    const card = document.createElement('div');
+    card.className = 'fakeml-product-card';
+    card.innerHTML = `
+      <div class="fakeml-product-img" style="background:${product.gradient};"></div>
+      <div class="fakeml-product-info">
+        <span class="fakeml-product-price">$${product.price.toLocaleString('es-AR')}</span>
+        <span class="fakeml-product-title">${product.title}</span>
+        <span class="fakeml-product-shipping">Envío gratis hoy</span>
+      </div>
+    `;
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (product.id === 'barbie') {
+        openFakeMLCheckout();
+      } else {
+        showToast('Esta funcionalidad no está disponible');
+      }
+    });
+    list.appendChild(card);
+  });
+}
+
+function openFakeMLProducts() {
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+  renderFakeMLProducts();
+  switchPhoneView('phoneFakeMLView');
+}
+
+function openFakeMLCheckout() {
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+  // Clear previous card data
+  if (ui.fakemlCardNumber) ui.fakemlCardNumber.value = '';
+  if (ui.fakemlCardName) ui.fakemlCardName.value = '';
+  if (ui.fakemlCardExp) ui.fakemlCardExp.value = '';
+  if (ui.fakemlCardCvv) ui.fakemlCardCvv.value = '';
+  if (ui.fakemlLoadCardBtn) {
+    ui.fakemlLoadCardBtn.disabled = false;
+    ui.fakemlLoadCardBtn.style.opacity = '1';
+  }
+  if (ui.fakemlConfirmBtn) {
+    ui.fakemlConfirmBtn.disabled = true;
+    ui.fakemlConfirmBtn.style.opacity = '0.5';
+  }
+  switchPhoneView('phoneFakeMLCheckoutView');
+}
+
+function loadFakeCardData() {
+  if (ui.fakemlCardNumber) ui.fakemlCardNumber.value = '4509 9535 6623 4188';
+  if (ui.fakemlCardName) ui.fakemlCardName.value = 'MARTA GOMEZ';
+  if (ui.fakemlCardExp) ui.fakemlCardExp.value = '08/29';
+  if (ui.fakemlCardCvv) ui.fakemlCardCvv.value = '324';
+  if (ui.fakemlLoadCardBtn) {
+    ui.fakemlLoadCardBtn.disabled = true;
+    ui.fakemlLoadCardBtn.style.opacity = '0.5';
+    ui.fakemlLoadCardBtn.textContent = 'Datos cargados';
+  }
+  if (ui.fakemlConfirmBtn) {
+    ui.fakemlConfirmBtn.disabled = false;
+    ui.fakemlConfirmBtn.style.opacity = '1';
+  }
+}
+
+function renderMLProducts() {
+  const list = ui.mlProducts;
+  if (!list) return;
+  list.innerHTML = '';
+
+  mlProducts.forEach((product) => {
+    const card = document.createElement('div');
+    card.className = 'fakeml-product-card';
+    card.innerHTML = `
+      <div class="fakeml-product-img" style="background:${product.gradient};"></div>
+      <div class="fakeml-product-info">
+        <span class="fakeml-product-price">$${product.price.toLocaleString('es-AR')}</span>
+        <span class="fakeml-product-title">${product.title}</span>
+        <span class="fakeml-product-shipping">Envío gratis hoy</span>
+      </div>
+    `;
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (product.id === 'barbie') {
+        openMLCheckout();
+      } else {
+        showToast('Esta funcionalidad no está disponible');
+      }
+    });
+    list.appendChild(card);
+  });
+}
+
+function openMLProducts() {
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+  renderMLProducts();
+  switchPhoneView('phoneMLProductsView');
+}
+
+function openMLCheckout() {
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+  if (ui.mlCardNumber) ui.mlCardNumber.value = '';
+  if (ui.mlCardName) ui.mlCardName.value = '';
+  if (ui.mlCardExp) ui.mlCardExp.value = '';
+  if (ui.mlCardCvv) ui.mlCardCvv.value = '';
+  if (ui.mlLoadCardBtn) {
+    ui.mlLoadCardBtn.disabled = false;
+    ui.mlLoadCardBtn.style.opacity = '1';
+    ui.mlLoadCardBtn.textContent = 'Cargar datos de tarjeta';
+  }
+  if (ui.mlConfirmBtn) {
+    ui.mlConfirmBtn.disabled = true;
+    ui.mlConfirmBtn.style.opacity = '0.5';
+    ui.mlConfirmBtn.textContent = 'Confirmar compra';
+  }
+  switchPhoneView('phoneMLCheckoutView');
+}
+
+function loadMLCardData() {
+  if (ui.mlCardNumber) ui.mlCardNumber.value = '4509 9535 6623 4188';
+  if (ui.mlCardName) ui.mlCardName.value = 'MARTA GOMEZ';
+  if (ui.mlCardExp) ui.mlCardExp.value = '08/29';
+  if (ui.mlCardCvv) ui.mlCardCvv.value = '324';
+  if (ui.mlLoadCardBtn) {
+    ui.mlLoadCardBtn.disabled = true;
+    ui.mlLoadCardBtn.style.opacity = '0.5';
+    ui.mlLoadCardBtn.textContent = 'Datos cargados';
+  }
+  if (ui.mlConfirmBtn) {
+    ui.mlConfirmBtn.disabled = false;
+    ui.mlConfirmBtn.style.opacity = '1';
+  }
+}
+
+function confirmMLPurchase() {
+  if (!ui.mlConfirmBtn || ui.mlConfirmBtn.disabled) return;
+  ui.mlConfirmBtn.disabled = true;
+  ui.mlConfirmBtn.style.opacity = '0.5';
+  ui.mlConfirmBtn.textContent = 'Procesando...';
+  if (ui.mlLoadCardBtn) {
+    ui.mlLoadCardBtn.disabled = true;
+    ui.mlLoadCardBtn.style.opacity = '0.5';
+  }
+
+  setTimeout(() => {
+    if (ui.mlConfirmBtn) {
+      ui.mlConfirmBtn.textContent = '✓ Pago confirmado';
+    }
+    setTimeout(() => {
+      statsState.money = Math.max(0, statsState.money - 42999);
+      updateStats(0);
+      switchPhoneView('phoneMLSuccessView');
+    }, 1000);
+  }, 2000);
+}
+
+function completeMLPurchaseAndMission() {
+  if (missionsState.currentMissionId === 'downloadMercadoLibre' && !missionsState.completed) {
+    completeMission('downloadMercadoLibre');
+  }
+  addMessageToConversation('camilo', 'incoming', '¡Excelente, mamá! Ya compraste el regalo para Clara 🎁. Llegará mañana, así que estate atenta. ❤️');
+  statsState.happiness = Math.min(100, statsState.happiness + 5);
+  updateStats(0);
+  if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
+}
+
+function startFraudDrain() {
+  fraudDrainState.active = true;
+  fraudDrainState.startMoney = statsState.money;
+  fraudDrainState.elapsed = 0;
+  fraudDrainState.lastAlert = 0;
+  if (ui.fraudOverlay) ui.fraudOverlay.classList.add('is-active');
+  playAlertSound();
+}
+
+function updateFraudDrain(dt) {
+  if (!fraudDrainState.active) return;
+  fraudDrainState.elapsed += dt;
+  const progress = Math.min(1, fraudDrainState.elapsed / fraudDrainState.duration);
+  const newMoney = Math.max(0, Math.round(fraudDrainState.startMoney * (1 - progress)));
+  statsState.money = newMoney;
+  updateStats(0);
+
+  if (fraudDrainState.elapsed - fraudDrainState.lastAlert > 0.6) {
+    playAlertSound();
+    fraudDrainState.lastAlert = fraudDrainState.elapsed;
+  }
+
+  if (statsState.money <= 0) {
+    statsState.money = 0;
+    fraudDrainState.active = false;
+    triggerBadEndingAppFraud();
+  }
+}
+
+function triggerBadEndingAppFraud() {
+  if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
+  if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'false');
+  statsState.calm = Math.max(0, statsState.calm - 30);
+  updateStats(0);
 }
 
 if (ui.phoneAppBtns) {
@@ -3027,7 +3541,10 @@ if (ui.phoneAppBtns) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const app = btn.getAttribute('data-app');
-      if (app === 'messages') switchPhoneView('phoneMessagesView');
+      if (app === 'messages') {
+        switchPhoneView('phoneMessagesView');
+        renderContactList();
+      }
       if (app === 'map') switchPhoneView('phoneMapView');
       if (app === 'settings') switchPhoneView('phoneSettingsView');
       if (app === 'playstore') {
@@ -3035,10 +3552,17 @@ if (ui.phoneAppBtns) {
         switchPhoneView('phonePlayStoreView');
       }
       if (app === 'mercadolibre') {
-        mlAdState.phase = 1;
-        mlAdState.ad3Clicks = 0;
-        renderMLAd();
-        switchPhoneView('phoneMLAdView');
+        if (mlAdState.adsCompleted) {
+          openMLProducts();
+        } else {
+          mlAdState.phase = 1;
+          mlAdState.ad3Clicks = 0;
+          renderMLAd();
+          switchPhoneView('phoneMLAdView');
+        }
+      }
+      if (app === 'mercad0libre') {
+        openFakeMLProducts();
       }
     });
   });
@@ -3048,6 +3572,7 @@ if (ui.openMessagesBtn) {
   ui.openMessagesBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     switchPhoneView('phoneMessagesView');
+    renderContactList();
   });
 }
 
@@ -3055,7 +3580,12 @@ if (ui.phoneBackBtns) {
   ui.phoneBackBtns.forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      switchPhoneView('phoneHomeView');
+      const view = btn.closest('.phone-view');
+      if (view && view.id === 'phoneMessagesView' && currentContact !== null) {
+        renderContactList();
+      } else {
+        switchPhoneView('phoneHomeView');
+      }
     });
   });
 }
@@ -3178,6 +3708,16 @@ function applyEffects(effects) {
 
 let activeDilemmaResolve = null;
 
+let fraudDrainState = {
+  active: false,
+  startMoney: 0,
+  elapsed: 0,
+  duration: 5,
+  lastAlert: 0,
+};
+
+let dayRestarted = false;
+
 function showDilemma(config, onResolve) {
   activeDilemmaResolve = onResolve;
   if (!ui.dilemmaModal) return;
@@ -3244,70 +3784,60 @@ function selectDilemmaOption(option) {
   }
 }
 
-if (ui.sendReplyBtn) {
-  ui.sendReplyBtn.addEventListener('click', (e) => {
+if (ui.phoneChatReplyBox) {
+  ui.phoneChatReplyBox.addEventListener('click', (e) => {
+    const btn = e.target.closest('#sendReplyBtn');
+    if (!btn) return;
     e.stopPropagation();
-    if (missionsState.currentMissionId !== 'tutorial' || missionsState.completed) return;
 
-    ui.sendReplyBtn.disabled = true;
-    ui.sendReplyBtn.style.opacity = '0.5';
-    ui.sendReplyBtn.textContent = 'Eligiendo...';
-    const replyBox = document.querySelector('.phone-chat-reply-box');
-    if (replyBox) replyBox.classList.add('is-hidden');
+    if (missionsState.currentMissionId === 'tutorial' && !missionsState.completed) {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.textContent = 'Enviando...';
 
-    if (ui.dilemmaTitle) ui.dilemmaTitle.textContent = dilemmaTutorial.title;
-    if (ui.dilemmaDesc) ui.dilemmaDesc.textContent = dilemmaTutorial.description;
-    if (ui.optATitle) ui.optATitle.textContent = dilemmaTutorial.optionA.label;
-    if (ui.optAPosDesc) ui.optAPosDesc.textContent = dilemmaTutorial.optionA.positive.description;
-    renderImpactBadges(ui.optAPosImpact, dilemmaTutorial.optionA.positive.effects);
-    if (ui.optANegDesc) ui.optANegDesc.textContent = dilemmaTutorial.optionA.negative.description;
-    renderImpactBadges(ui.optANegImpact, dilemmaTutorial.optionA.negative.effects);
-    if (ui.optBTitle) ui.optBTitle.textContent = dilemmaTutorial.optionB.label;
-    if (ui.optBPosDesc) ui.optBPosDesc.textContent = dilemmaTutorial.optionB.positive.description;
-    renderImpactBadges(ui.optBPosImpact, dilemmaTutorial.optionB.positive.effects);
-    if (ui.optBNegDesc) ui.optBNegDesc.textContent = dilemmaTutorial.optionB.negative.description;
-    renderImpactBadges(ui.optBNegImpact, dilemmaTutorial.optionB.negative.effects);
+      showMartaReplyTutorial();
 
-    ui.dilemmaModal.setAttribute('aria-hidden', 'false');
-
-    const btnA = document.getElementById('btnSelectA');
-    const btnB = document.getElementById('btnSelectB');
-
-    if (btnA) {
-      btnA.onclick = () => {
-        ui.dilemmaModal.setAttribute('aria-hidden', 'true');
-        applyEffects(dilemmaTutorial.optionA.positive.effects);
-        if (ui.outcomeDesc) ui.outcomeDesc.textContent = dilemmaTutorial.optionA.positive.description;
-        renderImpactBadges(ui.outcomeImpact, dilemmaTutorial.optionA.positive.effects);
-        if (ui.btnConfirmOutcome) {
-          ui.btnConfirmOutcome.onclick = () => {
-            ui.outcomeModal.setAttribute('aria-hidden', 'true');
-            setTimeout(() => {
-              showMartaReplyTutorial('A');
-              setTimeout(() => showCamiloBedMessage(), 1500);
-            }, 300);
-          };
+      setTimeout(() => {
+        showCamiloBedMessage();
+        if (missionsState.currentMissionId === 'tutorial' && !missionsState.completed) {
+          completeMission('tutorial');
         }
-        ui.outcomeModal.setAttribute('aria-hidden', 'false');
-      };
+      }, 1500);
+      return;
     }
-    if (btnB) {
-      btnB.onclick = () => {
-        ui.dilemmaModal.setAttribute('aria-hidden', 'true');
-        applyEffects(dilemmaTutorial.optionB.positive.effects);
-        if (ui.outcomeDesc) ui.outcomeDesc.textContent = dilemmaTutorial.optionB.positive.description;
-        renderImpactBadges(ui.outcomeImpact, dilemmaTutorial.optionB.positive.effects);
-        if (ui.btnConfirmOutcome) {
-          ui.btnConfirmOutcome.onclick = () => {
-            ui.outcomeModal.setAttribute('aria-hidden', 'true');
-            setTimeout(() => {
-              showMartaReplyTutorial('B');
-              setTimeout(() => showCamiloBedMessage(), 1500);
-            }, 300);
-          };
+
+    if (missionsState.currentMissionId === 'claraGift' && !missionsState.completed) {
+      if (btn.getAttribute('data-clara-reply') === 'true') {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+
+        addMessageToConversation('camilo', 'outgoing', `La verdad que no sé, hijo. ¿Vos tenés idea?`);
+
+        setTimeout(() => {
+          addMessageToConversation('camilo', 'incoming', `Yo tampoco sé 😅. ¿Por qué no le preguntas directamente a ella? Seguro te dice qué le gustaría. ❤️`);
+          if (ui.phoneChatReplyBox) {
+            ui.phoneChatReplyBox.classList.remove('is-hidden');
+            ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-clara-accept="true">Escribirle a Clara</button>`;
+          }
+        }, 1200);
+        return;
+      }
+
+      if (btn.getAttribute('data-clara-accept') === 'true') {
+        openClaraChat();
+        return;
+      }
+    }
+
+    if (missionsState.currentMissionId === 'downloadMercadoLibre' && !missionsState.completed) {
+      if (btn.getAttribute('data-open-playstore') === 'true') {
+        renderPlayStore();
+        switchPhoneView('phonePlayStoreView');
+        if (ui.phoneChatReplyBox) {
+          ui.phoneChatReplyBox.classList.add('is-hidden');
         }
-        ui.outcomeModal.setAttribute('aria-hidden', 'false');
-      };
+        return;
+      }
     }
   });
 }
@@ -3325,12 +3855,14 @@ if (ui.phoneUI) {
 }
 
 function updateStats(dt) {
-  if (phoneState.active) {
-    statsState.fatigue += dt;
-    statsState.fatigue = Math.min(60, statsState.fatigue);
-  } else {
-    statsState.fatigue -= dt * 2;
-    statsState.fatigue = Math.max(0, statsState.fatigue);
+  if (!visualFatigueDisabled) {
+    if (phoneState.active) {
+      statsState.fatigue += dt;
+      statsState.fatigue = Math.min(60, statsState.fatigue);
+    } else {
+      statsState.fatigue -= dt * 2;
+      statsState.fatigue = Math.max(0, statsState.fatigue);
+    }
   }
 
   const percentage = (statsState.fatigue / 60) * 100;
@@ -3350,7 +3882,7 @@ function updateStats(dt) {
   if (ui.calmValue) ui.calmValue.textContent = Math.round(statsState.calm) + '%';
   if (ui.calmFill) ui.calmFill.style.width = statsState.calm + '%';
 
-  const t = statsState.fatigue / 60;
+  const t = visualFatigueDisabled ? 0 : statsState.fatigue / 60;
   const blurFactor = t * t * 10;
   const filterVal = blurFactor > 0.05 ? `blur(${blurFactor.toFixed(2)}px)` : 'none';
   if (ui.experienceCanvas) ui.experienceCanvas.style.filter = filterVal;
@@ -3368,6 +3900,7 @@ function animate() {
   updateStats(dt);
   updateMissions(dt);
   updateCinematic(dt);
+  updateFraudDrain(dt);
 
   // Actualizar mezcladores de animación esquelética
   if (martaMixer) {
@@ -3437,6 +3970,52 @@ if (ui.startBtn) {
   });
 }
 
+if (ui.fakemlLoadCardBtn) {
+  ui.fakemlLoadCardBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    loadFakeCardData();
+  });
+}
+
+if (ui.fakemlConfirmBtn) {
+  ui.fakemlConfirmBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.fakemlConfirmBtn.disabled) return;
+    ui.fakemlConfirmBtn.disabled = true;
+    ui.fakemlConfirmBtn.style.opacity = '0.5';
+    ui.fakemlConfirmBtn.textContent = 'Procesando...';
+    startFraudDrain();
+  });
+}
+
+if (ui.mlLoadCardBtn) {
+  ui.mlLoadCardBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    loadMLCardData();
+  });
+}
+
+if (ui.mlConfirmBtn) {
+  ui.mlConfirmBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    confirmMLPurchase();
+  });
+}
+
+if (ui.mlSuccessBtn) {
+  ui.mlSuccessBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    completeMLPurchaseAndMission();
+  });
+}
+
+if (ui.btnRewindGameOver) {
+  ui.btnRewindGameOver.addEventListener('click', (e) => {
+    e.stopPropagation();
+    restartCurrentDay();
+  });
+}
+
 document.addEventListener('click', (e) => {
   if (missionsState.currentMissionId === 'tutorial' && !missionsState.completed) {
     if (e.target && e.target.matches('[data-tutorial-accept="true"]')) {
@@ -3455,6 +4034,17 @@ if (ui.daysBlockedModal) {
       hideDaysBlockedModal();
     });
   }
+}
+
+if (ui.settingFatigue) {
+  ui.settingFatigue.addEventListener('change', (e) => {
+    e.stopPropagation();
+    visualFatigueDisabled = ui.settingFatigue.checked;
+    if (visualFatigueDisabled) {
+      statsState.fatigue = 0;
+    }
+    updateStats(0);
+  });
 }
 
 const playstoreSearchInput = document.getElementById('playstoreSearchInput');
