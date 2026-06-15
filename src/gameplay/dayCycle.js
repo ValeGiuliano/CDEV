@@ -6,6 +6,7 @@ import {
   phoneState,
 } from '../state/index.js';
 import { ui } from '../utils/dom.js';
+import { completeMission } from './missions.js';
 
 let deps = null;
 let day2StartInProgress = false;
@@ -76,6 +77,9 @@ export function getDayTransitionOpacity() {
 
 export function sleepToNextDay() {
   if (!deps) return;
+  if (missionsState.currentMissionId === 'goToSleep') {
+    completeMission('goToSleep');
+  }
   startDayTransition(() => {
     gameState.currentDay++;
     if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + gameState.currentDay;
@@ -128,24 +132,12 @@ export function startDay2() {
 
       setTimeout(() => {
         playNotificationSound();
-        phoneState.active = true;
-        if (document.pointerLockElement === canvas) {
-          document.exitPointerLock();
-        }
-        if (ui.phonePrompt) {
-          ui.phonePrompt.textContent = 'T Guardar teléfono';
-          ui.phonePrompt.classList.add('is-active');
-        }
         startClaraBirthdayMission();
         switchPhoneView('phoneMessagesView');
-        setTimeout(() => {
-          renderContactList();
-          openContactChat('camilo');
-          setTimeout(() => {
-            startClaraBirthdayFlow();
-            day2StartInProgress = false;
-          }, 500);
-        }, 200);
+        renderContactList();
+        openContactChat('camilo');
+        startClaraBirthdayFlow();
+        day2StartInProgress = false;
       }, 5000);
     });
   }
@@ -157,7 +149,7 @@ export function startDay3() {
   if (ui.missionsContainer) {
     ui.missionsContainer.setAttribute('aria-hidden', 'false');
     if (ui.missionTitle) ui.missionTitle.textContent = 'Fin del Día 2';
-    if (ui.missionText) ui.missionText.textContent = 'Marta se acuesta tranquila. La Barbie llegará mañana y Clara estará feliz. ❤️';
+    if (ui.missionText) ui.missionText.textContent = 'Marta se acuesta preocupada por su tarjeta, pero sabe que su hijo la ayudará mañana. ❤️';
     if (ui.missionCard) ui.missionCard.classList.add('is-completed');
   }
 }

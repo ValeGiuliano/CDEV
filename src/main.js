@@ -53,7 +53,7 @@ import { initPlayer, updateFirstPerson, updateLook, setLookFromEuler, clampPlaye
 import { initDoors, handleDoorKey, updateDoors } from './gameplay/doors.js';
 import { initBed, handleSleepKey, updateBedPrompt, showCamiloBedMessage } from './gameplay/bed.js';
 import { initDayCycle, updateDayTransition, getDayTransitionOpacity, hideDaysBlockedModal, startDay2, sleepToNextDay as sleepToNextDayFn } from './gameplay/dayCycle.js';
-import { initMissions, setMission, completeMission, updateMissions, addTutorialMessage, showMartaReplyTutorial, startClaraBirthdayMission, startClaraBirthdayFlow, openClaraChat, startDownloadMercadoLibreMission } from './gameplay/missions.js';
+import { initMissions, setMission, completeMission, updateMissions, addTutorialMessage, showMartaReplyTutorial, startClaraBirthdayMission, startClaraBirthdayFlow, triggerClaraGiftDialogue, startDownloadMercadoLibreMission } from './gameplay/missions.js';
 import {
   initPhone,
   updatePhonePrompt,
@@ -2184,12 +2184,52 @@ initPhone({
         );
         if (ui.phoneChatReplyBox) {
           ui.phoneChatReplyBox.classList.remove('is-hidden');
-          ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-clara-accept="true">Escribirle a Clara</button>`;
+          ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-camilo-ok="true">Responder 'Ok'</button>`;
         }
       }, 1200);
     },
-    onClaraAccept: () => {
-      openClaraChat();
+    onCamiloOk: (btn) => {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      addMessageToConversation('camilo', 'outgoing', `Ok`);
+      if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
+
+      if (missionsState.currentMissionId === 'readCamiloMessage' && !missionsState.completed) {
+        completeMission('readCamiloMessage');
+      }
+
+      setTimeout(() => {
+        setMission('claraGift', 'Regalo de Clara', 'Averiguá qué le gustaría de regalo a tu nieta Clara.');
+      }, 1500);
+    },
+    onClaraHowTo: (btn) => {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      addMessageToConversation('clara', 'outgoing', `¡Qué lindo regalo, mi amor! Pero no sé dónde se compran esas cosas ahora. ¿Vos sabés dónde la puedo conseguir?`);
+
+      setTimeout(() => {
+        addMessageToConversation(
+          'clara',
+          'incoming',
+          `¡Sí, abu! Seguro la conseguís en <strong>MercadoLibre</strong>. Es facilísimo, te descargás la aplicación y la comprás ahí. Cualquier cosa decile a papá que te ayude! ❤️`
+        );
+        if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
+
+        if (missionsState.currentMissionId === 'claraGift' && !missionsState.completed) {
+          completeMission('claraGift');
+        }
+
+        setTimeout(() => {
+          startDownloadMercadoLibreMission();
+        }, 1500);
+      }, 1500);
+    },
+    onOpenContactChat: (contact) => {
+      if (contact === 'clara') {
+        if (missionsState.currentMissionId === 'claraGift' && conversations.clara.length === 0) {
+          triggerClaraGiftDialogue();
+        }
+      }
     },
     onOpenPlaystoreFromReply: () => {
       renderPlayStore();
@@ -2243,9 +2283,13 @@ function installApp(appId, btn) {
     if (app) showToast(app.name + ' instalado');
     updatePhoneHomeApps();
 
-    if (appId === 'mercadolibre') {
-      // Installing the app no longer completes the mission:
-      // the player must perform a real purchase to finish the mission.
+    if (appId === 'mercadolibre' || appId === 'mercad0libre') {
+      if (missionsState.currentMissionId === 'downloadMercadoLibre' && !missionsState.completed) {
+        completeMission('downloadMercadoLibre');
+        setTimeout(() => {
+          setMission('tryBuyGift', 'Comprar el regalo', 'Intentá comprar la muñeca Barbie para Clara en la aplicación instalada.');
+        }, 1500);
+      }
     }
 
     setTimeout(() => renderPlayStore(document.getElementById('playstoreSearchInput')?.value || ''), 500);
@@ -2508,10 +2552,10 @@ function confirmMLPurchase() {
 
   setTimeout(() => {
     if (ui.mlConfirmBtn) {
-      ui.mlConfirmBtn.textContent = '✓ Pago confirmado';
+      ui.mlConfirmBtn.textContent = '✕ Pago rechazado';
     }
     setTimeout(() => {
-      statsState.money = Math.max(0, statsState.money - 42999);
+      // No money is deducted since the purchase failed
       updateStats(0);
       switchPhoneView('phoneMLSuccessView');
     }, 1000);
@@ -2519,13 +2563,18 @@ function confirmMLPurchase() {
 }
 
 function completeMLPurchaseAndMission() {
-  if (missionsState.currentMissionId === 'downloadMercadoLibre' && !missionsState.completed) {
-    completeMission('downloadMercadoLibre');
+  if (missionsState.currentMissionId === 'tryBuyGift' && !missionsState.completed) {
+    completeMission('tryBuyGift');
   }
-  addMessageToConversation('camilo', 'incoming', '¡Excelente, mamá! Ya compraste el regalo para Clara 🎁. Llegará mañana, así que estate atenta. ❤️');
-  statsState.happiness = Math.min(100, statsState.happiness + 5);
+  addMessageToConversation('camilo', 'incoming', 'Mamá, ¿qué pasó? Me enteré de que tuviste un problema con la tarjeta del Banco Nación. No te preocupes, mañana llamamos al banco y lo solucionamos juntos. Andá a descansar. ❤️');
+  statsState.calm = Math.max(0, statsState.calm - 15);
+  statsState.happiness = Math.max(0, statsState.happiness - 10);
   updateStats(0);
   if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
+
+  setTimeout(() => {
+    setMission('goToSleep', 'Ir a dormir', 'Ya es tarde y tuviste un día largo. Ve a la cama a descansar.');
+  }, 1500);
 }
 
 function startFraudDrain() {

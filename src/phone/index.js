@@ -105,23 +105,19 @@ function registerEventListeners() {
         return;
       }
 
-      if (missionsState.currentMissionId === 'claraGift' && !missionsState.completed) {
-        if (btn.getAttribute('data-clara-reply') === 'true') {
-          if (typeof callbacks.onClaraReply === 'function') callbacks.onClaraReply(btn);
-          return;
-        }
-        if (
-          btn.getAttribute('data-clara-accept') === 'true' &&
-          typeof callbacks.onClaraAccept === 'function'
-        ) {
-          callbacks.onClaraAccept();
-          return;
-        }
+      if (btn.getAttribute('data-clara-reply') === 'true') {
+        if (typeof callbacks.onClaraReply === 'function') callbacks.onClaraReply(btn);
+        return;
       }
-
+      if (btn.getAttribute('data-camilo-ok') === 'true') {
+        if (typeof callbacks.onCamiloOk === 'function') callbacks.onCamiloOk(btn);
+        return;
+      }
+      if (btn.getAttribute('data-clara-how-to') === 'true') {
+        if (typeof callbacks.onClaraHowTo === 'function') callbacks.onClaraHowTo(btn);
+        return;
+      }
       if (
-        missionsState.currentMissionId === 'downloadMercadoLibre' &&
-        !missionsState.completed &&
         btn.getAttribute('data-open-playstore') === 'true' &&
         typeof callbacks.onOpenPlaystoreFromReply === 'function'
       ) {
@@ -327,6 +323,10 @@ export function openContactChat(contact) {
   if (ui.messagesTopbarTitle) ui.messagesTopbarTitle.textContent = name;
 
   renderConversation(contact);
+
+  if (typeof callbacks.onOpenContactChat === 'function') {
+    callbacks.onOpenContactChat(contact);
+  }
 }
 
 export function addMessageToConversation(contact, type, html) {

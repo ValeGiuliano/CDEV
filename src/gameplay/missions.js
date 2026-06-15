@@ -1,4 +1,4 @@
-import { missionsState, conversations } from '../state/index.js';
+import { missionsState, conversations, currentContact } from '../state/index.js';
 import { ui } from '../utils/dom.js';
 
 let deps = null;
@@ -119,7 +119,7 @@ export function showMartaReplyTutorial() {
 }
 
 export function startClaraBirthdayMission() {
-  setMission('claraGift', 'Regalo de Clara', 'Averiguá qué le gustaría de regalo a tu nieta Clara.');
+  setMission('readCamiloMessage', 'Mensaje de Camilo', 'Lee el mensaje de tu hijo Camilo en la aplicación de Mensajes.');
   addMessageSafe(
     'camilo',
     'incoming',
@@ -135,9 +135,8 @@ export function startClaraBirthdayFlow() {
   replyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-clara-reply="true">Responder</button>`;
 }
 
-export function openClaraChat() {
-  if (typeof deps.openContact !== 'function') return;
-  deps.openContact('clara');
+export function triggerClaraGiftDialogue() {
+  if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
 
   setTimeout(() => {
     addMessageSafe(
@@ -154,30 +153,13 @@ export function openClaraChat() {
       );
 
       setTimeout(() => {
-        addMessageSafe(
-          'clara',
-          'outgoing',
-          `Qué lindo, mi amor. Voy a ver si la consigo. Te quiero mucho. ❤️`
-        );
-
-        setTimeout(() => {
-          addMessageSafe(
-            'camilo',
-            'incoming',
-            `Genial, mamá. Para comprar online podés usar <strong>MercadoLibre</strong>. Es como un shopping pero en el celular.<br><br>Primero tenés que ir a la <strong>Play Store</strong> y buscar "MercadoLibre". Le das a <strong>Instalar</strong> y esperás un ratito.<br><br>Cualquier cosa me llamás y te ayudo! ❤️`
-          );
-
-          if (missionsState.currentMissionId === 'claraGift' && !missionsState.completed) {
-            completeMission('claraGift');
-          }
-
-          setTimeout(() => {
-            startDownloadMercadoLibreMission();
-          }, 1500);
-        }, 1200);
-      }, 1800);
-    }, 800);
-  }, 800);
+        if (ui.phoneChatReplyBox && currentContact === 'clara' && missionsState.currentMissionId === 'claraGift') {
+          ui.phoneChatReplyBox.classList.remove('is-hidden');
+          ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-clara-how-to="true">Preguntar cómo conseguirla</button>`;
+        }
+      }, 1200);
+    }, 1200);
+  }, 500);
 }
 
 export function startDownloadMercadoLibreMission() {
@@ -188,14 +170,5 @@ export function startDownloadMercadoLibreMission() {
   }
   if (typeof deps.updateHome === 'function') {
     deps.updateHome();
-  }
-
-  if (typeof deps.openContact === 'function') {
-    deps.openContact('camilo');
-  }
-
-  if (ui.phoneChatReplyBox) {
-    ui.phoneChatReplyBox.classList.remove('is-hidden');
-    ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-open-playstore="true">Abrir Play Store</button>`;
   }
 }
