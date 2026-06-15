@@ -5,13 +5,29 @@ import { createIcons, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, DollarSign, Smi
 import { ui } from './utils/dom.js';
 import { showToast } from './utils/helpers.js';
 import {
+  gameState,
+  moveState,
+  player,
+  phoneState,
+  mlAdState,
+  statsState,
+  missionsState,
+  conversations,
+  installedApps,
+  playstoreApps,
+  fraudDrainState,
+  cinematicState,
+  dayTransitionState,
   setVisualFatigueDisabled,
   setCurrentContact,
   setDayRestarted,
   dayRestarted,
+  currentContact,
+  visualFatigueDisabled,
+  doorState,
 } from './state/index.js';
 
-void dayRestarted; // referenced in day2WakeUpSequence below
+void dayRestarted;
 import {
   MONEY_INITIAL,
   MONEY_BARBIE,
@@ -26,11 +42,36 @@ import {
   MESSAGE_AFTER_INSTALL_MS,
   INSTALL_DELAY_MS,
 } from './config/constants.js';
-import { dilemmaTutorial, mlGiftsDilemma } from './data/dilemmas.js';
+
 import { mlProducts } from './data/products.js';
 const fakeMLProducts = mlProducts;
 import { camiloDialogues, claraDialogues } from './data/chats/index.js';
 import { playDoorbellSound, playNotificationSound, playAlertSound, playCinematicSound } from './audio/sounds.js';
+import { canvas, renderer, scene, camera, clock, lookEuler, initResizeListener } from './core/renderer.js';
+import { phoneScreenCorners } from './core/phone3d.js';
+import { initPlayer, updateFirstPerson, updateLook, setLookFromEuler, clampPlayerToBounds, isDoorKey, getMoveDirection } from './gameplay/player.js';
+import { initDoors, handleDoorKey, updateDoors } from './gameplay/doors.js';
+import { initBed, handleSleepKey, updateBedPrompt, showCamiloBedMessage } from './gameplay/bed.js';
+import { initDayCycle, updateDayTransition, getDayTransitionOpacity, hideDaysBlockedModal, startDay2, sleepToNextDay as sleepToNextDayFn } from './gameplay/dayCycle.js';
+import { initMissions, setMission, completeMission, updateMissions, addTutorialMessage, showMartaReplyTutorial, startClaraBirthdayMission, startClaraBirthdayFlow, openClaraChat, startDownloadMercadoLibreMission } from './gameplay/missions.js';
+import {
+  initPhone,
+  updatePhonePrompt,
+  updatePhoneAnimation,
+  updatePhoneUISize,
+  switchPhoneView,
+  updatePhoneHomeApps,
+  renderContactList,
+  openContactChat,
+  addMessageToConversation,
+  togglePhone,
+} from './phone/index.js';
+import { initCinematicEngine, startCinematic, advanceCinematicStep, endCinematic, updateCinematic } from './cinematics/engine.js';
+const gltfLoader = new GLTFLoader();
+let martaMixer = null;
+let martaLoadedModel = null;
+let sonMixer = null;
+let sonLoadedModel = null;
 
 createIcons({
   icons: {
@@ -45,142 +86,9 @@ createIcons({
   },
 });
 
-const canvas = document.querySelector('#experience');
 document.body.tabIndex = 0;
 document.body.focus();
 canvas.tabIndex = 0;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xabe3f8);
-scene.fog = new THREE.Fog(0xabe3f8, 12, 45);
-
-const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 80);
-camera.position.set(-0.85, 1.58, 3.25);
-scene.add(camera);
-
-const clock = new THREE.Clock();
-const lookEuler = new THREE.Euler(-0.08, -0.28, 0, 'YXZ');
-const gltfLoader = new GLTFLoader();
-let martaMixer = null;
-let martaLoadedModel = null;
-let sonMixer = null;
-let sonLoadedModel = null;
-const moveState = {
-  forward: false,
-  back: false,
-  left: false,
-  right: false,
-};
-const player = {
-  velocity: new THREE.Vector3(),
-  walkBob: 0,
-  dragging: false,
-  lastX: 0,
-  lastY: 0,
-};
-
-const phoneState = {
-  active: false,
-  progress: 0,
-  wakeTimer: 0,
-  sleepTimer: 0,
-};
-
-const mlAdState = {
-  phase: 0,
-  adsCompleted: false,
-  ad2TrueIndex: -1,
-  ad3Clicks: 0,
-  ad3MaxClicks: 5,
-  ad3XPos: { top: '50%', left: '50%' },
-};
-
-const statsState = {
-  fatigue: 0,
-  money: 100000,
-  happiness: 80,
-  calm: 75,
-};
-
-let visualFatigueDisabled = false;
-
-const missionsState = {
-  currentMissionId: null,
-  active: false,
-  completed: false,
-  doorbellTimer: 0,
-};
-
-function setMission(id, title, text) {
-  missionsState.currentMissionId = id;
-  missionsState.active = true;
-  missionsState.completed = false;
-  missionsState.doorbellTimer = 0;
-
-  if (ui.missionsContainer) {
-    ui.missionsContainer.setAttribute('aria-hidden', 'false');
-    if (ui.missionTitle) ui.missionTitle.textContent = title;
-    if (ui.missionText) ui.missionText.textContent = text;
-    if (ui.missionCard) ui.missionCard.classList.remove('is-completed');
-  }
-
-  if (id === 'doorbell') {
-    playDoorbellSound();
-  }
-  if (id === 'tutorial') {
-    playNotificationSound();
-    addTutorialMessage();
-  }
-}
-
-function completeMission(id) {
-  if (missionsState.currentMissionId !== id || missionsState.completed) return;
-  missionsState.completed = true;
-
-  if (ui.missionCard) {
-    ui.missionCard.classList.add('is-completed');
-    try {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      const t0 = audioCtx.currentTime;
-      [440, 554, 659, 880].forEach((f, i) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(f, t0 + i * 0.1);
-        gain.gain.setValueAtTime(0.12, t0 + i * 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.001, t0 + i * 0.1 + 0.3);
-        osc.connect(gain); gain.connect(audioCtx.destination);
-        osc.start(t0 + i * 0.1); osc.stop(t0 + i * 0.1 + 0.3);
-      });
-    } catch (e) { }
-
-    setTimeout(() => {
-      if (missionsState.currentMissionId === id && ui.missionsContainer) {
-        ui.missionsContainer.setAttribute('aria-hidden', 'true');
-        missionsState.active = false;
-      }
-    }, 4000);
-  }
-}
-
-function updateMissions(dt) {
-  if (missionsState.active && !missionsState.completed && missionsState.currentMissionId === 'doorbell') {
-    missionsState.doorbellTimer += dt;
-    if (missionsState.doorbellTimer >= 6.0) {
-      missionsState.doorbellTimer = 0;
-      playDoorbellSound();
-    }
-  }
-}
 
 function makeCanvasTexture(draw, size = 512) {
   const c = document.createElement('canvas');
@@ -1074,6 +982,7 @@ livingDoorGroup.position.set(-0.04, 0, -6.03);
 room.add(livingDoorGroup);
 addBox(livingDoorGroup, [1.52, 2.1, 0.13], materials.wood, [0.76, 1.05, 0]);
 addBox(livingDoorGroup, [0.05, 0.05, 0.04], materials.metal, [1.35, 1.03, 0.08]);
+doorState.living.group = livingDoorGroup;
 addBox(room, [0.14, 2.1, 0.16], materials.wood, [1.48, 1.05, -6.03]);
 addBox(room, [0.14, 2.1, 0.16], materials.wood, [-0.04, 1.05, -6.03]);
 addBox(room, [1.66, 0.14, 0.16], materials.wood, [0.72, 2.17, -6.03]);
@@ -1430,40 +1339,6 @@ addBox(bedGroup, [1.65, 0.85, 0.08], materials.wood, [0, 0.78, -1.02]);
 // Manta doblada al pie de la cama
 addBox(bedGroup, [1.3, 0.08, 0.5], new THREE.MeshStandardMaterial({ color: 0xc4786a, roughness: 0.85 }), [0, 0.64, 0.65]);
 
-const bedState = {
-  position: new THREE.Vector3(4.2, 0, 4.2),
-  label: 'cama',
-};
-
-let gameState = {
-  currentDay: 1,
-};
-
-const conversations = {
-  camilo: [],
-  clara: [],
-};
-
-let currentContact = null;
-
-const installedApps = {
-  messages: true,
-  map: true,
-  settings: true,
-  playstore: false,
-  mercadolibre: false,
-  mercad0libre: false,
-};
-
-const playstoreApps = [
-  { id: 'mercad0libre', name: 'Mercad0Libre', dev: 'Mercado Libre', color: '#FFF600', label: 'M0' },
-  { id: 'whatsapp', name: 'WhatsApp', dev: 'Meta Platforms', color: '#25D366', label: 'WA' },
-  { id: 'instagram', name: 'Instagram', dev: 'Meta Platforms', color: '#E4405F', label: 'IG' },
-  { id: 'spotify', name: 'Spotify', dev: 'Spotify AB', color: '#1DB954', label: 'Sp' },
-  { id: 'netflix', name: 'Netflix', dev: 'Netflix, Inc.', color: '#E50914', label: 'N' },
-  { id: 'mercadolibre', name: 'MercadoLibre', dev: 'Mercado Libre', color: '#FFF600', label: 'ML' },
-];
-
 // 6. Reloj de Pared Analógico (Fondo Comedor)
 const wallClock = new THREE.Group();
 wallClock.position.set(-1.20, 2.9, 5.94); // En la pared del fondo a la altura de los ojos
@@ -1564,201 +1439,6 @@ const windowLight = new THREE.RectAreaLight(0xdff7ff, 4.2, 2.8, 2.2);
 windowLight.position.set(4.35, 2.45, -5.55);
 windowLight.rotation.y = Math.PI;
 scene.add(windowLight);
-
-const doorState = {
-  living: { open: false, group: livingDoorGroup, position: new THREE.Vector3(0.72, 0, -6.03), label: 'puerta exterior' },
-};
-
-const playerRadius = 0.28;
-
-function inRect(x, z, rect) {
-  return x > rect.minX + playerRadius && x < rect.maxX - playerRadius && z > rect.minZ + playerRadius && z < rect.maxZ - playerRadius;
-}
-
-function isPositionAllowed(x, z) {
-  const living = { minX: -5.65, maxX: 5.65, minZ: -5.78, maxZ: 5.65 };
-  const outside = { minX: -18.0, maxX: 18.0, minZ: -19.5, maxZ: -5.55 };
-
-  if (inRect(x, z, living)) {
-    if (z < -5.34 && x > -0.08 && x < 1.5) return doorState.living.open;
-    if (z < -5.34 && (x <= -0.08 || x >= 1.5)) return false;
-    return true;
-  }
-
-  if (doorState.living.open && inRect(x, z, outside)) return true;
-  return false;
-}
-
-function resolveMovement(nextX, nextZ) {
-  const currentX = camera.position.x;
-  const currentZ = camera.position.z;
-  if (isPositionAllowed(nextX, nextZ)) {
-    camera.position.x = nextX;
-    camera.position.z = nextZ;
-    return;
-  }
-  if (isPositionAllowed(nextX, currentZ)) camera.position.x = nextX;
-  if (isPositionAllowed(camera.position.x, nextZ)) camera.position.z = nextZ;
-}
-
-function clampPlayerToBounds() {
-  if (isPositionAllowed(camera.position.x, camera.position.z)) return;
-  const fallback = new THREE.Vector3(-0.85, 1.58, 3.25);
-  camera.position.x = fallback.x;
-  camera.position.z = fallback.z;
-}
-
-function setLookFromEuler() {
-  camera.quaternion.setFromEuler(lookEuler);
-}
-
-function getNearbyDoor() {
-  let nearest = null;
-  let nearestDistance = Infinity;
-  Object.entries(doorState).forEach(([id, door]) => {
-    const distance = Math.hypot(camera.position.x - door.position.x, camera.position.z - door.position.z);
-    if (distance < 1.35 && distance < nearestDistance) {
-      nearest = { id, door };
-      nearestDistance = distance;
-    }
-  });
-  return nearest;
-}
-
-function isNearBed() {
-  const distance = Math.hypot(camera.position.x - bedState.position.x, camera.position.z - bedState.position.z);
-  return distance < 1.8;
-}
-
-const cinematicState = {
-  active: false,
-  currentStep: 0,
-  timer: 0,
-  sequence: null,
-  playedLivingCutscene: false,
-  savedCamPos: new THREE.Vector3(),
-  savedCamQuat: new THREE.Quaternion(),
-  waitingForSpace: false,
-};
-
-function startCinematic(sequence, onEnd) {
-  // Exit pointer lock if active
-  if (document.pointerLockElement === canvas) {
-    document.exitPointerLock();
-  }
-  cinematicState.active = true;
-  cinematicState.currentStep = 0;
-  cinematicState.timer = 0;
-  cinematicState.sequence = sequence;
-  cinematicState.waitingForSpace = false;
-  cinematicState.onEnd = onEnd || null;
-
-  cinematicState.savedCamPos.copy(camera.position);
-  cinematicState.savedCamQuat.copy(camera.quaternion);
-
-  document.body.classList.add('cinematic-active');
-
-  if (ui.cinematicOverlay) {
-    ui.cinematicOverlay.setAttribute('aria-hidden', 'false');
-  }
-  if (ui.cinematicPrompt) {
-    ui.cinematicPrompt.classList.remove('is-visible');
-  }
-
-  const firstStep = sequence[0];
-  if (firstStep) {
-    if (firstStep.onStart) firstStep.onStart();
-    if (firstStep.dialogue) {
-      if (ui.cinematicSpeaker) ui.cinematicSpeaker.textContent = firstStep.dialogue.speaker;
-      if (ui.cinematicText) ui.cinematicText.textContent = firstStep.dialogue.text;
-    }
-    if (firstStep.sound) playCinematicSound(firstStep.sound);
-  }
-}
-
-function advanceCinematicStep() {
-  if (!cinematicState.active || !cinematicState.sequence) return;
-
-  const currentStepObj = cinematicState.sequence[cinematicState.currentStep];
-  if (currentStepObj && currentStepObj.action) {
-    currentStepObj.action(1.0, 0);
-  }
-
-  cinematicState.currentStep++;
-  cinematicState.timer = 0;
-  cinematicState.waitingForSpace = false;
-
-  const nextStep = cinematicState.sequence[cinematicState.currentStep];
-  if (nextStep) {
-    if (nextStep.onStart) nextStep.onStart();
-    if (nextStep.dialogue) {
-      if (ui.cinematicSpeaker) ui.cinematicSpeaker.textContent = nextStep.dialogue.speaker;
-      if (ui.cinematicText) ui.cinematicText.textContent = nextStep.dialogue.text;
-    }
-    if (nextStep.sound) playCinematicSound(nextStep.sound);
-    if (ui.cinematicPrompt) ui.cinematicPrompt.classList.remove('is-visible');
-  } else {
-    endCinematic();
-  }
-}
-
-function endCinematic() {
-  cinematicState.active = false;
-  cinematicState.waitingForSpace = false;
-  document.body.classList.remove('cinematic-active');
-  if (ui.cinematicOverlay) ui.cinematicOverlay.setAttribute('aria-hidden', 'true');
-  if (ui.cinematicPrompt) ui.cinematicPrompt.classList.remove('is-visible');
-
-  camera.position.copy(cinematicState.savedCamPos);
-  camera.quaternion.copy(cinematicState.savedCamQuat);
-
-  // If a custom onEnd callback was provided, call it and skip default behavior
-  if (cinematicState.onEnd) {
-    const cb = cinematicState.onEnd;
-    cinematicState.onEnd = null;
-    cb();
-    return;
-  }
-
-  // Default behavior for regular cinematics
-  if (typeof sonMesh !== 'undefined') sonMesh.visible = false;
-  if (sonLoadedModel) sonLoadedModel.visible = false;
-  if (typeof oldWomanMesh !== 'undefined') oldWomanMesh.visible = false;
-  if (martaLoadedModel) martaLoadedModel.visible = false;
-  if (typeof phoneProp !== 'undefined') phoneProp.visible = false;
-
-  if (missionsState.currentMissionId === 'doorbell' && !missionsState.completed) {
-    setTimeout(() => {
-      completeMission('doorbell');
-    }, 1500);
-  }
-}
-
-function updateCinematic(dt) {
-  if (!cinematicState.active || !cinematicState.sequence) return;
-
-  const step = cinematicState.sequence[cinematicState.currentStep];
-  if (!step) {
-    endCinematic();
-    return;
-  }
-
-  if (!cinematicState.waitingForSpace) {
-    cinematicState.timer += dt;
-    const progress = Math.min(1, cinematicState.timer / step.duration);
-
-    if (step.action) step.action(progress, dt);
-
-    if (cinematicState.timer >= step.duration) {
-      if (step.autoAdvance) {
-        advanceCinematicStep();
-      } else {
-        cinematicState.waitingForSpace = true;
-        if (ui.cinematicPrompt) ui.cinematicPrompt.classList.add('is-visible');
-      }
-    }
-  }
-}
 
 const cutsceneEntry = [
   {
@@ -2210,6 +1890,14 @@ function restartCurrentDay() {
   if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'true');
   if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
 
+  // Reset cinematic and transition state to avoid double wake-up animation
+  cinematicState.active = false;
+  cinematicState.onEnd = null;
+  dayTransitionState.active = false;
+
+  // Disable rewind button to prevent double click during restart
+  if (ui.btnRewindGameOver) ui.btnRewindGameOver.disabled = true;
+
   // Reset stats to initial Day 2 values
   statsState.fatigue = 0;
   statsState.money = 100000;
@@ -2281,64 +1969,6 @@ function restartCurrentDay() {
   }, 400);
 }
 
-function startDay3() {
-  // Stub for Day 3: position player, show a short message via the missions container.
-  if (ui.missionsContainer) {
-    ui.missionsContainer.setAttribute('aria-hidden', 'false');
-    if (ui.missionTitle) ui.missionTitle.textContent = 'Fin del Día 2';
-    if (ui.missionText) ui.missionText.textContent = 'Marta se acuesta tranquila. La Barbie llegará mañana y Clara estará feliz. ❤️';
-    if (ui.missionCard) ui.missionCard.classList.add('is-completed');
-  }
-}
-
-function startDay2() {
-  // Position player in bed area for the wake-up cinematic
-  camera.position.set(4.2, 0.72, 3.45);
-  lookEuler.set(0, 0, 0);
-  camera.quaternion.setFromEuler(lookEuler);
-
-  // Wait for the day transition fade-out to finish before starting the cinematic
-  function waitForTransition() {
-    if (dayTransitionState.active) {
-      requestAnimationFrame(waitForTransition);
-      return;
-    }
-
-    startCinematic(day2WakeUpSequence, () => {
-      // After cinematic: give control back and wait 5 seconds for the message
-      camera.position.set(4.2, 1.48, 3.8);
-      lookEuler.set(0, Math.PI, 0);
-      camera.quaternion.setFromEuler(lookEuler);
-
-      // Reset dayRestarted flag now that the cinematic has played
-      setDayRestarted(false);
-
-      setTimeout(() => {
-        playNotificationSound();
-        phoneState.active = true;
-        if (document.pointerLockElement === canvas) {
-          document.exitPointerLock();
-        }
-        if (ui.phonePrompt) {
-          ui.phonePrompt.textContent = 'T Guardar teléfono';
-          ui.phonePrompt.classList.add('is-active');
-        }
-        startClaraBirthdayMission();
-        switchPhoneView('phoneMessagesView');
-        setTimeout(() => {
-          renderContactList();
-          openContactChat('camilo');
-          setTimeout(() => {
-            startClaraBirthdayFlow();
-          }, 500);
-        }, 200);
-      }, 5000);
-    });
-  }
-
-  waitForTransition();
-}
-
 function startIntro() {
   document.body.classList.add('intro-active');
 
@@ -2394,193 +2024,6 @@ function startIntro() {
   }, 600);
 }
 
-function toggleNearbyDoor() {
-  const nearby = getNearbyDoor();
-  if (!nearby) return;
-  nearby.door.open = !nearby.door.open;
-
-  if (nearby.id === 'living' && nearby.door.open && missionsState.currentMissionId === 'doorbell' && !missionsState.completed) {
-    startCinematic(cutsceneLiving, () => {
-      // After son's cinematic: phone appears on table, door closes, mission completes
-      tablePhoneGroup.visible = true;
-      doorState.living.open = false;
-      if (typeof sonMesh !== 'undefined') sonMesh.visible = false;
-      if (typeof oldWomanMesh !== 'undefined') oldWomanMesh.visible = false;
-      if (martaLoadedModel) martaLoadedModel.visible = false;
-      if (typeof phoneProp !== 'undefined') phoneProp.visible = false;
-
-      if (missionsState.currentMissionId === 'doorbell' && !missionsState.completed) {
-        setTimeout(() => {
-          completeMission('doorbell');
-          setTimeout(() => {
-            setMission('tutorial', 'Tutorial', 'Lee el mensaje de Camilo para aprender a jugar.');
-          }, 1000);
-        }, 1500);
-      }
-    });
-  }
-}
-
-function updateDoors(dt) {
-  let livingTarget = doorState.living.open ? -Math.PI * 0.52 : 0;
-  doorState.living.group.rotation.y += (livingTarget - doorState.living.group.rotation.y) * Math.min(1, dt * 7);
-
-  const nearby = getNearbyDoor();
-  if (nearby) {
-    ui.doorPrompt.textContent = `E ${nearby.door.open ? 'Cerrar' : 'Abrir'} ${nearby.door.label}`;
-    ui.doorPrompt.classList.add('is-visible');
-  } else {
-    ui.doorPrompt.classList.remove('is-visible');
-  }
-}
-
-function updateBedPrompt(dt) {
-  if (ui.bedPrompt) {
-    if (isNearBed() && !getNearbyDoor()) {
-      ui.bedPrompt.textContent = 'E Dormir';
-      ui.bedPrompt.classList.add('is-visible');
-    } else {
-      ui.bedPrompt.classList.remove('is-visible');
-    }
-  }
-}
-
-let dayTransitionState = {
-  active: false,
-  progress: 0,
-  phase: 'fade-in', // 'fade-in' or 'fade-out'
-  onEnd: null,
-};
-
-function startDayTransition(onEnd) {
-  if (cinematicState.active) return;
-  if (!areAllMissionsComplete()) {
-    showDaysBlockedModal();
-    return;
-  }
-  dayTransitionState = {
-    active: true,
-    progress: 0,
-    phase: 'fade-in',
-    onEnd: onEnd,
-  };
-  cinematicState.active = true;
-}
-
-function showDaysBlockedModal() {
-  if (ui.daysBlockedModal) {
-    ui.daysBlockedModal.setAttribute('aria-hidden', 'false');
-  }
-}
-
-function hideDaysBlockedModal() {
-  if (ui.daysBlockedModal) {
-    ui.daysBlockedModal.setAttribute('aria-hidden', 'true');
-  }
-}
-
-function updateDayTransition(dt) {
-  if (!dayTransitionState.active) return;
-
-  const speed = 1.8;
-  dayTransitionState.progress += dt * speed;
-
-  if (dayTransitionState.phase === 'fade-in') {
-    if (dayTransitionState.progress >= 1) {
-      dayTransitionState.progress = 1;
-      // Execute the callback (advance day, reset fatigue)
-      if (dayTransitionState.onEnd) dayTransitionState.onEnd();
-      // Switch to fade-out
-      dayTransitionState.phase = 'fade-out';
-      dayTransitionState.progress = 0;
-    }
-  } else if (dayTransitionState.phase === 'fade-out') {
-    if (dayTransitionState.progress >= 1) {
-      dayTransitionState.progress = 1;
-      dayTransitionState.active = false;
-      cinematicState.active = false;
-    }
-  }
-}
-
-function getDayTransitionOpacity() {
-  if (!dayTransitionState.active) return 0;
-  if (dayTransitionState.phase === 'fade-in') {
-    return dayTransitionState.progress;
-  } else {
-    return 1 - dayTransitionState.progress;
-  }
-}
-
-function updatePhonePrompt(dt) {
-  // El teléfono solo está disponible después de completar la misión del timbre
-  const phoneAvailable = !missionsState.currentMissionId || missionsState.currentMissionId !== 'doorbell' || missionsState.completed;
-  
-  if (ui.phonePrompt) {
-    if (phoneAvailable) {
-      ui.phonePrompt.classList.add('is-visible');
-    } else {
-      ui.phonePrompt.classList.remove('is-visible');
-    }
-  }
-}
-
-function updateFirstPerson(dt) {
-  if (cinematicState.active) return;
-  const movement = new THREE.Vector3();
-  const forward = new THREE.Vector3(-Math.sin(lookEuler.y), 0, -Math.cos(lookEuler.y));
-  const right = new THREE.Vector3(Math.cos(lookEuler.y), 0, -Math.sin(lookEuler.y));
-
-  if (moveState.forward) movement.add(forward);
-  if (moveState.back) movement.sub(forward);
-  if (moveState.right) movement.add(right);
-  if (moveState.left) movement.sub(right);
-
-  const speed = 1.8;
-  if (movement.lengthSq() > 0) {
-    movement.normalize().multiplyScalar(speed);
-    player.velocity.lerp(movement, Math.min(1, dt * 8.0));
-    player.walkBob += dt * 5.0;
-  } else {
-    player.velocity.lerp(new THREE.Vector3(0, 0, 0), Math.min(1, dt * 10.0));
-  }
-
-  const nextX = camera.position.x + player.velocity.x * dt;
-  const nextZ = camera.position.z + player.velocity.z * dt;
-  resolveMovement(nextX, nextZ);
-
-  const bob = Math.sin(player.walkBob) * Math.min(0.04, player.velocity.length() * 0.02);
-  camera.position.y = 1.48 + bob; // Altura de ojos de Marta (1.48m) en lugar de la altura de la frente/cabeza (1.58m)
-  setLookFromEuler();
-}
-
-const keyMap = {
-  KeyW: 'forward',
-  w: 'forward',
-  W: 'forward',
-  ArrowUp: 'forward',
-  KeyS: 'back',
-  s: 'back',
-  S: 'back',
-  ArrowDown: 'back',
-  KeyA: 'left',
-  a: 'left',
-  A: 'left',
-  ArrowLeft: 'left',
-  KeyD: 'right',
-  d: 'right',
-  D: 'right',
-  ArrowRight: 'right',
-};
-
-function isDoorKey(event) {
-  return event.code === 'KeyE' || event.key === 'e' || event.key === 'E';
-}
-
-function getMoveDirection(event) {
-  return keyMap[event.code] || keyMap[event.key];
-}
-
 function handleMoveKey(event, active) {
   if (cinematicState.active) {
     if (active && (event.code === 'Space' || event.key === ' ')) {
@@ -2593,51 +2036,14 @@ function handleMoveKey(event, active) {
   if (active && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
     if (event.repeat) return;
     event.preventDefault();
-
-    // El teléfono solo está disponible después de completar la misión del timbre
-    if (missionsState.currentMissionId === 'doorbell' && !missionsState.completed) {
-      return;
-    }
-
-    phoneState.active = !phoneState.active;
-    
-    // Release pointer lock to allow clicking on the phone screen,
-    // or request it back when putting the phone away.
-    if (phoneState.active) {
-      if (document.pointerLockElement === canvas) {
-        document.exitPointerLock();
-      }
-    } else {
-      canvas.requestPointerLock();
-    }
-    if (ui.phonePrompt) {
-      ui.phonePrompt.textContent = phoneState.active ? 'T Guardar teléfono' : 'T Coger teléfono';
-      ui.phonePrompt.classList.toggle('is-active', phoneState.active);
-    }
+    togglePhone();
     return;
   }
   if (active && isDoorKey(event)) {
     if (event.repeat) return;
     event.preventDefault();
-    if (getNearbyDoor()) {
-      toggleNearbyDoor();
-      return;
-    }
-    if (isNearBed()) {
-      startDayTransition(() => {
-        gameState.currentDay++;
-        if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + gameState.currentDay;
-        missionsState.currentMissionId = null;
-        missionsState.active = false;
-        missionsState.completed = false;
-        if (gameState.currentDay === 2) {
-          startDay2();
-        } else if (gameState.currentDay === 3) {
-          startDay3();
-        }
-      });
-      return;
-    }
+    if (handleDoorKey()) return;
+    if (handleSleepKey()) return;
     return;
   }
   const key = getMoveDirection(event);
@@ -2649,95 +2055,11 @@ function handleMoveKey(event, active) {
 document.addEventListener('keydown', (event) => handleMoveKey(event, true), { capture: true });
 document.addEventListener('keyup', (event) => handleMoveKey(event, false), { capture: true });
 
-function bindWalkButton(id, direction) {
-  const button = document.querySelector(`#${id}`);
-  const setActive = (active) => {
-    moveState[direction] = active;
-    button.classList.toggle('is-active', active);
-  };
-  button.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
-    button.setPointerCapture(event.pointerId);
-    setActive(true);
-  });
-  button.addEventListener('pointerup', () => setActive(false));
-  button.addEventListener('pointercancel', () => setActive(false));
-  button.addEventListener('lostpointercapture', () => setActive(false));
-  button.addEventListener('mousedown', (event) => {
-    event.preventDefault();
-    setActive(true);
-  });
-  button.addEventListener('mouseup', () => setActive(false));
-  button.addEventListener('mouseleave', () => setActive(false));
-  button.addEventListener('touchstart', (event) => {
-    event.preventDefault();
-    setActive(true);
-  }, { passive: false });
-  button.addEventListener('touchend', () => setActive(false));
-  button.addEventListener('touchcancel', () => setActive(false));
-}
-
-bindWalkButton('moveForward', 'forward');
-bindWalkButton('moveBack', 'back');
-bindWalkButton('moveLeft', 'left');
-bindWalkButton('moveRight', 'right');
-
-function updateLook(deltaX, deltaY) {
-  const sensitivity = 0.0022; // Adjust this value up or down to tune the feel
-  lookEuler.y -= deltaX * sensitivity;
-  lookEuler.x -= deltaY * sensitivity;
-  lookEuler.x = THREE.MathUtils.clamp(lookEuler.x, -Math.PI * 0.45, Math.PI * 0.32);
-}
-
-// Request Pointer Lock when clicking the canvas
-canvas.addEventListener('click', () => {
-  // Do not lock pointer during cutscenes or when using the phone
-  if (!cinematicState.active && !phoneState.active) {
-    canvas.requestPointerLock();
-  }
-});
-
-// Track pointer lock status changes if needed
-document.addEventListener('pointerlockchange', () => {
-  if (document.pointerLockElement === canvas) {
-    player.dragging = false; // Disable drag-to-look flag when fully locked
-  }
-});
-
-// Update camera look using movement deltas
-window.addEventListener('pointermove', (event) => {
-  if (document.pointerLockElement === canvas) {
-    // When pointer is locked, use direct movement deltas
-    updateLook(event.movementX, event.movementY);
-  } else if (player.dragging) {
-    // Fallback to drag-to-look when not locked (original behavior)
-    updateLook(event.clientX - player.lastX, event.clientY - player.lastY);
-    player.lastX = event.clientX;
-    player.lastY = event.clientY;
-  }
-});
-
-// Retain pointerdown for the fallback drag system
-canvas.addEventListener('pointerdown', (event) => {
-  canvas.focus();
-  if (document.pointerLockElement !== canvas) {
-    player.dragging = true;
-    player.lastX = event.clientX;
-    player.lastY = event.clientY;
-  }
-});
-
 canvas.addEventListener('click', () => {
   if (phoneState.active) return;
   if (!document.pointerLockElement) {
     canvas.requestPointerLock();
   }
-});
-
-window.addEventListener('blur', () => {
-  Object.keys(moveState).forEach((key) => {
-    moveState[key] = false;
-  });
 });
 
 window.addEventListener('resize', () => {
@@ -2751,234 +2073,133 @@ window.addEventListener('resize', () => {
 
 clampPlayerToBounds();
 setLookFromEuler();
+initPlayer();
 
-function updatePhoneAnimation(dt) {
-  let target = 0;
+initCinematicEngine({
+  camera,
+  canvas,
+  ui,
+  playCinematicSound,
+});
 
-  if (phoneState.active) {
-    phoneState.sleepTimer = 0;
-    target = 1;
-    if (phoneState.progress > 0.95) {
-      phoneState.wakeTimer += dt;
-    }
-  } else {
-    phoneState.wakeTimer = 0;
-    if (phoneState.progress > 0.05) {
-      phoneState.sleepTimer += dt;
-    }
-    if (phoneState.sleepTimer < 0.2 && phoneState.progress > 0.9) {
-      target = 1;
-    } else {
-      target = 0;
-    }
-  }
-
-  const speed = 4.5;
-  phoneState.progress += (target - phoneState.progress) * Math.min(1, dt * speed);
-
-  if (phoneState.progress < 0.01 && !phoneState.active) {
-    tablePhoneGroup.visible = true;
-    heldPhoneGroup.visible = false;
-    if (ui.phoneUI) {
-      ui.phoneUI.classList.remove('is-visible');
-      ui.phoneUI.setAttribute('aria-hidden', 'true');
-    }
-    return;
-  }
-
-  tablePhoneGroup.visible = false;
-  heldPhoneGroup.visible = true;
-
-  const startPos = new THREE.Vector3(0, -0.6, -0.4);
-  const startRot = new THREE.Euler(-Math.PI * 0.4, 0, 0);
-
-  const endPos = new THREE.Vector3(0, -0.02, -0.65);
-  const endRot = new THREE.Euler(0, 0, 0);
-
-  const t = phoneState.progress;
-  const ease = t * t * (3 - 2 * t);
-
-  heldPhoneGroup.position.lerpVectors(startPos, endPos, ease);
-
-  heldPhoneGroup.rotation.x = THREE.MathUtils.lerp(startRot.x, endRot.x, ease);
-  heldPhoneGroup.rotation.y = THREE.MathUtils.lerp(startRot.y, endRot.y, ease);
-  heldPhoneGroup.rotation.z = THREE.MathUtils.lerp(startRot.z, endRot.z, ease);
-
-  if (ui.phoneUI) {
-    const showUI = phoneState.active && phoneState.wakeTimer > 0.25;
-    ui.phoneUI.classList.toggle('is-visible', showUI);
-    ui.phoneUI.setAttribute('aria-hidden', !showUI);
-  }
-}
-
-const phoneScreenCorners = [
-  new THREE.Vector3(-0.11, -0.22, 0.013),
-  new THREE.Vector3(0.11, -0.22, 0.013),
-  new THREE.Vector3(0.11, 0.22, 0.013),
-  new THREE.Vector3(-0.11, 0.22, 0.013),
-];
-
-function updatePhoneUISize() {
-  if (!ui.phoneUI || !heldPhoneGroup.visible) return;
-
-  heldPhoneGroup.updateMatrixWorld(true);
-
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  const tmp = new THREE.Vector3();
-
-  phoneScreenCorners.forEach((corner) => {
-    tmp.copy(corner).applyMatrix4(heldPhoneGroup.matrixWorld);
-    tmp.project(camera);
-    const px = ((tmp.x + 1) / 2) * window.innerWidth;
-    const py = ((-tmp.y + 1) / 2) * window.innerHeight;
-    if (px < minX) minX = px;
-    if (px > maxX) maxX = px;
-    if (py < minY) minY = py;
-    if (py > maxY) maxY = py;
-  });
-
-  const width = Math.max(0, maxX - minX);
-  const height = Math.max(0, maxY - minY);
-
-  ui.phoneUI.style.left = `${minX}px`;
-  ui.phoneUI.style.top = `${minY}px`;
-  ui.phoneUI.style.width = `${width}px`;
-  ui.phoneUI.style.height = `${height}px`;
-  ui.phoneUI.style.transform = 'none';
-}
-
-function switchPhoneView(viewId) {
-  if (!ui.phoneViews) return;
-  ui.phoneViews.forEach((view) => {
-    view.classList.toggle('is-active', view.id === viewId);
-  });
-}
-
-function addTutorialMessage() {
-  const html = `<strong>📱 ¡Bienvenida, Mamá! 📱</strong><br><br>
-Este celular es tuyo. Sé que al principio puede parecer complicado, pero vas a ver que no es tan difícil.<br><br>
-Te explico rápido:<br><br>
-😐 <strong>Fatiga:</strong> Usar el celular te cansa la vista y la cabeza. Si estás muy fatigada, la pantalla se pone borrosa. Descansá un rato y se te va a pasar.<br><br>
-💰 <strong>Dinero:</strong> Es lo que tenés guardado. Te va a servir para lo que necesites.<br><br>
-😊 <strong>Felicidad:</strong> Lo bien que te sentís. Cada decisión que tomes va a influir en cómo te sentís.<br><br>
-😌 <strong>Calma:</strong> Tu tranquilidad interior. Las situaciones difíciles pueden alterarte.<br><br>
-Las <strong>decisiones tienen consecuencias</strong>: cada cosa que elijas va a cambiar cómo te sentís y cómo le va a ir a la familia.<br><br>
-Entrá a <strong>Mensajes</strong> para ver qué te escribí. ¡Ah! Y recordá: no importa cuánto tiempo te lleve entender todo, estoy acá para ayudarte. Te quiero, mamá. ❤️<br><br>
-<em>PD: Presioná "Responder" cuando estés lista.</em>`;
-
-  // Remove any existing tutorial message to avoid duplicates
-  if (conversations.camilo) {
-    conversations.camilo = conversations.camilo.filter((msg) => !msg.html.includes('¡Bienvenida, Mamá!'));
-  }
-  addMessageToConversation('camilo', 'incoming', html);
-}
-
-function showMartaReplyTutorial() {
-  addMessageToConversation('camilo', 'outgoing', `Camilito, gracias por el celular y por tu mensaje tan lindo. Con tu cariño me alcanza y sobra. Voy a tratar de aprender a usarlo, aunque me cueste. Te quiero mucho, hijo. ❤️`);
-}
-
-function showCamiloBedMessage() {
-  addMessageToConversation('camilo', 'incoming', `Mamá, me alegra que te haya gustado el celular. ¿Ves que no era tan difícil? 😄<br><br>Ah, y una cosa importante: la cama es para descansar entre día y día. Si no dormís bien, el tiempo no avanza. Es tu manera de recuperarte y empezar un nuevo día.<br><br>Bueno, ya te dejo descansar. Mañana seguimos hablando. Te quiere, Camilo. ❤️<br><br><em>PD: Cuando quieras terminar la noche, andá a la cama.</em>`);
-
-  const replyBox = ui.phoneChatReplyBox;
-  if (replyBox) {
-    replyBox.classList.remove('is-hidden');
-    replyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-tutorial-accept="true">Aceptar</button>`;
-  }
-}
-
-function areAllMissionsComplete() {
-  return missionsState.completed === true;
-}
-
-function renderContactList() {
-  const list = ui.phoneContactsList;
-  if (!list) return;
-
-  list.innerHTML = '';
-  currentContact = null;
-
-  const contacts = [
-    { id: 'camilo', name: 'Camilo', avatar: '👨', preview: getLastPreview('camilo') },
-    { id: 'clara', name: 'Clara', avatar: '👧', preview: getLastPreview('clara') },
-  ];
-
-  contacts.forEach((contact) => {
-    const card = document.createElement('div');
-    card.className = 'contact-card';
-    card.innerHTML = `
-      <div class="contact-avatar" style="background:${contact.id === 'camilo' ? '#2563eb' : '#ec4899'}">${contact.avatar}</div>
-      <div class="contact-info">
-        <p class="contact-name">${contact.name}</p>
-        <p class="contact-preview">${contact.preview}</p>
-      </div>
-    `;
-    card.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openContactChat(contact.id);
+initDoors({
+  doorPrompt: ui.doorPrompt,
+  onOpenLivingDoor: () => {
+    startCinematic(cutsceneLiving, () => {
+      tablePhoneGroup.visible = true;
+      doorState.living.open = false;
+      if (typeof sonMesh !== 'undefined') sonMesh.visible = false;
+      if (typeof oldWomanMesh !== 'undefined') oldWomanMesh.visible = false;
+      if (martaLoadedModel) martaLoadedModel.visible = false;
+      if (typeof phoneProp !== 'undefined') phoneProp.visible = false;
+      setTimeout(() => {
+        completeMission('doorbell');
+        setTimeout(() => {
+          setMission('tutorial', 'Tutorial', 'Lee el mensaje de Camilo para aprender a jugar.');
+        }, 1000);
+      }, 1500);
     });
-    list.appendChild(card);
-  });
+  },
+});
 
-  if (ui.phoneChatContainer) ui.phoneChatContainer.style.display = 'none';
-  if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.style.display = 'none';
-  if (ui.phoneContactsList) ui.phoneContactsList.style.display = 'flex';
-  if (ui.messagesTopbarTitle) ui.messagesTopbarTitle.textContent = 'Mensajes';
-}
+initBed({
+  bedPrompt: ui.bedPrompt,
+  addMessage: addMessageToConversation,
+  sleepToNextDay: sleepToNextDayFn,
+});
 
-function getLastPreview(contact) {
-  if (!conversations[contact] || conversations[contact].length === 0) return '';
-  const last = conversations[contact][conversations[contact].length - 1];
-  const text = last.html.replace(/<[^>]*>/g, ' ').trim();
-  return text.length > 40 ? text.slice(0, 40) + '…' : text;
-}
+initDayCycle({
+  camera,
+  lookEuler,
+  canvas,
+  startCinematic,
+  day2WakeUpSequence,
+  setDayRestarted,
+  playNotificationSound,
+  startClaraBirthdayMission,
+  switchPhoneView,
+  renderContactList,
+  openContactChat,
+  startClaraBirthdayFlow,
+});
 
-function openContactChat(contact) {
-  currentContact = contact;
+initMissions({
+  addMessage: addMessageToConversation,
+  openContact: openContactChat,
+  updateHome: updatePhoneHomeApps,
+  playDoorbell: playDoorbellSound,
+  playNotification: playNotificationSound,
+  installedAppsRef: installedApps,
+});
 
-  if (ui.phoneContactsList) ui.phoneContactsList.style.display = 'none';
-  if (ui.phoneChatContainer) ui.phoneChatContainer.style.display = 'flex';
-  if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.style.display = 'block';
+initPhone({
+  tablePhoneGroup,
+  heldPhoneGroup,
+  camera,
+  canvas,
+  getUpdateStats: () => updateStats,
+  callbacks: {
+    onOpenPlaystoreApp: () => {
+      renderPlayStore();
+      switchPhoneView('phonePlayStoreView');
+    },
+    onOpenMercadoLibreApp: () => {
+      if (mlAdState.adsCompleted) {
+        openMLProducts();
+      } else {
+        mlAdState.phase = 1;
+        mlAdState.ad3Clicks = 0;
+        renderMLAd();
+        switchPhoneView('phoneMLAdView');
+      }
+    },
+    onOpenMercad0LibreApp: () => {
+      openFakeMLProducts();
+    },
+    onTutorialReply: (btn) => {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.textContent = 'Enviando...';
 
-  const name = contact === 'camilo' ? 'Camilo' : 'Clara';
-  if (ui.messagesTopbarTitle) ui.messagesTopbarTitle.textContent = name;
+      showMartaReplyTutorial();
 
-  renderConversation(contact);
-}
+      setTimeout(() => {
+        showCamiloBedMessage();
+        if (missionsState.currentMissionId === 'tutorial' && !missionsState.completed) {
+          completeMission('tutorial');
+        }
+      }, 1500);
+    },
+    onClaraReply: (btn) => {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
 
-function addMessageToConversation(contact, type, html) {
-  if (!conversations[contact]) conversations[contact] = [];
-  conversations[contact].push({ type, html });
+      addMessageToConversation('camilo', 'outgoing', `La verdad que no sé, hijo. ¿Vos tenés idea?`);
 
-  if (currentContact === contact) {
-    const container = ui.phoneChatContainer;
-    if (!container) return;
-    const bubble = document.createElement('div');
-    bubble.className = `chat-bubble ${type}`;
-    bubble.innerHTML = html;
-    container.appendChild(bubble);
-    container.scrollTop = container.scrollHeight;
-  }
-
-  // Update preview if contact list is visible
-  if (currentContact === null && ui.phoneContactsList && ui.phoneContactsList.style.display !== 'none') {
-    renderContactList();
-  }
-}
-
-function renderConversation(contact) {
-  const container = ui.phoneChatContainer;
-  if (!container) return;
-  container.innerHTML = '';
-  if (!conversations[contact]) return;
-  conversations[contact].forEach((msg) => {
-    const bubble = document.createElement('div');
-    bubble.className = `chat-bubble ${msg.type}`;
-    bubble.innerHTML = msg.html;
-    container.appendChild(bubble);
-  });
-  container.scrollTop = container.scrollHeight;
-}
+      setTimeout(() => {
+        addMessageToConversation(
+          'camilo',
+          'incoming',
+          `Yo tampoco sé 😅. ¿Por qué no le preguntas directamente a ella? Seguro te dice qué le gustaría. ❤️`
+        );
+        if (ui.phoneChatReplyBox) {
+          ui.phoneChatReplyBox.classList.remove('is-hidden');
+          ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-clara-accept="true">Escribirle a Clara</button>`;
+        }
+      }, 1200);
+    },
+    onClaraAccept: () => {
+      openClaraChat();
+    },
+    onOpenPlaystoreFromReply: () => {
+      renderPlayStore();
+      switchPhoneView('phonePlayStoreView');
+      if (ui.phoneChatReplyBox) {
+        ui.phoneChatReplyBox.classList.add('is-hidden');
+      }
+    },
+  },
+});
 
 function renderPlayStore(filterText) {
   const list = document.getElementById('playstoreAppList');
@@ -3029,15 +2250,6 @@ function installApp(appId, btn) {
 
     setTimeout(() => renderPlayStore(document.getElementById('playstoreSearchInput')?.value || ''), 500);
   }, 1500);
-}
-
-function updatePhoneHomeApps() {
-  const psBtn = document.getElementById('playstoreAppBtn');
-  const mlBtn = document.getElementById('mercadolibreAppBtn');
-  const fakeBtn = document.getElementById('mercad0libreAppBtn');
-  if (psBtn) psBtn.style.display = installedApps.playstore ? '' : 'none';
-  if (mlBtn) mlBtn.style.display = installedApps.mercadolibre ? '' : 'none';
-  if (fakeBtn) fakeBtn.style.display = installedApps.mercad0libre ? '' : 'none';
 }
 
 function renderMLAd() {
@@ -3136,64 +2348,6 @@ function renderMLAd() {
           }
         });
       }
-  }
-}
-
-function startClaraBirthdayMission() {
-  setMission('claraGift', 'Regalo de Clara', 'Averiguá qué le gustaría de regalo a tu nieta Clara.');
-  addMessageToConversation('camilo', 'incoming', `Hola mamá. ¿Cómo dormiste? 😊<br><br>Te escribo porque en 5 días es el cumpleaños de <strong>Clara</strong> 🎂 y quería recordarte que estás invitada a la casa para el festejo. ¿Ya sabés qué le regalarías?`);
-}
-
-function startClaraBirthdayFlow() {
-  const replyBox = ui.phoneChatReplyBox;
-  if (!replyBox) return;
-
-  replyBox.classList.remove('is-hidden');
-  replyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-clara-reply="true">Responder</button>`;
-}
-
-function openClaraChat() {
-  openContactChat('clara');
-
-  setTimeout(() => {
-    addMessageToConversation('clara', 'outgoing', `Hola Clara, ¿cómo estás? Tu papá me dijo que tu cumpleaños se acerca y quería saber qué te gustaría de regalo.`);
-
-    setTimeout(() => {
-      addMessageToConversation('clara', 'incoming', `Hola abuela! 😊 Estoy re contenta. Sí, falta poquito. Me encantaría una <strong>Barbie futbolista edición mundial 2026</strong> ⚽💖`);
-
-      setTimeout(() => {
-        addMessageToConversation('clara', 'outgoing', `Qué lindo, mi amor. Voy a ver si la consigo. Te quiero mucho. ❤️`);
-
-        setTimeout(() => {
-          // Switch back to Camilo chat to receive the next instructions
-          addMessageToConversation('camilo', 'incoming', `Genial, mamá. Para comprar online podés usar <strong>MercadoLibre</strong>. Es como un shopping pero en el celular.<br><br>Primero tenés que ir a la <strong>Play Store</strong> y buscar "MercadoLibre". Le das a <strong>Instalar</strong> y esperás un ratito.<br><br>Cualquier cosa me llamás y te ayudo! ❤️`);
-
-          // Complete the claraGift mission and start the download mission
-          if (missionsState.currentMissionId === 'claraGift' && !missionsState.completed) {
-            completeMission('claraGift');
-          }
-
-          setTimeout(() => {
-            startDownloadMercadoLibreMission();
-          }, 1500);
-        }, 1500);
-      }, 1200);
-    }, 1800);
-  }, 800);
-}
-
-function startDownloadMercadoLibreMission() {
-  setMission('downloadMercadoLibre', 'Descargar MercadoLibre', 'Entrá a la Play Store y descargá la app oficial de MercadoLibre.');
-
-  installedApps.playstore = true;
-  updatePhoneHomeApps();
-
-  // Go back to Camilo chat and show button to open PlayStore
-  openContactChat('camilo');
-
-  if (ui.phoneChatReplyBox) {
-    ui.phoneChatReplyBox.classList.remove('is-hidden');
-    ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-open-playstore="true">Abrir Play Store</button>`;
   }
 }
 
@@ -3410,252 +2564,6 @@ function triggerBadEndingAppFraud() {
   updateStats(0);
 }
 
-if (ui.phoneAppBtns) {
-  ui.phoneAppBtns.forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const app = btn.getAttribute('data-app');
-      if (app === 'messages') {
-        switchPhoneView('phoneMessagesView');
-        renderContactList();
-      }
-      if (app === 'map') switchPhoneView('phoneMapView');
-      if (app === 'settings') switchPhoneView('phoneSettingsView');
-      if (app === 'playstore') {
-        renderPlayStore();
-        switchPhoneView('phonePlayStoreView');
-      }
-      if (app === 'mercadolibre') {
-        if (mlAdState.adsCompleted) {
-          openMLProducts();
-        } else {
-          mlAdState.phase = 1;
-          mlAdState.ad3Clicks = 0;
-          renderMLAd();
-          switchPhoneView('phoneMLAdView');
-        }
-      }
-      if (app === 'mercad0libre') {
-        openFakeMLProducts();
-      }
-    });
-  });
-}
-
-if (ui.openMessagesBtn) {
-  ui.openMessagesBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    switchPhoneView('phoneMessagesView');
-    renderContactList();
-  });
-}
-
-if (ui.phoneBackBtns) {
-  ui.phoneBackBtns.forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const view = btn.closest('.phone-view');
-      if (view && view.id === 'phoneMessagesView' && currentContact !== null) {
-        renderContactList();
-      } else {
-        switchPhoneView('phoneHomeView');
-      }
-    });
-  });
-}
-
-if (ui.phoneHomeBar) {
-  ui.phoneHomeBar.addEventListener('click', (e) => {
-    e.stopPropagation();
-    switchPhoneView('phoneHomeView');
-  });
-}
-
-function openMLGifts() {
-  switchPhoneView('phoneHomeView');
-  setTimeout(() => {
-    showDilemma(mlGiftsDilemma, () => {
-      updateStats(0);
-      switchPhoneView('phoneMLHomeView');
-    });
-  }, 300);
-}
-
-function renderImpactBadges(container, effects) {
-  if (!container) return;
-  container.innerHTML = '';
-  if (effects.money) {
-    const b = document.createElement('span');
-    b.className = `impact-badge ${effects.money > 0 ? 'pos' : 'neg'}`;
-    b.textContent = `Dinero ${effects.money > 0 ? '+$' : '-$'}${Math.abs(effects.money)}`;
-    container.appendChild(b);
-  }
-  if (effects.happiness) {
-    const b = document.createElement('span');
-    b.className = `impact-badge ${effects.happiness > 0 ? 'pos' : 'neg'}`;
-    b.textContent = `Felicidad ${effects.happiness > 0 ? '+' : ''}${effects.happiness}%`;
-    container.appendChild(b);
-  }
-  if (effects.calm) {
-    const b = document.createElement('span');
-    b.className = `impact-badge ${effects.calm > 0 ? 'pos' : 'neg'}`;
-    b.textContent = `Calma ${effects.calm > 0 ? '+' : ''}${effects.calm}%`;
-    container.appendChild(b);
-  }
-}
-
-function applyEffects(effects) {
-  if (effects.money) statsState.money = Math.max(0, statsState.money + effects.money);
-  if (effects.happiness) statsState.happiness = Math.max(0, Math.min(100, statsState.happiness + effects.happiness));
-  if (effects.calm) statsState.calm = Math.max(0, Math.min(100, statsState.calm + effects.calm));
-}
-
-let activeDilemmaResolve = null;
-
-let fraudDrainState = {
-  active: false,
-  startMoney: 0,
-  elapsed: 0,
-  duration: 5,
-  lastAlert: 0,
-};
-
-function showDilemma(config, onResolve) {
-  activeDilemmaResolve = onResolve;
-  if (!ui.dilemmaModal) return;
-
-  if (ui.dilemmaTitle) ui.dilemmaTitle.textContent = config.title;
-  if (ui.dilemmaDesc) ui.dilemmaDesc.textContent = config.description;
-
-  if (ui.optATitle) ui.optATitle.textContent = config.optionA.label;
-  if (ui.optAPosDesc) ui.optAPosDesc.textContent = config.optionA.positive.description;
-  renderImpactBadges(ui.optAPosImpact, config.optionA.positive.effects);
-  if (ui.optANegDesc) ui.optANegDesc.textContent = config.optionA.negative.description;
-  renderImpactBadges(ui.optANegImpact, config.optionA.negative.effects);
-
-  if (ui.optBTitle) ui.optBTitle.textContent = config.optionB.label;
-  if (ui.optBPosDesc) ui.optBPosDesc.textContent = config.optionB.positive.description;
-  renderImpactBadges(ui.optBPosImpact, config.optionB.positive.effects);
-  if (ui.optBNegDesc) ui.optBNegDesc.textContent = config.optionB.negative.description;
-  renderImpactBadges(ui.optBNegImpact, config.optionB.negative.effects);
-
-  if (config.optionC) {
-    if (ui.optCTitle) ui.optCTitle.textContent = config.optionC.label;
-    if (ui.optCPosDesc) ui.optCPosDesc.textContent = config.optionC.positive.description;
-    renderImpactBadges(ui.optCPosImpact, config.optionC.positive.effects);
-    if (ui.optCNegDesc) ui.optCNegDesc.textContent = config.optionC.negative.description;
-    renderImpactBadges(ui.optCNegImpact, config.optionC.negative.effects);
-    if (ui.optCContainer) ui.optCContainer.style.display = 'block';
-    if (ui.btnSelectC) ui.btnSelectC.onclick = () => selectDilemmaOption(config.optionC);
-  } else {
-    if (ui.optCContainer) ui.optCContainer.style.display = 'none';
-  }
-
-  if (ui.btnSelectA) ui.btnSelectA.onclick = () => selectDilemmaOption(config.optionA);
-  if (ui.btnSelectB) ui.btnSelectB.onclick = () => selectDilemmaOption(config.optionB);
-
-  ui.dilemmaModal.setAttribute('aria-hidden', 'false');
-}
-
-function selectDilemmaOption(option) {
-  if (ui.dilemmaModal) ui.dilemmaModal.setAttribute('aria-hidden', 'true');
-
-  const isSuccess = Math.random() < option.successRate;
-  const outcome = isSuccess ? option.positive : option.negative;
-
-  applyEffects(outcome.effects);
-
-  if (!isSuccess && ui.damageOverlay) {
-    ui.damageOverlay.classList.remove('is-active');
-    void ui.damageOverlay.offsetWidth;
-    ui.damageOverlay.classList.add('is-active');
-  }
-
-  if (ui.outcomeModal) {
-    if (ui.outcomeDesc) ui.outcomeDesc.textContent = outcome.description;
-    renderImpactBadges(ui.outcomeImpact, outcome.effects);
-    if (ui.btnConfirmOutcome) {
-      ui.btnConfirmOutcome.onclick = () => {
-        ui.outcomeModal.setAttribute('aria-hidden', 'true');
-        if (activeDilemmaResolve) activeDilemmaResolve();
-      };
-    }
-    ui.outcomeModal.setAttribute('aria-hidden', 'false');
-  } else {
-    if (activeDilemmaResolve) activeDilemmaResolve();
-  }
-}
-
-if (ui.phoneChatReplyBox) {
-  ui.phoneChatReplyBox.addEventListener('click', (e) => {
-    const btn = e.target.closest('#sendReplyBtn');
-    if (!btn) return;
-    e.stopPropagation();
-
-    if (missionsState.currentMissionId === 'tutorial' && !missionsState.completed) {
-      btn.disabled = true;
-      btn.style.opacity = '0.5';
-      btn.textContent = 'Enviando...';
-
-      showMartaReplyTutorial();
-
-      setTimeout(() => {
-        showCamiloBedMessage();
-        if (missionsState.currentMissionId === 'tutorial' && !missionsState.completed) {
-          completeMission('tutorial');
-        }
-      }, 1500);
-      return;
-    }
-
-    if (missionsState.currentMissionId === 'claraGift' && !missionsState.completed) {
-      if (btn.getAttribute('data-clara-reply') === 'true') {
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
-
-        addMessageToConversation('camilo', 'outgoing', `La verdad que no sé, hijo. ¿Vos tenés idea?`);
-
-        setTimeout(() => {
-          addMessageToConversation('camilo', 'incoming', `Yo tampoco sé 😅. ¿Por qué no le preguntas directamente a ella? Seguro te dice qué le gustaría. ❤️`);
-          if (ui.phoneChatReplyBox) {
-            ui.phoneChatReplyBox.classList.remove('is-hidden');
-            ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-clara-accept="true">Escribirle a Clara</button>`;
-          }
-        }, 1200);
-        return;
-      }
-
-      if (btn.getAttribute('data-clara-accept') === 'true') {
-        openClaraChat();
-        return;
-      }
-    }
-
-    if (missionsState.currentMissionId === 'downloadMercadoLibre' && !missionsState.completed) {
-      if (btn.getAttribute('data-open-playstore') === 'true') {
-        renderPlayStore();
-        switchPhoneView('phonePlayStoreView');
-        if (ui.phoneChatReplyBox) {
-          ui.phoneChatReplyBox.classList.add('is-hidden');
-        }
-        return;
-      }
-    }
-  });
-}
-
-if (ui.phoneUI) {
-  ui.phoneUI.addEventListener('pointerdown', (e) => {
-    e.stopPropagation();
-  });
-  ui.phoneUI.addEventListener('mousedown', (e) => {
-    e.stopPropagation();
-  });
-  ui.phoneUI.addEventListener('touchstart', (e) => {
-    e.stopPropagation();
-  });
-}
-
 function updateStats(dt) {
   if (!visualFatigueDisabled) {
     if (phoneState.active) {
@@ -3844,7 +2752,7 @@ if (ui.daysBlockedModal) {
 if (ui.settingFatigue) {
   ui.settingFatigue.addEventListener('change', (e) => {
     e.stopPropagation();
-    visualFatigueDisabled = ui.settingFatigue.checked;
+    setVisualFatigueDisabled(ui.settingFatigue.checked);
     if (visualFatigueDisabled) {
       statsState.fatigue = 0;
     }
