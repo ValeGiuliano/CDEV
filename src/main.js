@@ -2,6 +2,35 @@ import './styles.css';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createIcons, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, DollarSign, Smile, Wind, Eye } from 'lucide';
+import { ui } from './utils/dom.js';
+import { showToast } from './utils/helpers.js';
+import {
+  setVisualFatigueDisabled,
+  setCurrentContact,
+  setDayRestarted,
+  dayRestarted,
+} from './state/index.js';
+
+void dayRestarted; // referenced in day2WakeUpSequence below
+import {
+  MONEY_INITIAL,
+  MONEY_BARBIE,
+  FATIGUE_MAX,
+  FATIGUE_INCREASE_PER_SEC,
+  FATIGUE_DECREASE_PER_SEC,
+  BED_POSITION,
+  CAMERA_WAKE_UP,
+  CAMERA_AFTER_WAKE_UP,
+  CAMERA_LOOK_AT_AFTER_WAKE_UP,
+  MESSAGE_AFTER_PLAYSTORE_MS,
+  MESSAGE_AFTER_INSTALL_MS,
+  INSTALL_DELAY_MS,
+} from './config/constants.js';
+import { dilemmaTutorial, mlGiftsDilemma } from './data/dilemmas.js';
+import { mlProducts } from './data/products.js';
+const fakeMLProducts = mlProducts;
+import { camiloDialogues, claraDialogues } from './data/chats/index.js';
+import { playDoorbellSound, playNotificationSound, playAlertSound, playCinematicSound } from './audio/sounds.js';
 
 createIcons({
   icons: {
@@ -57,6 +86,7 @@ const player = {
   lastX: 0,
   lastY: 0,
 };
+
 const phoneState = {
   active: false,
   progress: 0,
@@ -82,144 +112,12 @@ const statsState = {
 
 let visualFatigueDisabled = false;
 
-const ui = {
-  doorPrompt: document.querySelector('#doorPrompt'),
-  phonePrompt: document.querySelector('#phonePrompt'),
-  bedPrompt: document.querySelector('#bedPrompt'),
-  dayCounter: document.querySelector('#dayCounter'),
-  phoneUI: document.querySelector('#phoneUI'),
-  phoneViews: document.querySelectorAll('.phone-view'),
-  phoneAppBtns: document.querySelectorAll('.phone-app-btn'),
-  phoneBackBtns: document.querySelectorAll('.phone-back-btn'),
-  phoneHomeBar: document.querySelector('#phoneHomeBar'),
-  openMessagesBtn: document.querySelector('#openMessagesBtn'),
-  sendReplyBtn: document.querySelector('#sendReplyBtn'),
-  fatigueValue: document.querySelector('#fatigueValue'),
-  fatigueFill: document.querySelector('#fatigueFill'),
-  moneyValue: document.querySelector('#moneyValue'),
-  happinessValue: document.querySelector('#happinessValue'),
-  happinessFill: document.querySelector('#happinessFill'),
-  calmValue: document.querySelector('#calmValue'),
-  calmFill: document.querySelector('#calmFill'),
-  dilemmaModal: document.querySelector('#dilemmaModal'),
-  daysBlockedModal: document.querySelector('#daysBlockedModal'),
-  dilemmaTitle: document.querySelector('#dilemmaTitle'),
-  dilemmaDesc: document.querySelector('#dilemmaDesc'),
-  optATitle: document.querySelector('#optATitle'),
-  optAPosDesc: document.querySelector('#optAPosDesc'),
-  optAPosImpact: document.querySelector('#optAPosImpact'),
-  optANegDesc: document.querySelector('#optANegDesc'),
-  optANegImpact: document.querySelector('#optANegImpact'),
-  btnSelectA: document.querySelector('#btnSelectA'),
-  optBTitle: document.querySelector('#optBTitle'),
-  optBPosDesc: document.querySelector('#optBPosDesc'),
-  optBPosImpact: document.querySelector('#optBPosImpact'),
-  optBNegDesc: document.querySelector('#optBNegDesc'),
-  optBNegImpact: document.querySelector('#optBNegImpact'),
-  btnSelectB: document.querySelector('#btnSelectB'),
-  optCTitle: document.querySelector('#optCTitle'),
-  optCPosDesc: document.querySelector('#optCPosDesc'),
-  optCPosImpact: document.querySelector('#optCPosImpact'),
-  optCNegDesc: document.querySelector('#optCNegDesc'),
-  optCNegImpact: document.querySelector('#optCNegImpact'),
-  btnSelectC: document.querySelector('#btnSelectC'),
-  optCContainer: document.querySelector('#optCContainer'),
-  outcomeModal: document.querySelector('#outcomeModal'),
-  outcomeDesc: document.querySelector('#outcomeDesc'),
-  outcomeImpact: document.querySelector('#outcomeImpact'),
-  btnConfirmOutcome: document.querySelector('#btnConfirmOutcome'),
-  experienceCanvas: document.querySelector('#experience'),
-  damageOverlay: document.querySelector('#damageOverlay'),
-  cinematicOverlay: document.querySelector('#cinematicOverlay'),
-  cinematicSpeaker: document.querySelector('#cinematicSpeaker'),
-  cinematicText: document.querySelector('#cinematicText'),
-  cinematicPrompt: document.querySelector('#cinematicPrompt'),
-  missionsContainer: document.querySelector('#missionsContainer'),
-  missionCard: document.querySelector('#missionCard'),
-  missionTitle: document.querySelector('#missionTitle'),
-  missionText: document.querySelector('#missionText'),
-  introOverlay: document.querySelector('#introOverlay'),
-  introFade: document.querySelector('#introFade'),
-  startBtn: document.querySelector('#startBtn'),
-  messagesTopbarTitle: document.querySelector('#messagesTopbarTitle'),
-  phoneContactsList: document.querySelector('#phoneContactsList'),
-  phoneChatContainer: document.querySelector('#phoneChatContainer'),
-  phoneChatReplyBox: document.querySelector('#phoneChatReplyBox'),
-  mercad0libreAppBtn: document.querySelector('#mercad0libreAppBtn'),
-  settingFatigue: document.querySelector('#settingFatigue'),
-  fakemlProducts: document.querySelector('#fakemlProducts'),
-  fakemlCardNumber: document.querySelector('#fakemlCardNumber'),
-  fakemlCardName: document.querySelector('#fakemlCardName'),
-  fakemlCardExp: document.querySelector('#fakemlCardExp'),
-  fakemlCardCvv: document.querySelector('#fakemlCardCvv'),
-  fakemlLoadCardBtn: document.querySelector('#fakemlLoadCardBtn'),
-  fakemlConfirmBtn: document.querySelector('#fakemlConfirmBtn'),
-  mlProducts: document.querySelector('#mlProducts'),
-  mlCardNumber: document.querySelector('#mlCardNumber'),
-  mlCardName: document.querySelector('#mlCardName'),
-  mlCardExp: document.querySelector('#mlCardExp'),
-  mlCardCvv: document.querySelector('#mlCardCvv'),
-  mlLoadCardBtn: document.querySelector('#mlLoadCardBtn'),
-  mlConfirmBtn: document.querySelector('#mlConfirmBtn'),
-  mlSuccessBtn: document.querySelector('#mlSuccessBtn'),
-  fraudOverlay: document.querySelector('#fraudOverlay'),
-  gameOverModal: document.querySelector('#gameOverModal'),
-  btnRewindGameOver: document.querySelector('#btnRewindGameOver'),
-};
-
 const missionsState = {
   currentMissionId: null,
   active: false,
   completed: false,
   doorbellTimer: 0,
 };
-
-function playDoorbellSound() {
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    const t0 = audioCtx.currentTime;
-    const osc1 = audioCtx.createOscillator();
-    const gain1 = audioCtx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(660, t0);
-    gain1.gain.setValueAtTime(0.25, t0);
-    gain1.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
-    osc1.connect(gain1); gain1.connect(audioCtx.destination);
-    osc1.start(t0); osc1.stop(t0 + 0.5);
-
-    const t1 = t0 + 0.4;
-    const osc2 = audioCtx.createOscillator();
-    const gain2 = audioCtx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(550, t1);
-    gain2.gain.setValueAtTime(0.25, t1);
-    gain2.gain.exponentialRampToValueAtTime(0.001, t1 + 0.7);
-    osc2.connect(gain2); gain2.connect(audioCtx.destination);
-    osc2.start(t1); osc2.stop(t1 + 0.7);
-  } catch (e) { }
-}
-
-function playNotificationSound() {
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    const t0 = audioCtx.currentTime;
-    const notes = [523, 659, 784, 1047];
-    notes.forEach((freq, i) => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, t0 + i * 0.12);
-      gain.gain.setValueAtTime(0.2, t0 + i * 0.12);
-      gain.gain.exponentialRampToValueAtTime(0.001, t0 + i * 0.12 + 0.15);
-      osc.connect(gain); gain.connect(audioCtx.destination);
-      osc.start(t0 + i * 0.12); osc.stop(t0 + i * 0.12 + 0.15);
-    });
-  } catch (e) { }
-}
 
 function setMission(id, title, text) {
   missionsState.currentMissionId = id;
@@ -1741,51 +1639,6 @@ const cinematicState = {
   waitingForSpace: false,
 };
 
-let audioCtx = null;
-function playCinematicSound(cfg) {
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-
-    osc.type = cfg.type || 'sine';
-    osc.frequency.setValueAtTime(cfg.freq || 440, audioCtx.currentTime);
-
-    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (cfg.duration || 0.2));
-
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-
-    osc.start();
-    osc.stop(audioCtx.currentTime + (cfg.duration || 0.2));
-  } catch (e) { }
-}
-
-function playAlertSound() {
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    const t0 = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(880, t0);
-    osc.frequency.linearRampToValueAtTime(440, t0 + 0.15);
-    osc.frequency.linearRampToValueAtTime(880, t0 + 0.3);
-
-    gain.gain.setValueAtTime(0.18, t0);
-    gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
-
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(t0); osc.stop(t0 + 0.5);
-  } catch (e) { }
-}
-
 function startCinematic(sequence, onEnd) {
   // Exit pointer lock if active
   if (document.pointerLockElement === canvas) {
@@ -2331,7 +2184,7 @@ const day2WakeUpSequence = [
       if (ui.dayTransitionOverlay) {
         ui.dayTransitionOverlay.style.opacity = '0.3';
       }
-      if (dayRestarted && ui.cinematicText) {
+      if (dayRestarted.value && ui.cinematicText) {
         ui.cinematicText.textContent = 'Qué horrible pesadilla…';
       }
     },
@@ -2414,7 +2267,7 @@ function restartCurrentDay() {
   }
 
   // Flag for restarted day
-  dayRestarted = true;
+  setDayRestarted(true);
 
   // Position camera in bed and restart wake-up cinematic
   camera.position.set(4.2, 0.72, 3.45);
@@ -2456,7 +2309,7 @@ function startDay2() {
       camera.quaternion.setFromEuler(lookEuler);
 
       // Reset dayRestarted flag now that the cinematic has played
-      dayRestarted = false;
+      setDayRestarted(false);
 
       setTimeout(() => {
         playNotificationSound();
@@ -3086,20 +2939,6 @@ function renderConversation(contact) {
   container.scrollTop = container.scrollHeight;
 }
 
-function showToast(text) {
-  let toast = document.querySelector('.toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.className = 'toast';
-    document.body.appendChild(toast);
-  }
-  toast.textContent = text;
-  toast.classList.add('is-visible');
-  setTimeout(() => {
-    toast.classList.remove('is-visible');
-  }, 2500);
-}
-
 function renderPlayStore(filterText) {
   const list = document.getElementById('playstoreAppList');
   if (!list) return;
@@ -3314,14 +3153,6 @@ function startDownloadMercadoLibreMission() {
     ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-open-playstore="true">Abrir Play Store</button>`;
   }
 }
-
-const mlProducts = [
-  { id: 'barbie', title: 'Barbie futbolista edición mundial 2026', price: 42999, gradient: 'linear-gradient(135deg, #ff5e7e 0%, #ffd93d 100%)' },
-  { id: 'tv', title: 'Smart TV 50" 4K', price: 289999, gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
-  { id: 'headphones', title: 'Auriculares Bluetooth', price: 15999, gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
-];
-
-const fakeMLProducts = mlProducts;
 
 function renderFakeMLProducts() {
   const list = ui.fakemlProducts;
@@ -3597,76 +3428,6 @@ if (ui.phoneHomeBar) {
   });
 }
 
-const dilemmaTutorial = {
-  title: "Respuesta a Camilo",
-  description: "Tu hijo te mandó un mensaje tan bonito. ¿Qué le respondés?",
-  optionA: {
-    label: "Enviarle un regalito de agradecimiento",
-    successRate: 0,
-    positive: {
-      description: "Le mandás un detallito por correo. A Camilo le llega y se emociona mucho.",
-      effects: { happiness: 20, money: -30, calm: 5 }
-    },
-    negative: {
-      description: "Gastás un poco más de lo esperado en el regalo, pero la intención vale.",
-      effects: { happiness: 15, money: -50, calm: 5 }
-    }
-  },
-  optionB: {
-    label: "Agradecerle con el corazón",
-    successRate: 0,
-    positive: {
-      description: "Le contestás con palabras bonitas. Camilo sabe que tu cariño no tiene precio.",
-      effects: { happiness: 10, money: 0, calm: -5 }
-    },
-    negative: {
-      description: "Tu tranquilidad se resiente un poco por no poder darle más.",
-      effects: { happiness: 5, money: 0, calm: -10 }
-    }
-  }
-};
-
-const mlGiftsDilemma = {
-  title: "¡Día especial!",
-  description: "Es el cumpleaños de alguien especial. ¿Qué le regalás?",
-  optionA: {
-    label: "🎮 PlayStation 5",
-    successRate: 1,
-    positive: {
-      description: "¡Le gustó DEMASIADO! No para de agradecer. ¡Todos te admiran!",
-      effects: { happiness: 40, calm: -15, money: -200 }
-    },
-    negative: {
-      description: "Igual le gustó mucho, pero el bolsillo llora.",
-      effects: { happiness: 35, calm: -10, money: -200 }
-    }
-  },
-  optionB: {
-    label: "⚽ Pelota",
-    successRate: 1,
-    positive: {
-      description: "Un regalo sencillo pero con cariño. ¡Está feliz!",
-      effects: { happiness: 15, calm: 5, money: -30 }
-    },
-    negative: {
-      description: "No es lo que esperaba, pero la intención vale.",
-      effects: { happiness: 10, calm: 0, money: -30 }
-    }
-  },
-  optionC: {
-    label: "😢 Nada",
-    successRate: 1,
-    positive: {
-      description: "...se nota la situación. La persona entiende pero está muy triste.",
-      effects: { happiness: -30, calm: -5, money: 0 }
-    },
-    negative: {
-      description: "La persona se pone muy triste. La relación se enfría.",
-      effects: { happiness: -40, calm: -10, money: 0 }
-    }
-  }
-};
-
 function openMLGifts() {
   switchPhoneView('phoneHomeView');
   setTimeout(() => {
@@ -3715,8 +3476,6 @@ let fraudDrainState = {
   duration: 5,
   lastAlert: 0,
 };
-
-let dayRestarted = false;
 
 function showDilemma(config, onResolve) {
   activeDilemmaResolve = onResolve;
