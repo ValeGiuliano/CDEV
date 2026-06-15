@@ -1110,8 +1110,9 @@ addRoundedCylinder(room, 0.08, 0.06, materials.metal, [-0.42, 0.59, 0.31]);
 addRoundedCylinder(room, 0.045, 0.05, materials.metal, [-0.27, 0.59, 0.31]);
 
 const tablePhoneGroup = new THREE.Group();
-tablePhoneGroup.position.set(0.35, 0.565, 0.28);
+tablePhoneGroup.position.set(0.35, 0.569, 0.28);
 tablePhoneGroup.rotation.set(0, -0.25, 0);
+tablePhoneGroup.scale.set(2 / 3, 2 / 3, 2 / 3);
 room.add(tablePhoneGroup);
 const tablePhoneBody = addBox(tablePhoneGroup, [0.24, 0.024, 0.46], materials.phoneCase, [0, 0, 0]);
 tablePhoneBody.frustumCulled = false;
@@ -1413,6 +1414,7 @@ addRoundedCylinder(tvModel, 0.005, 0.42, materials.metal, [-0.06, 0.61, 0.12], [
 // 5b. Cama de Marta (Rincón del dormitorio)
 const bedGroup = new THREE.Group();
 bedGroup.position.set(4.2, 0, 4.2);
+bedGroup.rotation.y = Math.PI;
 room.add(bedGroup);
 
 // Base de la cama (estructura de madera)
@@ -2742,6 +2744,9 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  if (phoneState.active && phoneState.wakeTimer > 0.25) {
+    updatePhoneUISize();
+  }
 });
 
 clampPlayerToBounds();
@@ -2804,6 +2809,42 @@ function updatePhoneAnimation(dt) {
     ui.phoneUI.classList.toggle('is-visible', showUI);
     ui.phoneUI.setAttribute('aria-hidden', !showUI);
   }
+}
+
+const phoneScreenCorners = [
+  new THREE.Vector3(-0.11, -0.22, 0.013),
+  new THREE.Vector3(0.11, -0.22, 0.013),
+  new THREE.Vector3(0.11, 0.22, 0.013),
+  new THREE.Vector3(-0.11, 0.22, 0.013),
+];
+
+function updatePhoneUISize() {
+  if (!ui.phoneUI || !heldPhoneGroup.visible) return;
+
+  heldPhoneGroup.updateMatrixWorld(true);
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const tmp = new THREE.Vector3();
+
+  phoneScreenCorners.forEach((corner) => {
+    tmp.copy(corner).applyMatrix4(heldPhoneGroup.matrixWorld);
+    tmp.project(camera);
+    const px = ((tmp.x + 1) / 2) * window.innerWidth;
+    const py = ((-tmp.y + 1) / 2) * window.innerHeight;
+    if (px < minX) minX = px;
+    if (px > maxX) maxX = px;
+    if (py < minY) minY = py;
+    if (py > maxY) maxY = py;
+  });
+
+  const width = Math.max(0, maxX - minX);
+  const height = Math.max(0, maxY - minY);
+
+  ui.phoneUI.style.left = `${minX}px`;
+  ui.phoneUI.style.top = `${minY}px`;
+  ui.phoneUI.style.width = `${width}px`;
+  ui.phoneUI.style.height = `${height}px`;
+  ui.phoneUI.style.transform = 'none';
 }
 
 function switchPhoneView(viewId) {
@@ -2950,8 +2991,10 @@ function renderPlayStore(filterText) {
     const card = document.createElement('div');
     card.className = 'playstore-card';
     card.innerHTML = `
-      <div class="playstore-icon" style="background:${app.color}"><span style="color:#fff;font-weight:800;font-size:0.85rem;">${app.label}</span></div>
-      <div class="playstore-card-info"><h5>${app.name}</h5><span>${app.dev}</span></div>
+      <div class="playstore-card-top">
+        <div class="playstore-icon" style="background:${app.color}"><span style="color:#fff;font-weight:800;font-size:0.85rem;">${app.label}</span></div>
+        <div class="playstore-card-info"><h5>${app.name}</h5><span>${app.dev}</span></div>
+      </div>
       <button class="playstore-install-btn" data-install-btn="${app.id}">Instalar</button>
     `;
     list.appendChild(card);
@@ -3656,6 +3699,9 @@ function animate() {
   updateDayTransition(dt);
   updatePhonePrompt(dt);
   updatePhoneAnimation(dt);
+  if (phoneState.active && phoneState.wakeTimer > 0.25) {
+    updatePhoneUISize();
+  }
   updateStats(dt);
   updateMissions(dt);
   updateCinematic(dt);

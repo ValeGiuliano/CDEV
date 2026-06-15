@@ -105,8 +105,6 @@ button {
   position: fixed;
   left: 50%;
   top: 53%;
-  width: 250px;
-  height: 500px;
   transform: translate(-50%, -50%);
   background: #111827;
   border: none;
@@ -122,6 +120,8 @@ button {
   font-family: 'Inter', system-ui, sans-serif;
   color: #f3f4f6;
   user-select: none;
+  min-width: 180px;
+  min-height: 360px;
 }
 
 .phone-ui.is-visible {
@@ -151,8 +151,8 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px 8px;
-  font-size: 0.75rem;
+  padding: 4% 5% 2.5%;
+  font-size: clamp(0.55rem, 1.6vw, 0.75rem);
   font-weight: 600;
   z-index: 2;
   background: rgba(17, 24, 39, 0.8);
@@ -166,15 +166,15 @@ button {
 }
 
 .phone-icon {
-  width: 14px;
-  height: 14px;
+  width: clamp(8px, 1.6vw, 14px);
+  height: clamp(8px, 1.6vw, 14px);
 }
 
 .phone-view {
   flex: 1;
   display: none;
   flex-direction: column;
-  padding: 16px;
+  padding: 4% 5%;
   overflow-y: auto;
   animation: viewFadeIn 200ms ease;
 }
@@ -1495,8 +1495,9 @@ body.intro-active .day-counter {
 
 .playstore-card {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
@@ -1511,6 +1512,12 @@ body.intro-active .day-counter {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.playstore-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .playstore-card-info {
@@ -1543,8 +1550,7 @@ body.intro-active .day-counter {
   font-weight: 700;
   cursor: pointer;
   transition: background 150ms ease, transform 100ms ease;
-  white-space: nowrap;
-  flex-shrink: 0;
+  width: 100%;
 }
 
 .playstore-install-btn:hover { background: #1d4ed8; }
