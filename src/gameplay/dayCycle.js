@@ -128,7 +128,7 @@ export function startDay2() {
 
     startCinematic(day2WakeUpSequence, () => {
       camera.position.set(4.2, 1.48, 3.8);
-      lookEuler.set(0, Math.PI, 0);
+      lookEuler.set(0, 0, 0);
       camera.quaternion.setFromEuler(lookEuler);
 
       setDayRestarted(false);
@@ -149,10 +149,39 @@ export function startDay2() {
 }
 
 export function startDay3() {
-  if (ui.missionsContainer) {
-    ui.missionsContainer.setAttribute('aria-hidden', 'false');
-    if (ui.missionTitle) ui.missionTitle.textContent = 'Fin del Día 2';
-    if (ui.missionText) ui.missionText.textContent = 'Marta se acuesta preocupada por su tarjeta, pero sabe que su hijo la ayudará mañana. ❤️';
-    if (ui.missionCard) ui.missionCard.classList.add('is-completed');
+  if (!deps) return;
+  const {
+    camera,
+    lookEuler,
+    startCinematic,
+    day3WakeUpSequence,
+  } = deps;
+
+  camera.position.set(4.2, 0.72, 3.45);
+  lookEuler.set(0, 0, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  setTimeOfDay('dia', 0.0);
+
+  function waitForTransition() {
+    if (dayTransitionState.active) {
+      requestAnimationFrame(waitForTransition);
+      return;
+    }
+
+    startCinematic(day3WakeUpSequence, () => {
+      camera.position.set(4.2, 1.48, 3.8);
+      lookEuler.set(0, 0, 0);
+      camera.quaternion.setFromEuler(lookEuler);
+
+      if (ui.missionsContainer) {
+        ui.missionsContainer.setAttribute('aria-hidden', 'false');
+        if (ui.missionTitle) ui.missionTitle.textContent = 'Fin del Día 2';
+        if (ui.missionText) ui.missionText.textContent = 'Marta se acuesta preocupada por su tarjeta, pero sabe que su hijo la ayudará mañana. ❤️';
+        if (ui.missionCard) ui.missionCard.classList.add('is-completed');
+      }
+    });
   }
+
+  waitForTransition();
 }

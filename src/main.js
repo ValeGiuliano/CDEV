@@ -1885,6 +1885,54 @@ const day2WakeUpSequence = [
   }
 ];
 
+// --- DAY 3 WAKE-UP SEQUENCE ---
+const day3WakeUpSequence = [
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Al día siguiente…' },
+    onStart: () => {
+      camera.position.set(4.2, 0.72, 3.45);
+      camera.lookAt(4.2, 2.5, 3.45);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.transition = 'none';
+        ui.dayTransitionOverlay.style.opacity = '1';
+        ui.dayTransitionOverlay.setAttribute('aria-hidden', 'false');
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(1 - ease * 0.7);
+      }
+      camera.position.y = THREE.MathUtils.lerp(0.72, 0.78, ease);
+    }
+  },
+  {
+    duration: 4.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Marta abre los ojos. Aunque está preocupada por su tarjeta, el sol de la mañana le trae tranquilidad.' },
+    sound: { freq: 320, type: 'sine', duration: 0.4 },
+    onStart: () => {
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = '0.3';
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(0.3 * (1 - ease));
+      }
+      // From looking up at ceiling to looking toward the window
+      const startTarget = new THREE.Vector3(4.2, 2.5, 3.45);
+      const endTarget = new THREE.Vector3(4.2, 1.4, 0);
+      const currentTarget = new THREE.Vector3().lerpVectors(startTarget, endTarget, ease);
+      camera.lookAt(currentTarget);
+      camera.position.y = THREE.MathUtils.lerp(0.78, 0.82, ease);
+    }
+  }
+];
+
 function restartCurrentDay() {
   // Close game over modal
   if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'true');
@@ -2116,6 +2164,7 @@ initDayCycle({
   canvas,
   startCinematic,
   day2WakeUpSequence,
+  day3WakeUpSequence,
   setDayRestarted,
   playNotificationSound,
   startClaraBirthdayMission,
