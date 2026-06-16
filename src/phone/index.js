@@ -12,7 +12,7 @@ import {
 } from '../state/index.js';
 import { phoneScreenCorners } from '../core/phone3d.js';
 import { mlGiftsDilemma } from '../data/dilemmas.js';
-import { hideKeyboard } from './keyboard.js';
+import { hideKeyboard, showKeyboard } from './keyboard.js';
 
 let tablePhoneGroup = null;
 let heldPhoneGroup = null;
@@ -151,6 +151,19 @@ function registerEventListeners() {
     ui.phoneUI.addEventListener('mousedown', (e) => e.stopPropagation());
     ui.phoneUI.addEventListener('touchstart', (e) => e.stopPropagation());
   }
+
+  const messagesSearchInput = document.getElementById('messagesSearchInput');
+  if (messagesSearchInput) {
+    messagesSearchInput.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showKeyboard(messagesSearchInput, (val) => {
+        renderContactList(val);
+      });
+    });
+    messagesSearchInput.addEventListener('input', (e) => {
+      renderContactList(e.target.value);
+    });
+  }
 }
 
 export function togglePhone() {
@@ -278,6 +291,28 @@ export function switchPhoneView(viewId) {
   ui.phoneViews.forEach((view) => {
     view.classList.toggle('is-active', view.id === viewId);
   });
+
+  if (viewId === 'phoneSettingsView') {
+    const wifiInput = document.getElementById('settingWifi');
+    if (wifiInput) {
+      wifiInput.checked = phoneState.wifiEnabled;
+    }
+  }
+
+  if (viewId === 'phonePlayStoreView') {
+    const noConnectionEl = document.getElementById('playstoreNoConnection');
+    const searchBox = document.querySelector('.playstore-search-box');
+    const section = document.querySelector('.playstore-section');
+    if (phoneState.wifiEnabled) {
+      if (noConnectionEl) noConnectionEl.style.display = 'none';
+      if (searchBox) searchBox.style.display = 'flex';
+      if (section) section.style.display = 'block';
+    } else {
+      if (noConnectionEl) noConnectionEl.style.display = 'flex';
+      if (searchBox) searchBox.style.display = 'none';
+      if (section) section.style.display = 'none';
+    }
+  }
 }
 
 export function updatePhoneHomeApps() {
@@ -298,24 +333,37 @@ export function getLastPreview(contact) {
   return text.length > 40 ? text.slice(0, 40) + '…' : text;
 }
 
-export function renderContactList() {
+export function renderContactList(filterText = '') {
   const list = ui.phoneContactsList;
   if (!list) return;
 
   list.innerHTML = '';
   setCurrentContact(null);
 
-  const contacts = [
-    { id: 'camilo', name: 'Camilo', avatar: '👨', preview: getLastPreview('camilo'), bg: '#2563eb' },
-    { id: 'clara', name: 'Clara', avatar: '👧', preview: getLastPreview('clara'), bg: '#ec4899' },
-  ];
+  const cleanFilter = filterText.toLowerCase().trim();
+  const contacts = [];
+
+  // Camilo is shown if query is empty or matches
+  if (cleanFilter === '' || 'camilo'.includes(cleanFilter)) {
+    contacts.push({ id: 'camilo', name: 'Camilo', avatar: '👨', preview: getLastPreview('camilo'), bg: '#2563eb' });
+  }
+
+  // Clara is shown if searched specifically OR if she has already been messaged
+  const hasMessagedClara = conversations.clara && conversations.clara.length > 0;
+  if ('clara'.includes(cleanFilter) && (cleanFilter !== '' || hasMessagedClara)) {
+    contacts.push({ id: 'clara', name: 'Clara', avatar: '👧', preview: getLastPreview('clara'), bg: '#ec4899' });
+  }
 
   if (gameState.currentDay === 3) {
     if (conversations.soporteBna && conversations.soporteBna.length > 0) {
-      contacts.push({ id: 'soporteBna', name: 'Soporte BNA', avatar: '👤', preview: getLastPreview('soporteBna'), bg: '#ef4444' });
+      if (cleanFilter === '' || 'soporte bna'.includes(cleanFilter)) {
+        contacts.push({ id: 'soporteBna', name: 'Soporte BNA', avatar: '👤', preview: getLastPreview('soporteBna'), bg: '#ef4444' });
+      }
     }
     if (conversations.bancoNacion && conversations.bancoNacion.length > 0) {
-      contacts.push({ id: 'bancoNacion', name: 'Banco Nación', avatar: '🏛️', preview: getLastPreview('bancoNacion'), bg: '#10b981' });
+      if (cleanFilter === '' || 'banco nacion'.includes(cleanFilter)) {
+        contacts.push({ id: 'bancoNacion', name: 'Banco Nación', avatar: '🏛️', preview: getLastPreview('bancoNacion'), bg: '#10b981' });
+      }
     }
   }
 
@@ -340,6 +388,14 @@ export function renderContactList() {
   if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.style.display = 'none';
   if (ui.phoneContactsList) ui.phoneContactsList.style.display = 'flex';
   if (ui.messagesTopbarTitle) ui.messagesTopbarTitle.textContent = 'Mensajes';
+
+  const searchBox = document.getElementById('messagesSearchBox');
+  if (searchBox) searchBox.style.display = 'flex';
+
+  const searchInput = document.getElementById('messagesSearchInput');
+  if (searchInput && filterText === '') {
+    searchInput.value = '';
+  }
 }
 
 export function openContactChat(contact) {
@@ -349,7 +405,12 @@ export function openContactChat(contact) {
   if (ui.phoneChatContainer) ui.phoneChatContainer.style.display = 'flex';
   if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.style.display = 'block';
 
-  const name = contact === 'camilo' ? 'Camilo' : 'Clara';
+  let name = '';
+  if (contact === 'camilo') name = 'Camilo';
+  else if (contact === 'clara') name = 'Clara';
+  else if (contact === 'soporteBna') name = 'Soporte BNA';
+  else if (contact === 'bancoNacion') name = 'Banco Nación';
+
   if (ui.messagesTopbarTitle) ui.messagesTopbarTitle.textContent = name;
 
   renderConversation(contact);
@@ -357,6 +418,9 @@ export function openContactChat(contact) {
   if (typeof callbacks.onOpenContactChat === 'function') {
     callbacks.onOpenContactChat(contact);
   }
+
+  const searchBox = document.getElementById('messagesSearchBox');
+  if (searchBox) searchBox.style.display = 'none';
 }
 
 export function addMessageToConversation(contact, type, html) {

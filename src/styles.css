@@ -2361,3 +2361,25 @@ body.intro-active .day-counter {
 .phone-key.enter-key:active {
   background: #059669;
 }
+
+/* --- Messages Search Box --- */
+.messages-search-box {
+  display: flex;
+  align-items: center;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 6px 10px;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.messages-search-box input {
+  background: none;
+  border: none;
+  color: #fff;
+  width: 100%;
+  outline: none;
+  font-size: 0.8rem;
+  cursor: pointer;
+}

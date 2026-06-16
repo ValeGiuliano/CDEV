@@ -63,6 +63,8 @@ export const ui = {
   phoneChatReplyBox: document.querySelector('#phoneChatReplyBox'),
   mercad0libreAppBtn: document.querySelector('#mercad0libreAppBtn'),
   settingFatigue: document.querySelector('#settingFatigue'),
+  settingWifi: document.querySelector('#settingWifi'),
+  playstoreNoConnection: document.querySelector('#playstoreNoConnection'),
   fakemlProducts: document.querySelector('#fakemlProducts'),
   fakemlCardNumber: document.querySelector('#fakemlCardNumber'),
   fakemlCardName: document.querySelector('#fakemlCardName'),

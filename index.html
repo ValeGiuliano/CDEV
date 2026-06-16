@@ -148,6 +148,13 @@
             </svg></button>
           <span id="messagesTopbarTitle">Mensajes</span>
         </div>
+        <div class="messages-search-box" id="messagesSearchBox">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="messagesSearchInput" placeholder="Buscar contacto..." readonly />
+        </div>
         <div id="phoneContactsList" class="phone-contacts-list">
         </div>
         <div id="phoneChatContainer" class="phone-chat-container" style="display:none;">
@@ -186,6 +193,10 @@
         </div>
         <div class="phone-settings-container">
           <div class="setting-item">
+            <span>Wi-Fi</span>
+            <input type="checkbox" id="settingWifi" checked />
+          </div>
+          <div class="setting-item">
             <span>Notificaciones</span>
             <input type="checkbox" id="settingNotif" checked />
           </div>
@@ -212,6 +223,14 @@
             </svg></button>
           <span>Play Store</span>
         </div>
+        
+        <!-- Contenedor cuando no hay conexión -->
+        <div id="playstoreNoConnection" class="playstore-no-connection" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center; height: calc(100% - 44px); box-sizing: border-box;">
+          <div style="font-size: 3rem; margin-bottom: 15px;">📶⚠️</div>
+          <h3 style="margin-bottom: 10px; color: #f3f4f6; font-size: 1.1rem; font-weight: 600;">Sin conexión a Internet</h3>
+          <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 0px; line-height: 1.4;">Para poder descargar aplicaciones, activa el Wi-Fi desde los Ajustes del celular.</p>
+        </div>
+
         <div class="playstore-search-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
             <circle cx="11" cy="11" r="8"></circle>
@@ -647,15 +666,18 @@
     <div id="fraudOverlay" class="fraud-overlay" aria-hidden="true"></div>
 
     <div id="gameOverModal" class="game-over-modal" aria-hidden="true">
-      <div class="game-over-card">
-        <div class="game-over-icon">⚠️</div>
-        <h2>Final Malo: Aplicación Fraudulenta</h2>
-        <p>Instalaste y usaste <strong>Mercad0Libre</strong>, una app falsa que se hizo pasar por MercadoLibre. Tus datos y tu dinero fueron robados.</p>
+      <div class="game-over-card" style="border-color:#f59e0b; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(245, 158, 11, 0.4);">
+        <div class="game-over-icon" style="color:#f59e0b;">⚠️</div>
+        <h2 style="color:#fbbf24;">¡Alerta de Aplicación Fraudulenta!</h2>
+        <p>Instalaste y usaste <strong>Mercad0Libre</strong>, una app falsa que se hizo pasar por MercadoLibre. Al ingresar tus datos de pago, los estafadores robaron tu dinero.</p>
         <div class="impact-badges large">
-          <span class="impact-badge neg">Dinero -$100.000</span>
-          <span class="impact-badge neg">Calma -30%</span>
+          <span class="impact-badge neg" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4);">Dinero -$40.000</span>
+          <span class="impact-badge neg" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4);">Calma -30%</span>
         </div>
-        <button class="dilemma-btn" id="btnRewindGameOver">↩️ Volver atrás</button>
+        <p class="intro-description-highlight" style="color:#fcd34d; font-size:0.9rem; margin-top:8px;">
+          Recuerda: Descarga aplicaciones únicamente desde las tiendas oficiales (Play Store). Verifica la ortografía de los nombres y no confíes en ofertas sospechosas.
+        </p>
+        <button class="dilemma-btn" id="btnRewindGameOver" style="background:#f59e0b;">Desinstalar y buscar app oficial</button>
       </div>
     </div>
 
@@ -665,7 +687,7 @@
         <div class="game-over-icon" style="color:#f59e0b;">⚠️</div>
         <h2 style="color:#fbbf24;">¡Alerta de Estafa (Phishing)!</h2>
         <p>Acabas de ingresar tus credenciales y datos de tarjeta de crédito en una página de ayuda no oficial que simulaba ser del <strong>Banco Nación</strong>.</p>
-        <p>Los ciberdelincuentes utilizaron estos datos para ingresar a tu cuenta y transferir tu dinero, dejándote con solo <strong>$30.000</strong>.</p>
+        <p>Los ciberdelincuentes utilizaron estos datos para ingresar a tu cuenta y transferir tu dinero, robándote <strong>$40.000</strong> de tu cuenta.</p>
         <p class="intro-description-highlight" style="color:#fcd34d; font-size:0.9rem; margin-top:8px;">
           Recuerda: El banco oficial NUNCA te pedirá números de tarjeta completa, contraseñas o códigos de seguridad a través de chats de mensajería.
         </p>

@@ -135,6 +135,7 @@ export function startDay2() {
       lookEuler.set(0, 0, 0);
       camera.quaternion.setFromEuler(lookEuler);
 
+      phoneState.wifiEnabled = false;
       setDayRestarted(false);
 
       setTimeout(() => {

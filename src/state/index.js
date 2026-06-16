@@ -28,6 +28,7 @@ export const phoneState = {
   progress: 0,
   wakeTimer: 0,
   sleepTimer: 0,
+  wifiEnabled: true,
 };
 
 export const mlAdState = {

@@ -1953,6 +1953,7 @@ function restartCurrentDay() {
   statsState.money = 100000;
   statsState.happiness = 80;
   statsState.calm = 75;
+  phoneState.wifiEnabled = true;
   updateStats(0);
 
   // Reset missions
@@ -2688,7 +2689,7 @@ function completeMLPurchaseAndMission() {
 function startFraudDrain() {
   fraudDrainState.active = true;
   fraudDrainState.startMoney = statsState.money;
-  fraudDrainState.targetMoney = 0;
+  fraudDrainState.targetMoney = Math.max(0, statsState.money - 40000);
   fraudDrainState.elapsed = 0;
   fraudDrainState.lastAlert = 0;
   fraudDrainState.isDay3Scam = false;
@@ -2699,7 +2700,7 @@ function startFraudDrain() {
 function startFraudDrainDay3() {
   fraudDrainState.active = true;
   fraudDrainState.startMoney = statsState.money;
-  fraudDrainState.targetMoney = 30000;
+  fraudDrainState.targetMoney = Math.max(0, statsState.money - 40000);
   fraudDrainState.elapsed = 0;
   fraudDrainState.lastAlert = 0;
   fraudDrainState.isDay3Scam = true;
@@ -2736,6 +2737,7 @@ function triggerBadEndingAppFraud() {
   if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
   if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'false');
   statsState.calm = Math.max(0, statsState.calm - 30);
+  statsState.happiness = Math.max(0, statsState.happiness - 20);
   updateStats(0);
 }
 
@@ -2986,7 +2988,26 @@ if (ui.mlSuccessBtn) {
 if (ui.btnRewindGameOver) {
   ui.btnRewindGameOver.addEventListener('click', (e) => {
     e.stopPropagation();
-    restartCurrentDay();
+    
+    // Ocultar modal
+    if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'true');
+    
+    // Limpiar el estado de los botones de la app falsa por si acaso
+    if (ui.fakemlConfirmBtn) {
+      ui.fakemlConfirmBtn.disabled = false;
+      ui.fakemlConfirmBtn.style.opacity = '1';
+      ui.fakemlConfirmBtn.textContent = 'Confirmar Pago';
+    }
+    
+    // Desinstalar app falsa
+    installedApps.mercad0libre = false;
+    updatePhoneHomeApps();
+    
+    // Reiniciar misión de descarga
+    setMission('downloadMercadoLibre', 'Descargar MercadoLibre', 'Entrá a la Play Store y descargá la app oficial de MercadoLibre.');
+    
+    // Volver a la pantalla de inicio
+    switchPhoneView('phoneHomeView');
   });
 }
 
@@ -3010,6 +3031,13 @@ if (ui.settingFatigue) {
       statsState.fatigue = 0;
     }
     updateStats(0);
+  });
+}
+
+if (ui.settingWifi) {
+  ui.settingWifi.addEventListener('change', (e) => {
+    e.stopPropagation();
+    phoneState.wifiEnabled = ui.settingWifi.checked;
   });
 }
 
