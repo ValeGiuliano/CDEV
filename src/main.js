@@ -25,6 +25,7 @@ import {
   currentContact,
   visualFatigueDisabled,
   doorState,
+  day3Scammed,
 } from './state/index.js';
 
 void dayRestarted;
@@ -66,6 +67,7 @@ import {
   addMessageToConversation,
   togglePhone,
 } from './phone/index.js';
+import { initKeyboard, showKeyboard } from './phone/keyboard.js';
 import { initCinematicEngine, startCinematic, advanceCinematicStep, endCinematic, updateCinematic } from './cinematics/engine.js';
 const gltfLoader = new GLTFLoader();
 let martaMixer = null;
@@ -2207,6 +2209,52 @@ initPhone({
     onOpenMercad0LibreApp: () => {
       openFakeMLProducts();
     },
+    onOpenBrowserApp: () => {
+      resetBrowserApp();
+      switchPhoneView('phoneBrowserView');
+    },
+    onSoporteBnaGiveData: (btn) => {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.textContent = 'Enviando...';
+
+      addMessageToConversation('soporteBna', 'outgoing', 'Sí, claro. Los números son 4517 8829 0019 7254 y el código es 382.');
+      if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
+
+      setTimeout(() => {
+        addMessageToConversation('soporteBna', 'incoming', 'Muchas gracias 😈');
+        
+        // Trigger day 3 money drain
+        setTimeout(() => {
+          startFraudDrainDay3();
+        }, 1500);
+      }, 1500);
+    },
+    onBancoNacionVerify: (btn) => {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.textContent = 'Verificando...';
+
+      addMessageToConversation('bancoNacion', 'outgoing', 'El código es 8813');
+      if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
+
+      setTimeout(() => {
+        addMessageToConversation(
+          'bancoNacion',
+          'incoming',
+          'Código verificado con éxito. Tu tarjeta ha sido desbloqueada. Lamentamos las molestias, ya puedes volver a operar con normalidad.'
+        );
+
+        if (missionsState.currentMissionId === 'fixBankCard' && !missionsState.completed) {
+          completeMission('fixBankCard');
+        }
+
+        setTimeout(() => {
+          setMission('goToSleep', 'Ir a dormir', 'El problema del banco ya está solucionado. Ve a descansar.');
+          setTimeOfDay('noche', 5.0);
+        }, 2000);
+      }, 1500);
+    },
     onTutorialReply: (btn) => {
       btn.disabled = true;
       btn.style.opacity = '0.5';
@@ -2640,8 +2688,21 @@ function completeMLPurchaseAndMission() {
 function startFraudDrain() {
   fraudDrainState.active = true;
   fraudDrainState.startMoney = statsState.money;
+  fraudDrainState.targetMoney = 0;
   fraudDrainState.elapsed = 0;
   fraudDrainState.lastAlert = 0;
+  fraudDrainState.isDay3Scam = false;
+  if (ui.fraudOverlay) ui.fraudOverlay.classList.add('is-active');
+  playAlertSound();
+}
+
+function startFraudDrainDay3() {
+  fraudDrainState.active = true;
+  fraudDrainState.startMoney = statsState.money;
+  fraudDrainState.targetMoney = 30000;
+  fraudDrainState.elapsed = 0;
+  fraudDrainState.lastAlert = 0;
+  fraudDrainState.isDay3Scam = true;
   if (ui.fraudOverlay) ui.fraudOverlay.classList.add('is-active');
   playAlertSound();
 }
@@ -2650,7 +2711,8 @@ function updateFraudDrain(dt) {
   if (!fraudDrainState.active) return;
   fraudDrainState.elapsed += dt;
   const progress = Math.min(1, fraudDrainState.elapsed / fraudDrainState.duration);
-  const newMoney = Math.max(0, Math.round(fraudDrainState.startMoney * (1 - progress)));
+  const target = fraudDrainState.targetMoney !== undefined ? fraudDrainState.targetMoney : 0;
+  const newMoney = Math.max(target, Math.round(THREE.MathUtils.lerp(fraudDrainState.startMoney, target, progress)));
   statsState.money = newMoney;
   updateStats(0);
 
@@ -2659,10 +2721,14 @@ function updateFraudDrain(dt) {
     fraudDrainState.lastAlert = fraudDrainState.elapsed;
   }
 
-  if (statsState.money <= 0) {
-    statsState.money = 0;
+  if (progress >= 1) {
+    statsState.money = target;
     fraudDrainState.active = false;
-    triggerBadEndingAppFraud();
+    if (fraudDrainState.isDay3Scam) {
+      triggerDay3PhishingAlert();
+    } else {
+      triggerBadEndingAppFraud();
+    }
   }
 }
 
@@ -2671,6 +2737,91 @@ function triggerBadEndingAppFraud() {
   if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'false');
   statsState.calm = Math.max(0, statsState.calm - 30);
   updateStats(0);
+}
+
+function triggerDay3PhishingAlert() {
+  if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
+  if (ui.phishingModal) ui.phishingModal.setAttribute('aria-hidden', 'false');
+  statsState.calm = Math.max(0, statsState.calm - 20);
+  statsState.happiness = Math.max(0, statsState.happiness - 15);
+  updateStats(0);
+}
+
+function resetBrowserApp() {
+  if (ui.browserSearchInput) ui.browserSearchInput.value = '';
+  if (ui.browserGoogleLogo) ui.browserGoogleLogo.style.display = 'block';
+  if (ui.browserSearchResults) {
+    ui.browserSearchResults.classList.add('is-hidden');
+    ui.browserSearchResults.innerHTML = '';
+  }
+  if (ui.browserFakePortal) ui.browserFakePortal.classList.add('is-hidden');
+  if (ui.browserRealPortal) ui.browserRealPortal.classList.add('is-hidden');
+}
+
+function submitBrowserSearch(query) {
+  if (!ui.browserSearchResults) return;
+
+  if (ui.browserGoogleLogo) ui.browserGoogleLogo.style.display = 'none';
+  if (ui.browserFakePortal) ui.browserFakePortal.classList.add('is-hidden');
+  if (ui.browserRealPortal) ui.browserRealPortal.classList.add('is-hidden');
+
+  ui.browserSearchResults.classList.remove('is-hidden');
+  ui.browserSearchResults.innerHTML = '';
+
+  const cleanQuery = (query || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  if (cleanQuery.includes('banco') && cleanQuery.includes('nacion')) {
+    // Render search results
+    ui.browserSearchResults.innerHTML = `
+      <div class="search-result-item" data-result="fake-1">
+        <span class="search-result-url">www.banco-nacion-soporte-ayuda.com</span>
+        <span class="search-result-title">Banco Naciòn - Soporte y Ayuda</span>
+        <span class="search-result-desc">Atención al cliente BNA. Resuelve tus problemas de tarjeta de débito y crédito aquí de forma rápida.</span>
+      </div>
+      <div class="search-result-item" data-result="fake-2">
+        <span class="search-result-url">bancocentral-soporte-nacion.online</span>
+        <span class="search-result-title">BNA - Consultas de Saldo y Bloqueos</span>
+        <span class="search-result-desc">Soporte oficial para el desbloqueo de tarjetas del Banco Nación Argentina. Comunicate ahora.</span>
+      </div>
+      <div class="search-result-item" data-result="fake-3">
+        <span class="search-result-url">www.banco-nasion.net</span>
+        <span class="search-result-title">Banco Nasion - Trámites Online</span>
+        <span class="search-result-desc">Acceso rápido a canales de atención al cliente para desbloquear tu tarjeta de coordenadas y Token.</span>
+      </div>
+      <div class="search-result-item" data-result="real">
+        <span class="search-result-url">www.bna.com.ar</span>
+        <span class="search-result-title">Banco de la Nación Argentina - Sitio Oficial</span>
+        <span class="search-result-desc">Portal oficial del Banco de la Nación Argentina. Trámites, canales de atención al cliente y consultas oficiales de forma segura.</span>
+      </div>
+    `;
+
+    // Add click listeners to results
+    const items = ui.browserSearchResults.querySelectorAll('.search-result-item');
+    items.forEach((item) => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const type = item.getAttribute('data-result');
+        if (type.startsWith('fake')) {
+          ui.browserSearchResults.classList.add('is-hidden');
+          if (ui.browserFakePortal) ui.browserFakePortal.classList.remove('is-hidden');
+        } else if (type === 'real') {
+          if (!day3Scammed.value) {
+            showToast('Acceso denegado: Tarjeta inhabilitada temporalmente en portal oficial por bloqueo. Debe contactar al soporte técnico.');
+          } else {
+            ui.browserSearchResults.classList.add('is-hidden');
+            if (ui.browserRealPortal) ui.browserRealPortal.classList.remove('is-hidden');
+          }
+        }
+      });
+    });
+  } else {
+    ui.browserSearchResults.innerHTML = `
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 0.85rem;">
+        No se encontraron resultados para "${query}".<br><br>
+        <i>Consejo: Intente buscando "Banco Nación"</i>
+      </div>
+    `;
+  }
 }
 
 function updateStats(dt) {
@@ -2867,6 +3018,85 @@ if (playstoreSearchInput) {
   playstoreSearchInput.addEventListener('input', (e) => {
     e.stopPropagation();
     renderPlayStore(e.target.value);
+  });
+}
+
+initKeyboard();
+
+if (ui.browserSearchInput) {
+  ui.browserSearchInput.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showKeyboard(ui.browserSearchInput, (val) => {
+      submitBrowserSearch(val);
+    });
+  });
+}
+
+if (ui.btnBrowserFakeChat) {
+  ui.btnBrowserFakeChat.addEventListener('click', (e) => {
+    e.stopPropagation();
+    switchPhoneView('phoneMessagesView');
+    openContactChat('soporteBna');
+
+    if (conversations.soporteBna.length === 0) {
+      addMessageToConversation('soporteBna', 'outgoing', 'Hola, mi tarjeta fue rechazada en MercadoLibre y me dijeron que hable con ustedes.');
+      setTimeout(() => {
+        addMessageToConversation(
+          'soporteBna',
+          'incoming',
+          'Hola, estimada Marta. Vemos el bloqueo preventivo en su cuenta BNA. Para solucionarlo rápido, por favor confírmenos los 16 números de su tarjeta y el código de seguridad de 3 dígitos atrás.'
+        );
+        if (ui.phoneChatReplyBox) {
+          ui.phoneChatReplyBox.classList.remove('is-hidden');
+          ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-soporte-bna-give-data="true">Enviar datos de tarjeta</button>`;
+        }
+      }, 1500);
+    }
+  });
+}
+
+if (ui.btnBrowserRealChat) {
+  ui.btnBrowserRealChat.addEventListener('click', (e) => {
+    e.stopPropagation();
+    switchPhoneView('phoneMessagesView');
+    openContactChat('bancoNacion');
+
+    if (conversations.bancoNacion.length === 0) {
+      addMessageToConversation('bancoNacion', 'outgoing', 'Hola, necesito desbloquear mi tarjeta por favor.');
+      setTimeout(() => {
+        addMessageToConversation(
+          'bancoNacion',
+          'incoming',
+          'Hola Marta. Iniciamos el trámite de desbloqueo. Por seguridad, te enviaremos un código SMS de 4 dígitos a tu celular para confirmar tu identidad.'
+        );
+        
+        setTimeout(() => {
+          playNotificationSound();
+          addMessageToConversation(
+            'bancoNacion',
+            'incoming',
+            '<strong>💬 BNA SMS:</strong> Tu código de verificación es <strong>8813</strong>. No lo compartas con nadie.'
+          );
+          if (ui.phoneChatReplyBox) {
+            ui.phoneChatReplyBox.classList.remove('is-hidden');
+            ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-banco-nacion-verify="true">Ingresar código 8813</button>`;
+          }
+        }, 2000);
+      }, 1500);
+    }
+  });
+}
+
+if (ui.btnContinuePhishing) {
+  ui.btnContinuePhishing.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.phishingModal) ui.phishingModal.setAttribute('aria-hidden', 'true');
+    
+    day3Scammed.value = true;
+    setMission('fixBankCard', 'Buscar sitio oficial', 'Vuelve a buscar "Banco Nación" en Google, pero esta vez ingresa únicamente al sitio web oficial (www.bna.com.ar).');
+    
+    resetBrowserApp();
+    switchPhoneView('phoneBrowserView');
   });
 }
 

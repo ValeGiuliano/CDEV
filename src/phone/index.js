@@ -8,9 +8,11 @@ import {
   setCurrentContact,
   installedApps,
   statsState,
+  gameState,
 } from '../state/index.js';
 import { phoneScreenCorners } from '../core/phone3d.js';
 import { mlGiftsDilemma } from '../data/dilemmas.js';
+import { hideKeyboard } from './keyboard.js';
 
 let tablePhoneGroup = null;
 let heldPhoneGroup = null;
@@ -57,6 +59,9 @@ function registerEventListeners() {
         if (app === 'mercad0libre' && typeof callbacks.onOpenMercad0LibreApp === 'function') {
           callbacks.onOpenMercad0LibreApp();
         }
+        if (app === 'browser' && typeof callbacks.onOpenBrowserApp === 'function') {
+          callbacks.onOpenBrowserApp();
+        }
       });
     });
   }
@@ -78,6 +83,7 @@ function registerEventListeners() {
           renderContactList();
         } else {
           switchPhoneView('phoneHomeView');
+          hideKeyboard();
         }
       });
     });
@@ -87,6 +93,7 @@ function registerEventListeners() {
     ui.phoneHomeBar.addEventListener('click', (e) => {
       e.stopPropagation();
       switchPhoneView('phoneHomeView');
+      hideKeyboard();
     });
   }
 
@@ -126,6 +133,14 @@ function registerEventListeners() {
         typeof callbacks.onOpenPlaystoreFromReply === 'function'
       ) {
         callbacks.onOpenPlaystoreFromReply();
+        return;
+      }
+      if (btn.getAttribute('data-soporte-bna-give-data') === 'true') {
+        if (typeof callbacks.onSoporteBnaGiveData === 'function') callbacks.onSoporteBnaGiveData(btn);
+        return;
+      }
+      if (btn.getAttribute('data-banco-nacion-verify') === 'true') {
+        if (typeof callbacks.onBancoNacionVerify === 'function') callbacks.onBancoNacionVerify(btn);
         return;
       }
     });
@@ -272,6 +287,8 @@ export function updatePhoneHomeApps() {
   if (psBtn) psBtn.style.display = installedApps.playstore ? '' : 'none';
   if (mlBtn) mlBtn.style.display = installedApps.mercadolibre ? '' : 'none';
   if (fakeBtn) fakeBtn.style.display = installedApps.mercad0libre ? '' : 'none';
+  const browserBtn = document.getElementById('browserAppBtn');
+  if (browserBtn) browserBtn.style.display = installedApps.browser ? '' : 'none';
 }
 
 export function getLastPreview(contact) {
@@ -289,15 +306,24 @@ export function renderContactList() {
   setCurrentContact(null);
 
   const contacts = [
-    { id: 'camilo', name: 'Camilo', avatar: '👨', preview: getLastPreview('camilo') },
-    { id: 'clara', name: 'Clara', avatar: '👧', preview: getLastPreview('clara') },
+    { id: 'camilo', name: 'Camilo', avatar: '👨', preview: getLastPreview('camilo'), bg: '#2563eb' },
+    { id: 'clara', name: 'Clara', avatar: '👧', preview: getLastPreview('clara'), bg: '#ec4899' },
   ];
+
+  if (gameState.currentDay === 3) {
+    if (conversations.soporteBna && conversations.soporteBna.length > 0) {
+      contacts.push({ id: 'soporteBna', name: 'Soporte BNA', avatar: '👤', preview: getLastPreview('soporteBna'), bg: '#ef4444' });
+    }
+    if (conversations.bancoNacion && conversations.bancoNacion.length > 0) {
+      contacts.push({ id: 'bancoNacion', name: 'Banco Nación', avatar: '🏛️', preview: getLastPreview('bancoNacion'), bg: '#10b981' });
+    }
+  }
 
   contacts.forEach((contact) => {
     const card = document.createElement('div');
     card.className = 'contact-card';
     card.innerHTML = `
-      <div class="contact-avatar" style="background:${contact.id === 'camilo' ? '#2563eb' : '#ec4899'}">${contact.avatar}</div>
+      <div class="contact-avatar" style="background:${contact.bg}">${contact.avatar}</div>
       <div class="contact-info">
         <p class="contact-name">${contact.name}</p>
         <p class="contact-preview">${contact.preview}</p>

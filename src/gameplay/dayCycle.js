@@ -4,10 +4,12 @@ import {
   cinematicState,
   dayTransitionState,
   phoneState,
+  installedApps,
 } from '../state/index.js';
 import { ui } from '../utils/dom.js';
-import { completeMission } from './missions.js';
+import { completeMission, setMission } from './missions.js';
 import { setTimeOfDay } from '../core/renderer.js';
+import { updatePhoneHomeApps } from '../phone/index.js';
 
 let deps = null;
 let day2StartInProgress = false;
@@ -91,6 +93,8 @@ export function sleepToNextDay() {
       startDay2();
     } else if (gameState.currentDay === 3) {
       startDay3();
+    } else if (gameState.currentDay === 4) {
+      startDay4();
     }
   });
 }
@@ -174,14 +178,23 @@ export function startDay3() {
       lookEuler.set(0, 0, 0);
       camera.quaternion.setFromEuler(lookEuler);
 
-      if (ui.missionsContainer) {
-        ui.missionsContainer.setAttribute('aria-hidden', 'false');
-        if (ui.missionTitle) ui.missionTitle.textContent = 'Fin del Día 2';
-        if (ui.missionText) ui.missionText.textContent = 'Marta se acuesta preocupada por su tarjeta, pero sabe que su hijo la ayudará mañana. ❤️';
-        if (ui.missionCard) ui.missionCard.classList.add('is-completed');
-      }
+      // Unlock Google search app on Day 3 morning
+      installedApps.browser = true;
+      updatePhoneHomeApps();
+
+      // Start the mission to fix the card
+      setMission('fixBankCard', 'Solucionar tarjeta', 'Usa el navegador de tu celular para buscar "Banco Nación" y solucionar el bloqueo de tu tarjeta.');
     });
   }
 
   waitForTransition();
+}
+
+export function startDay4() {
+  if (ui.missionsContainer) {
+    ui.missionsContainer.setAttribute('aria-hidden', 'false');
+    if (ui.missionTitle) ui.missionTitle.textContent = 'Experiencia Completada';
+    if (ui.missionText) ui.missionText.textContent = '¡Felicitaciones! Has completado la experiencia sobre la brecha digital en la tercera edad. Marta logró superar los obstáculos y resolver sus problemas con el apoyo de su familia. ❤️';
+    if (ui.missionCard) ui.missionCard.classList.add('is-completed');
+  }
 }

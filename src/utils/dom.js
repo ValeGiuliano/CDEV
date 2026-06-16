@@ -81,6 +81,15 @@ export const ui = {
   fraudOverlay: document.querySelector('#fraudOverlay'),
   gameOverModal: document.querySelector('#gameOverModal'),
   btnRewindGameOver: document.querySelector('#btnRewindGameOver'),
+  browserSearchInput: document.querySelector('#browserSearchInput'),
+  browserSearchResults: document.querySelector('#browserSearchResults'),
+  browserGoogleLogo: document.querySelector('#browserGoogleLogo'),
+  browserFakePortal: document.querySelector('#browserFakePortal'),
+  browserRealPortal: document.querySelector('#browserRealPortal'),
+  btnBrowserFakeChat: document.querySelector('#btnBrowserFakeChat'),
+  btnBrowserRealChat: document.querySelector('#btnBrowserRealChat'),
+  phishingModal: document.querySelector('#phishingModal'),
+  btnContinuePhishing: document.querySelector('#btnContinuePhishing'),
 };
 
 export function getEl(id) {

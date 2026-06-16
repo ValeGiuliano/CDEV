@@ -109,6 +109,13 @@
               </svg></div>
             <span>Ajustes</span>
           </button>
+          <button class="phone-app-btn" data-app="browser" aria-label="Internet" id="browserAppBtn" style="display:none;">
+            <div class="app-icon bg-google"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg></div>
+            <span>Google</span>
+          </button>
           <button class="phone-app-btn" data-app="playstore" aria-label="Play Store" id="playstoreAppBtn" style="display:none;">
             <div class="app-icon bg-playstore"><svg viewBox="0 0 24 24" fill="white" stroke="none">
                 <polygon points="3,2 12,12 3,22" opacity="0.9"/>
@@ -215,6 +222,57 @@
         <div class="playstore-section">
           <h4>Apps destacadas</h4>
           <div class="playstore-grid" id="playstoreAppList"></div>
+        </div>
+      </div>
+
+      <div id="phoneBrowserView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span>Google</span>
+        </div>
+        <div class="browser-container">
+          <div class="browser-google-logo" id="browserGoogleLogo">
+            <span class="g-blue">G</span><span class="g-red">o</span><span class="g-yellow">o</span><span class="g-blue">g</span><span class="g-green">l</span><span class="g-red">e</span>
+          </div>
+          <div class="browser-search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="browserSearchInput" placeholder="Buscar en Google o escribir URL" readonly />
+          </div>
+          
+          <div id="browserSearchResults" class="browser-search-results is-hidden">
+          </div>
+          
+          <!-- Fake page details -->
+          <div id="browserFakePortal" class="browser-page-view is-hidden">
+            <div class="portal-header">
+              <h3>BANCO NACIÓN</h3>
+              <span>Atención al Cliente</span>
+            </div>
+            <div class="portal-body">
+              <p class="portal-warning">⚠️ ATENCIÓN: Tu tarjeta se encuentra suspendida de manera preventiva por actividad sospechosa.</p>
+              <p>Para desbloquear tu cuenta e iniciar el trámite de validación inmediata, por favor ponte en contacto con nuestro servicio técnico por mensaje.</p>
+              <button id="btnBrowserFakeChat" class="portal-chat-btn">💬 Iniciar Chat de Soporte</button>
+            </div>
+          </div>
+          
+          <!-- Real page details -->
+          <div id="browserRealPortal" class="browser-page-view is-hidden">
+            <div class="portal-header real-header">
+              <h3>Banco de la Nación Argentina</h3>
+              <span>Sitio Oficial Verificado</span>
+            </div>
+            <div class="portal-body">
+              <p class="portal-info">Bienvenido a los canales de autogestión de BNA. Vemos que tu tarjeta ha sido bloqueada temporalmente debido a un rechazo de compra preventivo.</p>
+              <p>Por motivos de seguridad, para desbloquear tu tarjeta debes iniciar un chat seguro con nuestro oficial de cuentas digital. Se te enviará un código SMS.</p>
+              <button id="btnBrowserRealChat" class="portal-chat-btn">🔒 Iniciar Chat Oficial</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -434,6 +492,16 @@
         </div>
       </div>
 
+      <!-- Custom Keyboard Overlay -->
+      <div id="phoneKeyboard" class="phone-keyboard is-hidden">
+        <div class="phone-keyboard-header">
+          <span class="phone-keyboard-status">Teclado táctil</span>
+          <button id="closePhoneKeyboardBtn" class="phone-keyboard-close">✕</button>
+        </div>
+        <div id="phoneKeyboardKeys" class="phone-keyboard-keys">
+        </div>
+      </div>
+
       <div class="phone-home-bar" id="phoneHomeBar"></div>
     </div>
 
@@ -588,6 +656,20 @@
           <span class="impact-badge neg">Calma -30%</span>
         </div>
         <button class="dilemma-btn" id="btnRewindGameOver">↩️ Volver atrás</button>
+      </div>
+    </div>
+
+    <!-- Phishing Educational Modal -->
+    <div id="phishingModal" class="game-over-modal" aria-hidden="true">
+      <div class="game-over-card" style="border-color:#f59e0b; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(245, 158, 11, 0.4);">
+        <div class="game-over-icon" style="color:#f59e0b;">⚠️</div>
+        <h2 style="color:#fbbf24;">¡Alerta de Estafa (Phishing)!</h2>
+        <p>Acabas de ingresar tus credenciales y datos de tarjeta de crédito en una página de ayuda no oficial que simulaba ser del <strong>Banco Nación</strong>.</p>
+        <p>Los ciberdelincuentes utilizaron estos datos para ingresar a tu cuenta y transferir tu dinero, dejándote con solo <strong>$30.000</strong>.</p>
+        <p class="intro-description-highlight" style="color:#fcd34d; font-size:0.9rem; margin-top:8px;">
+          Recuerda: El banco oficial NUNCA te pedirá números de tarjeta completa, contraseñas o códigos de seguridad a través de chats de mensajería.
+        </p>
+        <button class="dilemma-btn" id="btnContinuePhishing" style="background:#f59e0b;">Buscar en sitio oficial</button>
       </div>
     </div>
   </div>

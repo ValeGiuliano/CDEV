@@ -56,6 +56,8 @@ export const missionsState = {
 export const conversations = {
   camilo: [],
   clara: [],
+  soporteBna: [],
+  bancoNacion: [],
 };
 
 export const installedApps = {
@@ -65,7 +67,10 @@ export const installedApps = {
   playstore: false,
   mercadolibre: false,
   mercad0libre: false,
+  browser: false,
 };
+
+export const day3Scammed = { value: false };
 
 export const playstoreApps = [
   { id: 'mercad0libre', name: 'Mercad0Libre', dev: 'Mercado Libre', color: '#FFF600', label: 'M0' },

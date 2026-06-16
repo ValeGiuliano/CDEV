@@ -2068,3 +2068,296 @@ body.intro-active .day-counter {
 .game-over-card .dilemma-btn:hover {
   background: #dc2626;
 }
+
+/* --- Google App Icon --- */
+.bg-google {
+  background: linear-gradient(135deg, #4285f4, #2b6cb0);
+}
+
+/* --- Browser View & Portal --- */
+.browser-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.browser-google-logo {
+  font-size: 2.2rem;
+  font-weight: 800;
+  text-align: center;
+  margin: 24px 0 16px;
+  letter-spacing: -2px;
+}
+.browser-google-logo span {
+  display: inline-block;
+}
+.g-blue { color: #4285F4; }
+.g-red { color: #EA4335; }
+.g-yellow { color: #FBBC05; }
+.g-green { color: #34A853; }
+
+.browser-search-box {
+  display: flex;
+  align-items: center;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 999px;
+  padding: 8px 14px;
+  gap: 8px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.browser-search-box input {
+  background: none;
+  border: none;
+  color: #fff;
+  width: 100%;
+  outline: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.browser-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.browser-search-results.is-hidden {
+  display: none;
+}
+
+.search-result-item {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  transition: transform 150ms ease, background 150ms ease;
+  text-align: left;
+}
+
+.search-result-item:hover {
+  transform: translateY(-2px);
+  background: #2d3748;
+}
+
+.search-result-url {
+  font-size: 0.7rem;
+  color: #10b981;
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+.search-result-title {
+  font-size: 0.9rem;
+  color: #60a5fa;
+  font-weight: 700;
+  margin-bottom: 6px;
+  display: block;
+  text-decoration: underline;
+}
+
+.search-result-desc {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  line-height: 1.35;
+  display: block;
+}
+
+/* Page views for portals inside Google Browser */
+.browser-page-view {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-top: 8px;
+  flex: 1;
+}
+
+.browser-page-view.is-hidden {
+  display: none;
+}
+
+.portal-header {
+  background: linear-gradient(135deg, #0f4c81, #1e3a8a);
+  padding: 14px;
+  text-align: center;
+  border-bottom: 2px solid #1d4ed8;
+}
+.portal-header.real-header {
+  background: linear-gradient(135deg, #065f46, #047857);
+  border-bottom: 2px solid #059669;
+}
+
+.portal-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.portal-header span {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+  font-weight: 700;
+  display: block;
+  margin-top: 2px;
+}
+
+.portal-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+  font-size: 0.8rem;
+  color: #e5e7eb;
+  line-height: 1.45;
+}
+
+.portal-warning {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 8px;
+  padding: 10px;
+  color: #f87171;
+  font-weight: 600;
+}
+
+.portal-info {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  padding: 10px;
+  color: #34d399;
+  font-weight: 600;
+}
+
+.portal-chat-btn {
+  background: #10b981;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 700;
+  padding: 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 150ms;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);
+}
+
+.portal-chat-btn:hover {
+  background: #059669;
+}
+
+/* --- Virtual Keyboard --- */
+.phone-keyboard {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #1f2937;
+  border-top: 1px solid #374151;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  transform: translateY(0);
+  transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.phone-keyboard.is-hidden {
+  transform: translateY(100%);
+  pointer-events: none;
+}
+
+.phone-keyboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  padding: 0 4px;
+}
+
+.phone-keyboard-status {
+  font-size: 0.65rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.phone-keyboard-close {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.phone-keyboard-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.phone-keyboard-keys {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.phone-key {
+  background: #374151;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  transition: background 100ms, transform 50ms;
+}
+
+.phone-key:active {
+  background: #4b5563;
+  transform: scale(0.95);
+}
+
+.phone-key.wide-key {
+  grid-column: span 2;
+  background: #4b5563;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.phone-key.space-key {
+  grid-column: span 3;
+  background: #374151;
+}
+
+.phone-key.enter-key {
+  grid-column: span 2;
+  background: #10b981;
+  color: #fff;
+}
+.phone-key.enter-key:active {
+  background: #059669;
+}
