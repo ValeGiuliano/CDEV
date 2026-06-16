@@ -105,6 +105,10 @@ function registerEventListeners() {
         return;
       }
 
+      if (btn.getAttribute('data-tutorial-accept') === 'true') {
+        if (typeof callbacks.onTutorialAccept === 'function') callbacks.onTutorialAccept(btn);
+        return;
+      }
       if (btn.getAttribute('data-clara-reply') === 'true') {
         if (typeof callbacks.onClaraReply === 'function') callbacks.onClaraReply(btn);
         return;

@@ -107,6 +107,7 @@ Entrá a <strong>Mensajes</strong> para ver qué te escribí. ¡Ah! Y recordá: 
   if (conversations.camilo) {
     conversations.camilo = conversations.camilo.filter((msg) => !msg.html.includes('¡Bienvenida, Mamá!'));
   }
+  addMessageSafe('camilo', 'date-separator', 'Día 1');
   addMessageSafe('camilo', 'incoming', html);
 }
 
@@ -120,6 +121,7 @@ export function showMartaReplyTutorial() {
 
 export function startClaraBirthdayMission() {
   setMission('readCamiloMessage', 'Mensaje de Camilo', 'Lee el mensaje de tu hijo Camilo en la aplicación de Mensajes.');
+  addMessageSafe('camilo', 'date-separator', 'Día 2');
   addMessageSafe(
     'camilo',
     'incoming',

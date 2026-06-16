@@ -47,7 +47,7 @@ import { mlProducts } from './data/products.js';
 const fakeMLProducts = mlProducts;
 import { camiloDialogues, claraDialogues } from './data/chats/index.js';
 import { playDoorbellSound, playNotificationSound, playAlertSound, playCinematicSound } from './audio/sounds.js';
-import { canvas, renderer, scene, camera, clock, lookEuler, initResizeListener } from './core/renderer.js';
+import { canvas, renderer, scene, camera, clock, lookEuler, initResizeListener, setTimeOfDay, updateTimeOfDay } from './core/renderer.js';
 import { phoneScreenCorners } from './core/phone3d.js';
 import { initPlayer, updateFirstPerson, updateLook, setLookFromEuler, clampPlayerToBounds, isDoorKey, getMoveDirection } from './gameplay/player.js';
 import { initDoors, handleDoorKey, updateDoors } from './gameplay/doors.js';
@@ -1959,6 +1959,8 @@ function restartCurrentDay() {
   // Flag for restarted day
   setDayRestarted(true);
 
+  setTimeOfDay('dia', 0.0);
+
   // Position camera in bed and restart wake-up cinematic
   camera.position.set(4.2, 0.72, 3.45);
   lookEuler.set(0, 0, 0);
@@ -2168,7 +2170,15 @@ initPhone({
         if (missionsState.currentMissionId === 'tutorial' && !missionsState.completed) {
           completeMission('tutorial');
         }
+
+        setTimeout(() => {
+          setMission('goToSleep', 'Ir a dormir', 'Ve a la cama a descansar para empezar el siguiente día.');
+          setTimeOfDay('noche', 5.0);
+        }, 1000);
       }, 1500);
+    },
+    onTutorialAccept: (btn) => {
+      switchPhoneView('phoneHomeView');
     },
     onClaraReply: (btn) => {
       btn.disabled = true;
@@ -2574,6 +2584,7 @@ function completeMLPurchaseAndMission() {
 
   setTimeout(() => {
     setMission('goToSleep', 'Ir a dormir', 'Ya es tarde y tuviste un día largo. Ve a la cama a descansar.');
+    setTimeOfDay('noche', 5.0);
   }, 1500);
 }
 
@@ -2663,6 +2674,7 @@ function animate() {
   updateMissions(dt);
   updateCinematic(dt);
   updateFraudDrain(dt);
+  updateTimeOfDay(dt);
 
   // Actualizar mezcladores de animación esquelética
   if (martaMixer) {
@@ -2778,15 +2790,7 @@ if (ui.btnRewindGameOver) {
   });
 }
 
-document.addEventListener('click', (e) => {
-  if (missionsState.currentMissionId === 'tutorial' && !missionsState.completed) {
-    if (e.target && e.target.matches('[data-tutorial-accept="true"]')) {
-      e.stopPropagation();
-      completeMission('tutorial');
-      switchPhoneView('phoneHomeView');
-    }
-  }
-});
+
 
 if (ui.daysBlockedModal) {
   const btnAccept = document.getElementById('btnAcceptBlocked');

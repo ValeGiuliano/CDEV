@@ -7,6 +7,7 @@ import {
 } from '../state/index.js';
 import { ui } from '../utils/dom.js';
 import { completeMission } from './missions.js';
+import { setTimeOfDay } from '../core/renderer.js';
 
 let deps = null;
 let day2StartInProgress = false;
@@ -116,6 +117,8 @@ export function startDay2() {
   camera.position.set(4.2, 0.72, 3.45);
   lookEuler.set(0, 0, 0);
   camera.quaternion.setFromEuler(lookEuler);
+
+  setTimeOfDay('dia', 0.0);
 
   function waitForTransition() {
     if (dayTransitionState.active) {
