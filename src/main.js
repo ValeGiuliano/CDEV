@@ -25,6 +25,8 @@ import {
   currentContact,
   visualFatigueDisabled,
   doorState,
+  dayOutcomes,
+  setDayOutcome,
 } from './state/index.js';
 
 void dayRestarted;
@@ -1885,6 +1887,53 @@ const day2WakeUpSequence = [
   }
 ];
 
+// --- DAY 4 WAKE-UP SEQUENCE ---
+const day4WakeUpSequence = [
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Día 4: El cumpleaños de Clara.' },
+    onStart: () => {
+      camera.position.set(4.2, 0.72, 3.45);
+      camera.lookAt(4.2, 2.5, 3.45);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.transition = 'none';
+        ui.dayTransitionOverlay.style.opacity = '1';
+        ui.dayTransitionOverlay.setAttribute('aria-hidden', 'false');
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(1 - ease * 0.7);
+      }
+      camera.position.y = THREE.MathUtils.lerp(0.72, 0.78, ease);
+    }
+  },
+  {
+    duration: 3.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Hoy es el cumpleaños de Clara. Marta se levanta pensando en qué regalo le dará.' },
+    sound: { freq: 360, type: 'sine', duration: 0.4 },
+    onStart: () => {
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = '0.3';
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(0.3 * (1 - ease));
+      }
+      const startTarget = new THREE.Vector3(4.2, 2.5, 3.45);
+      const endTarget = new THREE.Vector3(4.2, 1.4, 0);
+      const currentTarget = new THREE.Vector3().lerpVectors(startTarget, endTarget, ease);
+      camera.lookAt(currentTarget);
+      camera.position.y = THREE.MathUtils.lerp(0.78, 0.82, ease);
+    }
+  }
+];
+
 function restartCurrentDay() {
   // Close game over modal
   if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'true');
@@ -1903,6 +1952,8 @@ function restartCurrentDay() {
   statsState.money = 100000;
   statsState.happiness = 80;
   statsState.calm = 75;
+  setDayOutcome('felledMercad0Libre', false);
+  setDayOutcome('felledPami', false);
   updateStats(0);
 
   // Reset missions
@@ -2108,6 +2159,121 @@ initBed({
   sleepToNextDay: sleepToNextDayFn,
 });
 
+function startDay4Flow() {
+  const mlFailed = dayOutcomes.felledMercad0Libre;
+  const pamiFailed = dayOutcomes.felledPami;
+  
+  let scamCount = 0;
+  if (mlFailed) scamCount++;
+  if (pamiFailed) scamCount++;
+  
+  playNotificationSound();
+  
+  if (scamCount === 0) {
+    setMission('giveGiftBest', 'Regalo de Clara', 'Abrí Mensajes y hablá con Clara para ver si le gustó su regalo.');
+    
+    conversations.clara = [];
+    conversations.camilo = [];
+    
+    setTimeout(() => {
+      addMessageToConversation('clara', 'incoming', '¡Abuela! ¡La muñeca Barbie está hermosa! Muchísimas gracias, ¡sos la mejor del mundo! 👧⚽💖');
+      playNotificationSound();
+      
+      if (ui.phoneChatReplyBox) {
+        ui.phoneChatReplyBox.classList.remove('is-hidden');
+        ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-day4-reply="true" data-gift-tier="best">Responder con cariño</button>`;
+      }
+    }, 1500);
+  } else if (scamCount === 1) {
+    setMission('giveGiftMid', 'Regalo de Clara', 'Abrí Mensajes y hablá con Clara para ver si le gustó la merienda.');
+    
+    conversations.clara = [];
+    conversations.camilo = [];
+    
+    setTimeout(() => {
+      addMessageToConversation('clara', 'incoming', '¡Hola abu! Qué lindo que viniste a visitarme por mi cumple. Me encantaron las facturas y la merienda que compartimos juntas. ¡Te quiero mucho! ❤️🍰');
+      playNotificationSound();
+      
+      if (ui.phoneChatReplyBox) {
+        ui.phoneChatReplyBox.classList.remove('is-hidden');
+        ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-day4-reply="true" data-gift-tier="mid">Responder con cariño</button>`;
+      }
+    }, 1500);
+  } else {
+    setMission('giveGiftWorst', 'Regalo de Clara', 'Abrí Mensajes y hablá con Clara para ver si recibió tu carta.');
+    
+    conversations.clara = [];
+    conversations.camilo = [];
+    
+    setTimeout(() => {
+      addMessageToConversation('clara', 'incoming', '¡Hola abuela! Gracias por venir a mi cumpleaños. Y gracias por la carta tan linda que me escribiste con tus dibujos, me re gustó. Te quiero. ❤️✍️');
+      playNotificationSound();
+      
+      if (ui.phoneChatReplyBox) {
+        ui.phoneChatReplyBox.classList.remove('is-hidden');
+        ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-day4-reply="true" data-gift-tier="worst">Responder con cariño</button>`;
+      }
+    }, 1500);
+  }
+}
+
+function onDay4Reply(btn) {
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+  
+  const tier = btn.getAttribute('data-gift-tier');
+  
+  if (tier === 'best') {
+    addMessageToConversation('clara', 'outgoing', 'De nada, mi amor. Me alegra mucho que te haya gustado la Barbie futbolista. ¡Te lo merecés! Disfrutala mucho. ❤️');
+    if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
+    
+    setTimeout(() => {
+      completeMission('giveGiftBest');
+      
+      setTimeout(() => {
+        addMessageToConversation('camilo', 'incoming', 'Hola mamá, ¡qué alegría! Clara me contó que le encantó la muñeca Barbie que le regalaste. Qué suerte que pudimos comprarla a tiempo. ¡Te re agradezco el esfuerzo! ❤️');
+        playNotificationSound();
+        
+        setTimeout(() => {
+          setMission('goToSleep', 'Ir a dormir', 'El día de cumpleaños terminó. Ve a la cama a descansar.');
+        }, 1500);
+      }, 2000);
+    }, 1500);
+  } else if (tier === 'mid') {
+    addMessageToConversation('clara', 'outgoing', '¡A mí también me encantó pasar la tarde con vos y comer unas ricas facturas, mi vida! Feliz cumpleaños. ❤️');
+    if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
+    
+    setTimeout(() => {
+      completeMission('giveGiftMid');
+      
+      setTimeout(() => {
+        addMessageToConversation('camilo', 'incoming', 'Hola mamá. Clara me dijo que la pasó hermoso con vos en su cumpleaños. Qué buena idea llevarle facturas para merendar, le encantó pasar la tarde con su abuela. ❤️');
+        playNotificationSound();
+        
+        setTimeout(() => {
+          setMission('goToSleep', 'Ir a dormir', 'El día de cumpleaños terminó. Ve a la cama a descansar.');
+        }, 1500);
+      }, 2000);
+    }, 1500);
+  } else {
+    addMessageToConversation('clara', 'outgoing', '¡Te la hice con todo mi amor, Clarita! Perdón que no pude comprarte la muñeca que querías, pero lo importante es estar juntas. ❤️');
+    if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
+    
+    setTimeout(() => {
+      completeMission('giveGiftWorst');
+      
+      setTimeout(() => {
+        addMessageToConversation('camilo', 'incoming', 'Hola mamá, qué lindo que viniste al cumple. No te preocupes por el regalo, lo que más importa es que estuviste ahí con ella. Le encantó la cartita que le hiciste. Te quiero mucho, mamá. ❤️');
+        playNotificationSound();
+        
+        setTimeout(() => {
+          setMission('goToSleep', 'Ir a dormir', 'El día de cumpleaños terminó. Ve a la cama a descansar.');
+        }, 1500);
+      }, 2000);
+    }, 1500);
+  }
+}
+
 initDayCycle({
   camera,
   lookEuler,
@@ -2121,6 +2287,8 @@ initDayCycle({
   renderContactList,
   openContactChat,
   startClaraBirthdayFlow,
+  day4WakeUpSequence,
+  startDay4Flow,
 });
 
 initMissions({
@@ -2237,6 +2405,9 @@ initPhone({
       if (ui.phoneChatReplyBox) {
         ui.phoneChatReplyBox.classList.add('is-hidden');
       }
+    },
+    onDay4Reply: (btn) => {
+      onDay4Reply(btn);
     },
   },
 });
@@ -2610,6 +2781,7 @@ function triggerBadEndingAppFraud() {
   if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
   if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'false');
   statsState.calm = Math.max(0, statsState.calm - 30);
+  setDayOutcome('felledMercad0Libre', true);
   updateStats(0);
 }
 

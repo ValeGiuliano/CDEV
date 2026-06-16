@@ -130,3 +130,13 @@ export const bedState = {
   position: new THREE.Vector3(4.2, 0, 4.2),
   label: 'cama',
 };
+
+export const dayOutcomes = {
+  felledMercad0Libre: false,
+  felledPami: false,
+};
+
+export function setDayOutcome(key, value) {
+  dayOutcomes[key] = value;
+}
+

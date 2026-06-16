@@ -117,6 +117,10 @@ function registerEventListeners() {
         if (typeof callbacks.onClaraHowTo === 'function') callbacks.onClaraHowTo(btn);
         return;
       }
+      if (btn.getAttribute('data-day4-reply') === 'true') {
+        if (typeof callbacks.onDay4Reply === 'function') callbacks.onDay4Reply(btn);
+        return;
+      }
       if (
         btn.getAttribute('data-open-playstore') === 'true' &&
         typeof callbacks.onOpenPlaystoreFromReply === 'function'

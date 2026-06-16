@@ -27,4 +27,22 @@ export const camiloDialogues = {
     type: 'incoming',
     text: '¡Bien hecho, mamá! Ya tenés MercadoLibre instalado. Cualquier cosa me avisás. Descansá bien. ❤️',
   },
+  day4Best: [
+    {
+      type: 'incoming',
+      text: 'Hola mamá, ¡qué alegría! Clara me contó que le encantó la muñeca Barbie que le regalaste. Qué suerte que pudimos comprarla a tiempo. ¡Te re agradezco el esfuerzo! ❤️',
+    },
+  ],
+  day4Mid: [
+    {
+      type: 'incoming',
+      text: 'Hola mamá. Clara me dijo que la pasó hermoso con vos en su cumpleaños. Qué buena idea llevarle facturas para merendar, le encantó pasar la tarde con su abuela. ❤️',
+    },
+  ],
+  day4Worst: [
+    {
+      type: 'incoming',
+      text: 'Hola mamá, qué lindo que viniste al cumple. No te preocupes por el regalo, lo que más importa es que estuviste ahí con ella. Le encantó la cartita que le hiciste. Te quiero mucho, mamá. ❤️',
+    },
+  ],
 };

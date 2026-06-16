@@ -90,6 +90,8 @@ export function sleepToNextDay() {
       startDay2();
     } else if (gameState.currentDay === 3) {
       startDay3();
+    } else if (gameState.currentDay === 4) {
+      startDay4();
     }
   });
 }
@@ -148,8 +150,53 @@ export function startDay2() {
 export function startDay3() {
   if (ui.missionsContainer) {
     ui.missionsContainer.setAttribute('aria-hidden', 'false');
-    if (ui.missionTitle) ui.missionTitle.textContent = 'Fin del Día 2';
-    if (ui.missionText) ui.missionText.textContent = 'Marta se acuesta preocupada por su tarjeta, pero sabe que su hijo la ayudará mañana. ❤️';
+    if (ui.missionTitle) ui.missionTitle.textContent = 'Día 3 (Saltado)';
+    if (ui.missionText) ui.missionText.textContent = 'En esta branch, el Día 3 se salta. Acuéstate en la cama para pasar al Día 4.';
     if (ui.missionCard) ui.missionCard.classList.add('is-completed');
   }
+  missionsState.currentMissionId = 'skipDay3';
+  missionsState.active = true;
+  missionsState.completed = true;
+}
+
+let day4StartInProgress = false;
+
+export function startDay4() {
+  if (!deps) return;
+  if (day4StartInProgress) return;
+  day4StartInProgress = true;
+  const {
+    camera,
+    lookEuler,
+    startCinematic,
+    day4WakeUpSequence,
+    setDayRestarted,
+    startDay4Flow,
+  } = deps;
+
+  camera.position.set(4.2, 0.72, 3.45);
+  lookEuler.set(0, 0, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  function waitForTransition() {
+    if (dayTransitionState.active) {
+      requestAnimationFrame(waitForTransition);
+      return;
+    }
+
+    startCinematic(day4WakeUpSequence, () => {
+      camera.position.set(4.2, 1.48, 3.8);
+      lookEuler.set(0, Math.PI, 0);
+      camera.quaternion.setFromEuler(lookEuler);
+
+      setDayRestarted(false);
+
+      setTimeout(() => {
+        startDay4Flow();
+        day4StartInProgress = false;
+      }, 1500);
+    });
+  }
+
+  waitForTransition();
 }
