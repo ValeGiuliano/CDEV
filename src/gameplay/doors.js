@@ -23,16 +23,24 @@ export function getNearbyDoor() {
 function toggleNearbyDoor() {
   const nearby = getNearbyDoor();
   if (!nearby) return;
-  nearby.door.open = !nearby.door.open;
 
   const currentMission = missionsState.currentMissionId;
   const isDay4Delivery = currentMission === 'attendDelivery' && !missionsState.completed;
   const isDay1Doorbell = currentMission === 'doorbell' && !missionsState.completed;
+  const isDay5Uber = currentMission === 'openDoorUber' && !missionsState.completed;
+
+  // Protect front door: can only open it if one of the valid missions is active
+  if (nearby.id === 'living' && !nearby.door.open) {
+    const allowed = (isDay1Doorbell || isDay4Delivery || isDay5Uber);
+    if (!allowed) return; // Ignore input, door is locked
+  }
+
+  nearby.door.open = !nearby.door.open;
 
   if (
     nearby.id === 'living' &&
     nearby.door.open &&
-    (isDay1Doorbell || isDay4Delivery) &&
+    (isDay1Doorbell || isDay4Delivery || isDay5Uber) &&
     typeof onOpenLivingDoor === 'function'
   ) {
     onOpenLivingDoor();
