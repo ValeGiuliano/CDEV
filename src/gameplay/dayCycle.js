@@ -8,6 +8,7 @@ import {
   day4State,
   day4InitialMoney,
   statsState,
+  uberState,
 } from '../state/index.js';
 import { ui } from '../utils/dom.js';
 import { completeMission, setMission, startDay4BuyMission } from './missions.js';
@@ -235,10 +236,51 @@ export function startDay4() {
 
 export function startDay5() {
   if (!deps) return;
-  if (ui.missionsContainer) {
-    ui.missionsContainer.setAttribute('aria-hidden', 'false');
-    if (ui.missionTitle) ui.missionTitle.textContent = 'Día 5 — Cumpleaños de Clara';
-    if (ui.missionText) ui.missionText.textContent = '¡Hoy es el cumpleaños de Clara! Continuará...';
-    if (ui.missionCard) ui.missionCard.classList.remove('is-completed');
+  const { camera, lookEuler, startCinematic, day5WakeUpSequence, playNotificationSound, startUberMission } = deps;
+  if (!camera || !lookEuler) return;
+
+  camera.position.set(4.2, 0.72, 3.45);
+  lookEuler.set(0, 0, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  setTimeOfDay('dia', 0.0);
+
+  uberState.mazeActive = false;
+  uberState.mazeRunning = false;
+  uberState.lives = 3;
+  uberState.elapsed = 0;
+  uberState.score = 0;
+  uberState.finished = false;
+  uberState.failed = false;
+  uberState.currentCheckpoint = 0;
+  uberState.invulnTimer = 0;
+  uberState.attempts = 1;
+
+  function waitForTransition() {
+    if (dayTransitionState.active) {
+      requestAnimationFrame(waitForTransition);
+      return;
+    }
+
+    const sequence = day5WakeUpSequence || [];
+    const runAfterWake = () => {
+      camera.position.set(4.2, 1.48, 3.8);
+      lookEuler.set(0, 0, 0);
+      camera.quaternion.setFromEuler(lookEuler);
+
+      installedApps.uber = true;
+      updatePhoneHomeApps();
+
+      if (typeof playNotificationSound === 'function') playNotificationSound();
+      if (typeof startUberMission === 'function') startUberMission();
+    };
+
+    if (sequence.length > 0 && typeof startCinematic === 'function') {
+      startCinematic(sequence, runAfterWake);
+    } else {
+      runAfterWake();
+    }
   }
+
+  waitForTransition();
 }

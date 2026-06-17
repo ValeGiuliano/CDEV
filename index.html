@@ -164,6 +164,16 @@
             </div>
             <span>Casino Slots</span>
           </button>
+          <button class="phone-app-btn" data-app="uber" aria-label="Uber" id="uberAppBtn" style="display:none;">
+            <div class="app-icon bg-uber">
+              <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M5 17h14" stroke-width="2.4"/>
+                <rect x="9" y="9" width="6" height="5" rx="1" fill="white" stroke="none"/>
+              </svg>
+            </div>
+            <span>Uber</span>
+          </button>
         </div>
       </div>
 
@@ -632,6 +642,71 @@
         </div>
       </div>
 
+      <div id="phoneUberView" class="phone-view phone-uber-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#000;font-weight:800;">Uber</span>
+        </div>
+        <div class="uber-content" id="uberMazeContent">
+          <div class="uber-hud">
+            <div class="uber-hud-item">Nivel: <span id="uberLevel">1/3</span></div>
+            <div class="uber-hud-item">Vidas: <span id="uberLives">3</span></div>
+            <div class="uber-hud-item">Tiempo: <span id="uberTimer">0.0s</span></div>
+          </div>
+          <div class="uber-canvas-wrap">
+            <canvas id="uberCanvas" width="320" height="420"></canvas>
+            <div class="uber-overlay-msg" id="uberMessage"></div>
+          </div>
+          <button id="uberStartBtn" class="uber-start-btn">Iniciar viaje</button>
+          <button id="uberSkipMazeBtn" class="uber-start-btn" style="background:#dc2626; border-color:#ef4444; margin-top: 4px; padding: 8px; font-size: 0.75rem;">Saltar laberinto (Dev)</button>
+          <div class="uber-dpad" id="uberDpad">
+            <button class="uber-dpad-btn uber-dpad-up" data-uber-dir="up" aria-label="Arriba">▲</button>
+            <button class="uber-dpad-btn uber-dpad-left" data-uber-dir="left" aria-label="Izquierda">◀</button>
+            <button class="uber-dpad-btn uber-dpad-down" data-uber-dir="down" aria-label="Abajo">▼</button>
+            <button class="uber-dpad-btn uber-dpad-right" data-uber-dir="right" aria-label="Derecha">▶</button>
+          </div>
+        </div>
+
+        <div class="uber-mappin-content is-hidden" id="uberMapPinContent">
+          <div class="uber-hud">
+            <div class="uber-hud-item">Confirmar Punto de Recogida</div>
+            <div class="uber-hud-item">Tiempo: <span id="uberMapTimer">0.0s</span></div>
+          </div>
+          <div class="uber-map-canvas-wrap">
+            <canvas id="uberMapCanvas" width="320" height="240"></canvas>
+            
+            <div id="uberMapGpsSearch" class="uber-gps-search-overlay">
+              <div class="uber-gps-spinner"></div>
+              <p>Buscando señal GPS...</p>
+            </div>
+
+            <div id="uberSuggestedPopup" class="uber-suggested-popup is-hidden">
+              <div class="uber-suggested-header">
+                <span>Sugerencia del sistema</span>
+                <button id="uberSuggestedClose" class="uber-suggested-close">×</button>
+              </div>
+              <p>Mejor punto de encuentro sugerido para abordar más rápido.</p>
+              <button id="uberSuggestedAccept" class="uber-suggested-accept">Aceptar sugerencia</button>
+            </div>
+          </div>
+
+          <div class="uber-dpad" id="uberMapDpad">
+            <button class="uber-dpad-btn uber-dpad-up" data-map-dir="up" aria-label="Mover Arriba">▲</button>
+            <button class="uber-dpad-btn uber-dpad-left" data-map-dir="left" aria-label="Mover Izquierda">◀</button>
+            <button class="uber-dpad-btn uber-dpad-down" data-map-dir="down" aria-label="Mover Abajo">▼</button>
+            <button class="uber-dpad-btn uber-dpad-right" data-map-dir="right" aria-label="Mover Derecha">▶</button>
+          </div>
+
+          <div class="uber-map-buttons" id="uberMapButtons">
+            <button id="uberCancelLocationBtn" class="uber-map-btn">Cancelar Ubicación</button>
+            <button id="uberConfirmLocationBtn" class="uber-map-btn">Confirmar Ubicación</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Custom Keyboard Overlay -->
       <div id="phoneKeyboard" class="phone-keyboard is-hidden">
         <div class="phone-keyboard-header">
@@ -884,6 +959,70 @@
         </p>
         <button class="dilemma-btn" id="btnCasinoBankruptRestart" style="background:#ef4444;">Reiniciar día</button>
       </div>
+    </div>
+
+    <!-- Uber success modal -->
+    <div id="uberSuccessModal" class="game-over-modal" aria-hidden="true">
+      <div class="game-over-card" style="border-color:#22c55e; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(34, 197, 94, 0.4); max-width: 420px; width: 90%;">
+        <div class="game-over-icon" style="color:#22c55e; margin-bottom: 8px;">🏆</div>
+        <h2 style="color:#4ade80; margin-bottom: 4px;">¡Viaje confirmado!</h2>
+        <p style="margin-bottom: 12px; font-size: 0.9rem;">Lograste pedir el Uber. Marta va camino al cumpleaños de Clara. 🎂</p>
+        
+        <!-- Score Breakdown Section -->
+        <div id="uberScoreBreakdown" class="uber-score-breakdown">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <!-- Leaderboard Submit Form -->
+        <div id="uberLeaderboardForm" class="uber-leaderboard-form">
+          <p style="font-size:0.85rem; color:#a1a1aa; margin: 8px 0;">¡Registrá tu puntuación en la tabla de posiciones!</p>
+          <div style="display: flex; gap: 8px; width: 100%; justify-content: center; margin-bottom: 8px;">
+            <input type="text" id="uberPlayerName" class="uber-leaderboard-input" placeholder="Tu nombre" value="Marta" maxlength="15" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #3f3f46; background: #27272a; color: #fff; font-size: 0.9rem;">
+            <button id="btnSaveUberScore" class="dilemma-btn" style="background:#22c55e; margin: 0; padding: 10px 16px; font-size: 0.9rem;">Guardar</button>
+          </div>
+        </div>
+
+        <!-- Leaderboard View Section -->
+        <div id="uberLeaderboardView" class="uber-leaderboard-view is-hidden" style="width: 100%; display: none;">
+          <h3 style="color:#fbbf24; font-size: 1.05rem; margin: 12px 0 8px; text-align: center;">Tabla de Posiciones</h3>
+          <div class="uber-table-wrapper" style="overflow-x: auto; width: 100%;">
+            <table class="uber-leaderboard-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left; color: #e4e4e7;">
+              <thead>
+                <tr style="border-bottom: 2px solid #3f3f46; color: #a1a1aa;">
+                  <th style="padding: 6px 4px;">Puesto</th>
+                  <th style="padding: 6px 4px;">Nombre</th>
+                  <th style="padding: 6px 4px;">Muñeca</th>
+                  <th style="padding: 6px 4px;">Tiempo</th>
+                  <th style="padding: 6px 4px; text-align: right;">Total</th>
+                </tr>
+              </thead>
+              <tbody id="uberLeaderboardBody">
+                <!-- Populated dynamically via JS -->
+              </tbody>
+            </table>
+          </div>
+          
+          <p class="intro-description-highlight" style="color:#86efac; font-size:0.8rem; margin: 12px 0 8px;">
+            A veces las apps parecen simples, pero para una persona mayor pueden ser un laberinto.
+          </p>
+          <button class="dilemma-btn" id="btnUberSuccessContinue" style="background:#22c55e; width: 100%; margin-top: 8px;">Ir al cumpleaños</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Uber fail modal (final malo) -->
+    <div id="uberFailModal" class="game-over-modal" aria-hidden="true">
+      <div class="game-over-card" style="border-color:#ef4444; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.4);">
+        <div class="game-over-icon" style="color:#ef4444;">💔</div>
+        <h2 style="color:#f87171;">Marta no llegó al cumpleaños</h2>
+        <p>No lograste pedir el Uber a tiempo. Agotaste tus intentos y Marta se perdió el cumpleaños de Clara.</p>
+        <p class="intro-description-highlight" style="color:#fcd34d; font-size:0.9rem; margin-top:8px;">
+          La tecnología, cuando es confusa o mal diseñada, puede dejar a las personas solas. La brecha digital también aísla.
+        </p>
+        <button class="dilemma-btn" id="btnUberFailRestart" style="background:#ef4444;">Reintentar</button>
+      </div>
+    </div>
+  </div>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>

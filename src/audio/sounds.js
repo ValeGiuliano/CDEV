@@ -143,3 +143,76 @@ export function playCasinoLoseSound() {
     setTimeout(() => play8BitTone(f, 'sawtooth', 0.18, 0.14), i * 130);
   });
 }
+
+export function createCarEngineSound() {
+  try {
+    ensureCtx();
+    if (!audioCtx) return null;
+
+    const osc = audioCtx.createOscillator();
+    const filter = audioCtx.createBiquadFilter();
+    const gainNode = audioCtx.createGain();
+    
+    // Use stereo panner (universally supported in modern browsers)
+    const pannerNode = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(60, audioCtx.currentTime); // low engine pitch
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(220, audioCtx.currentTime); // filter out harsh buzz
+
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime); // start silent
+
+    osc.connect(filter);
+    filter.connect(gainNode);
+
+    if (pannerNode) {
+      gainNode.connect(pannerNode);
+      pannerNode.connect(audioCtx.destination);
+    } else {
+      gainNode.connect(audioCtx.destination);
+    }
+
+    osc.start();
+
+    return {
+      updatePosition: (carPos, cameraPos) => {
+        try {
+          const dx = carPos.x - cameraPos.x;
+          const dz = carPos.z - cameraPos.z;
+          const distance = Math.sqrt(dx * dx + dz * dz);
+          
+          // Stereo panning based on relative X position
+          if (pannerNode) {
+            const panVal = Math.max(-1, Math.min(1, dx / 25));
+            pannerNode.pan.setValueAtTime(panVal, audioCtx.currentTime);
+          }
+          
+          // Volume attenuation based on distance
+          const maxVol = 0.08;
+          const refDist = 6;
+          const volume = maxVol * (refDist / Math.max(refDist, distance));
+          gainNode.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.1);
+        } catch (e) {}
+      },
+      stop: () => {
+        try {
+          gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+          setTimeout(() => {
+            try {
+              osc.stop();
+              osc.disconnect();
+              filter.disconnect();
+              gainNode.disconnect();
+              if (pannerNode) pannerNode.disconnect();
+            } catch (e) {}
+          }, 300);
+        } catch (e) {}
+      }
+    };
+  } catch (e) {
+    console.error('Error creating engine sound:', e);
+    return null;
+  }
+}
