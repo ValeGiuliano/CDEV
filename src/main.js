@@ -1741,7 +1741,7 @@ const cutsceneEntry = [
   },
   {
     duration: 3.5,
-    dialogue: { speaker: "Anciana", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
+    dialogue: { speaker: "Marta", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
     sound: { freq: 380, type: 'sine', duration: 0.3 },
     onStart: () => {
       // Activar la animación de conversación de Marta cuando habla
@@ -1865,7 +1865,7 @@ const cutsceneLiving = [
   },
   {
     duration: 3.5,
-    dialogue: { speaker: "Anciana", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
+    dialogue: { speaker: "Marta", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
     sound: { freq: 380, type: 'sine', duration: 0.3 },
     onStart: () => {
       // Activar la animación de conversación de Marta cuando habla
@@ -2951,14 +2951,14 @@ initPhone({
         );
         if (ui.phoneChatReplyBox) {
           ui.phoneChatReplyBox.classList.remove('is-hidden');
-          ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-camilo-ok="true">Responder 'Ok'</button>`;
+          ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-camilo-ok="true">Responder</button>`;
         }
       }, 1200);
     },
     onCamiloOk: (btn) => {
       btn.disabled = true;
       btn.style.opacity = '0.5';
-      addMessageToConversation('camilo', 'outgoing', `Ok`);
+      addMessageToConversation('camilo', 'outgoing', `Bueno, gracias!`);
       if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
 
       if (missionsState.currentMissionId === 'readCamiloMessage' && !missionsState.completed) {
