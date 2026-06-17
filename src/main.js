@@ -2776,7 +2776,6 @@ initDoors({
       return;
     }
     if (
-      gameState.currentDay === 4 &&
       missionsState.currentMissionId === 'openDoorUber' &&
       !missionsState.completed
     ) {
@@ -3182,6 +3181,7 @@ function startDay5EndCinematic() {
   const endSteps = [
     {
       duration: 3.5,
+      autoAdvance: true,
       dialogue: { speaker: "Marta", text: "¡Ahí está el Uber! Menos mal, ya voy tarde..." },
       sound: { freq: 440, type: 'sine', duration: 0.1 },
       onStart: () => {
@@ -3192,6 +3192,7 @@ function startDay5EndCinematic() {
     },
     {
       duration: 3.5,
+      autoAdvance: true,
       dialogue: { speaker: "Narrador", text: "Marta sale de la casa y se sube al Uber..." },
       onStart: () => {
         // Move camera closer to doorway
