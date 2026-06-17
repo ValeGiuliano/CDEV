@@ -112,6 +112,8 @@ export const ui = {
   btnMarketplaceSuccessContinue: document.querySelector('#btnMarketplaceSuccessContinue'),
   marketpl4ceHackModal: document.querySelector('#marketpl4ceHackModal'),
   btnMarketpl4ceRewind: document.querySelector('#btnMarketpl4ceRewind'),
+  postAssaultScamModal: document.querySelector('#postAssaultScamModal'),
+  btnPostAssaultRestart: document.querySelector('#btnPostAssaultRestart'),
 };
 
 export function getEl(id) {

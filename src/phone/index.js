@@ -85,6 +85,16 @@ function registerEventListeners() {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const view = btn.closest('.phone-view');
+
+        if (view && view.id === 'phoneMarketplaceProductDetailView') {
+          switchPhoneView('phoneMarketplaceView');
+          return;
+        }
+        if (view && view.id === 'phoneMarketplaceCheckoutView') {
+          switchPhoneView('phoneMarketplaceProductDetailView');
+          return;
+        }
+
         if (view && view.id === 'phoneMessagesView' && currentContact !== null) {
           renderContactList();
         } else {

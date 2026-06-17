@@ -662,6 +662,228 @@ gltfLoader.load(
   }
 );
 
+// --- CARGA ASÍNCRONA DEL REPARTIDOR (CON FALLBACK PROCEDURAL) ---
+let repartidorModel = null;
+let repartidorMixer = null;
+let repartidorActiveMesh = null;
+let repartidorReady = false;
+
+gltfLoader.load(
+  '/repartidor.glb',
+  (gltf) => {
+    const model = gltf.scene;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) child.material.side = THREE.DoubleSide;
+      }
+    });
+    repartidorModel = model;
+    room.add(model);
+    model.visible = false;
+    model.updateMatrixWorld(true);
+
+    if (gltf.animations && gltf.animations.length > 0) {
+      repartidorMixer = new THREE.AnimationMixer(model);
+      model.userData.animations = gltf.animations;
+      console.log("Repartidor: animaciones disponibles:", gltf.animations.map(a => a.name));
+    } else {
+      model.userData.proceduralIdle = true;
+    }
+
+    const box = new THREE.Box3();
+    let hasMeshes = false;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.updateMatrixWorld(true);
+        box.expandByObject(child);
+        hasMeshes = true;
+      }
+    });
+    if (!hasMeshes) box.setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const min = box.min;
+
+    const targetHeight = 1.7;
+    let scale = targetHeight / Math.max(size.y, 0.001);
+
+    if (scale < 0.5 || scale > 3) {
+      console.warn(`Repartidor GLB con escala anómala (size.y=${size.y}, scale=${scale}). Se forzará escala 1.0.`);
+      scale = 1.0;
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      model.position.sub(center);
+      model.position.y -= min.y;
+    }
+
+    model.userData.scaleFactor = scale;
+    model.userData.baseOffset = min.y * scale;
+    model.userData.centerX = (box.min.x + box.max.x) / 2;
+    model.userData.centerZ = (box.min.z + box.max.z) / 2;
+    model.scale.setScalar(scale);
+    model.updateMatrixWorld(true);
+    repartidorReady = true;
+    console.log("Repartidor listo. Escala:", scale, "size.y:", size.y);
+  },
+  undefined,
+  (error) => {
+    console.warn("No se encontró o no se pudo cargar repartidor.glb. Usando fallback procedural.", error);
+    repartidorReady = true;
+  }
+);
+
+// --- CARGA ASÍNCRONA DEL LADRÓN (CON FALLBACK PROCEDURAL) ---
+let ladronModel = null;
+let ladronMixer = null;
+let ladronReady = false;
+
+gltfLoader.load(
+  '/ladron.glb',
+  (gltf) => {
+    const model = gltf.scene;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) child.material.side = THREE.DoubleSide;
+      }
+    });
+    ladronModel = model;
+    room.add(model);
+    model.visible = false;
+    model.updateMatrixWorld(true);
+
+    if (gltf.animations && gltf.animations.length > 0) {
+      ladronMixer = new THREE.AnimationMixer(model);
+      model.userData.animations = gltf.animations;
+      console.log("Ladrón: animaciones disponibles:", gltf.animations.map(a => a.name));
+    } else {
+      model.userData.proceduralIdle = true;
+    }
+
+    const box = new THREE.Box3();
+    let hasMeshes = false;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.updateMatrixWorld(true);
+        box.expandByObject(child);
+        hasMeshes = true;
+      }
+    });
+    if (!hasMeshes) box.setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const min = box.min;
+
+    const targetHeight = 1.75;
+    let scale = targetHeight / Math.max(size.y, 0.001);
+
+    if (scale < 0.5 || scale > 3) {
+      console.warn(`Ladrón GLB con escala anómala (size.y=${size.y}, scale=${scale}). Se forzará escala 1.0.`);
+      scale = 1.0;
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      model.position.sub(center);
+      model.position.y -= min.y;
+    }
+
+    model.userData.scaleFactor = scale;
+    model.userData.baseOffset = min.y * scale;
+    model.userData.centerX = (box.min.x + box.max.x) / 2;
+    model.userData.centerZ = (box.min.z + box.max.z) / 2;
+    model.scale.setScalar(scale);
+    model.updateMatrixWorld(true);
+    ladronReady = true;
+    console.log("Ladrón listo. Escala:", scale, "size.y:", size.y);
+  },
+  undefined,
+  (error) => {
+    console.warn("No se encontró o no se pudo cargar ladron.glb. Usando fallback procedural.", error);
+    ladronReady = true;
+  }
+);
+
+// Placeholders procedurales para los personajes
+const repartidorPlaceholder = new THREE.Group();
+{
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.9, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x1e88e5, emissive: 0x1e88e5, emissiveIntensity: 0.4, roughness: 0.6 })
+  );
+  body.position.y = 0.55;
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffdbac, emissive: 0xffdbac, emissiveIntensity: 0.2, roughness: 0.6 })
+  );
+  head.position.y = 1.15;
+  const armL = new THREE.Mesh(
+    new THREE.BoxGeometry(0.15, 0.6, 0.15),
+    new THREE.MeshStandardMaterial({ color: 0x1e88e5, emissive: 0x1e88e5, emissiveIntensity: 0.4, roughness: 0.6 })
+  );
+  armL.position.set(-0.35, 0.7, 0);
+  const armR = armL.clone();
+  armR.position.x = 0.35;
+  const package_ = new THREE.Mesh(
+    new THREE.BoxGeometry(0.35, 0.3, 0.2),
+    new THREE.MeshStandardMaterial({ color: 0xc68642, emissive: 0xc68642, emissiveIntensity: 0.3, roughness: 0.8 })
+  );
+  package_.position.set(0.4, 0.85, 0.15);
+  repartidorPlaceholder.add(body, head, armL, armR, package_);
+  repartidorPlaceholder.visible = false;
+  room.add(repartidorPlaceholder);
+}
+
+const ladronPlaceholder = new THREE.Group();
+{
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.95, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0x550000, emissiveIntensity: 0.3, roughness: 0.7 })
+  );
+  body.position.y = 0.58;
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xb3826b, emissive: 0xb3826b, emissiveIntensity: 0.2, roughness: 0.6 })
+  );
+  head.position.y = 1.2;
+  const mask = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, 0.1, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x000000, emissiveIntensity: 0, roughness: 0.7 })
+  );
+  mask.position.set(0, 1.18, 0.15);
+  const armL = new THREE.Mesh(
+    new THREE.BoxGeometry(0.15, 0.6, 0.15),
+    new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0x550000, emissiveIntensity: 0.3, roughness: 0.7 })
+  );
+  armL.position.set(-0.35, 0.72, 0);
+  const armR = armL.clone();
+  armR.position.x = 0.35;
+  ladronPlaceholder.add(body, head, mask, armL, armR);
+  ladronPlaceholder.visible = false;
+  room.add(ladronPlaceholder);
+}
+
+// Esfera de debug: confirma que la posición de la cinemática es correcta
+const debugMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.2, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xff0000 })
+);
+debugMarker.position.set(0.72, 1, -7.5);
+debugMarker.visible = false;
+room.add(debugMarker);
+
+function hideDay4Characters() {
+  if (repartidorModel) repartidorModel.visible = false;
+  if (repartidorPlaceholder.parent === room) repartidorPlaceholder.visible = false;
+  if (ladronPlaceholder.parent === room) ladronPlaceholder.visible = false;
+  if (ladronModel && ladronModel.userData.clone1) ladronModel.userData.clone1.visible = false;
+  if (ladronModel && ladronModel.userData.clone2) ladronModel.userData.clone2.visible = false;
+  repartidorPlaceholder.visible = false;
+  ladronPlaceholder.visible = false;
+  if (repartidorActiveMesh) repartidorActiveMesh.visible = false;
+  debugMarker.visible = false;
+  repartidorActiveMesh = null;
+}
+
 function mesh(geometry, material, position, rotation = [0, 0, 0], cast = true, receive = true) {
   const m = new THREE.Mesh(geometry, material);
   m.position.set(...position);
@@ -1984,6 +2206,185 @@ const day4WakeUpSequence = [
   }
 ];
 
+// --- DAY 4: SECUENCIA DE ENTREGA (COMPRA REAL) ---
+const deliverySequence = [
+  {
+    duration: 2.5,
+    autoAdvance: true,
+    dialogue: { speaker: 'Repartidor', text: '¡Buenas! Vengo de Marketplace con su pedido.' },
+    sound: { freq: 520, type: 'triangle', duration: 0.25 },
+    onStart: () => {
+      console.log('deliverySequence start', {
+        repartidorModel: !!repartidorModel,
+        repartidorReady,
+        repartidorActiveMesh: !!repartidorActiveMesh
+      });
+      debugMarker.visible = true;
+
+      if (repartidorModel && repartidorReady) {
+        repartidorModel.visible = true;
+        repartidorModel.position.set(0.72, 0, -7.5);
+        repartidorModel.rotation.set(0, 0, 0);
+        repartidorActiveMesh = repartidorModel;
+        console.log('Usando modelo GLB del repartidor');
+      } else {
+        repartidorPlaceholder.visible = true;
+        repartidorPlaceholder.position.set(0.72, 0, -7.5);
+        repartidorPlaceholder.rotation.set(0, 0, 0);
+        repartidorActiveMesh = repartidorPlaceholder;
+        console.log('Usando placeholder del repartidor');
+      }
+      camera.position.set(2.2, 1.45, -5.2);
+      camera.lookAt(0.72, 1.25, -6.5);
+    },
+    action: (progress) => {
+      const z = THREE.MathUtils.lerp(-7.5, -5.6, progress);
+      if (repartidorActiveMesh === repartidorModel) {
+        repartidorModel.position.z = z;
+      } else if (repartidorActiveMesh === repartidorPlaceholder) {
+        repartidorPlaceholder.position.z = z;
+      }
+      camera.position.x = THREE.MathUtils.lerp(2.2, 1.9, progress);
+      camera.lookAt(0.72, 1.25, -5.8);
+    }
+  },
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: '¡Ay, gracias hijo! Pasó rápido.' },
+    onStart: () => {},
+    action: (progress) => {
+      camera.position.x = THREE.MathUtils.lerp(1.9, 1.85, progress);
+      camera.lookAt(0.72, 1.25, -5.8);
+    }
+  },
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: 'Repartidor', text: 'Que tenga un buen día. ¡Saludos!' },
+    onStart: () => {},
+    action: (progress) => {
+      const z = THREE.MathUtils.lerp(-5.6, -8.5, progress);
+      if (repartidorActiveMesh === repartidorModel) {
+        repartidorModel.position.z = z;
+      } else if (repartidorActiveMesh === repartidorPlaceholder) {
+        repartidorPlaceholder.position.z = z;
+      }
+      camera.position.x = THREE.MathUtils.lerp(1.85, 1.75, progress);
+      camera.lookAt(0.72, 1.25, -6.0);
+    }
+  }
+];
+
+// --- DAY 4: SECUENCIA DE ASALTO (COMPRA ESTAFA) ---
+const assaultSequence = [
+  {
+    duration: 1.8,
+    autoAdvance: true,
+    dialogue: { speaker: 'Ladrón', text: '¡Hola, buenas! ¿Marta?' },
+    sound: { freq: 200, type: 'sawtooth', duration: 0.4 },
+    onStart: () => {
+      console.log('assaultSequence start', {
+        ladronModel: !!ladronModel,
+        ladronReady
+      });
+      debugMarker.visible = true;
+
+      if (ladronModel && ladronReady) {
+        ladronModel.visible = true;
+        const offset = ladronModel.userData.baseOffset || 0;
+        ladronModel.position.set(0.72, offset, -7.5);
+        ladronModel.rotation.set(0, 0, 0);
+        repartidorActiveMesh = ladronModel;
+        console.log('Usando modelo GLB del ladrón');
+      } else {
+        ladronPlaceholder.visible = true;
+        ladronPlaceholder.position.set(0.72, 0, -7.5);
+        ladronPlaceholder.rotation.set(0, 0, 0);
+        repartidorActiveMesh = ladronPlaceholder;
+        console.log('Usando placeholder del ladrón');
+      }
+      camera.position.set(2.2, 1.45, -5.2);
+      camera.lookAt(0.72, 1.25, -6.5);
+    },
+    action: (progress) => {
+      const z = THREE.MathUtils.lerp(-7.5, -6.5, progress);
+      if (repartidorActiveMesh === ladronModel) {
+        const offset = ladronModel.userData.baseOffset || 0;
+        ladronModel.position.set(0.72, offset, z);
+      } else if (repartidorActiveMesh === ladronPlaceholder) {
+        ladronPlaceholder.position.z = z;
+      }
+      camera.position.x = THREE.MathUtils.lerp(2.2, 1.9, progress);
+      camera.lookAt(0.72, 1.25, -6.0);
+    }
+  },
+  {
+    duration: 1.5,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: '¿Sí? ¿Quién es?' },
+    action: (progress) => {
+      camera.position.x = THREE.MathUtils.lerp(1.9, 1.7, progress);
+      camera.position.z = THREE.MathUtils.lerp(-5.2, -5.5, progress);
+      camera.lookAt(0.72, 1.25, -6.0);
+    }
+  },
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: 'Ladrón', text: '¡ENTREGATE!' },
+    sound: { freq: 100, type: 'sawtooth', duration: 0.6 },
+    onStart: () => {
+      if (ladronModel) {
+        ladronModel.visible = true;
+        const offset = ladronModel.userData.baseOffset || 0;
+        ladronModel.position.set(0.72, offset, -5.8);
+        ladronModel.rotation.set(0, 0, 0);
+      } else {
+        ladronPlaceholder.visible = true;
+        ladronPlaceholder.position.set(0.72, 0, -5.8);
+        ladronPlaceholder.rotation.set(0, 0, 0);
+      }
+    },
+    action: (progress) => {
+      const shake = (Math.sin(progress * Math.PI * 20)) * 0.15;
+      camera.position.set(1.5 + shake, 1.2 - progress * 0.4, -5.5);
+      camera.lookAt(0.72, 1.1, -5.6);
+    }
+  }
+];
+
+function startDay4Delivery() {
+  hideDay4Characters();
+  if (ui.damageOverlay) {
+    ui.damageOverlay.classList.remove('is-active');
+    void ui.damageOverlay.offsetWidth;
+    ui.damageOverlay.classList.add('is-active');
+  }
+  if (day4State.purchasedProduct && day4State.purchasedProduct.isScam) {
+    startCinematic(assaultSequence, () => {
+      day4State.deliveryResolved = true;
+      day4State.awaitingDelivery = false;
+      if (ui.postAssaultScamModal) {
+        ui.postAssaultScamModal.setAttribute('aria-hidden', 'false');
+      }
+    });
+  } else {
+    startCinematic(deliverySequence, () => {
+      day4State.deliveryResolved = true;
+      day4State.awaitingDelivery = false;
+      hideDay4Characters();
+      if (missionsState.currentMissionId === 'attendDelivery' && !missionsState.completed) {
+        completeMission('attendDelivery');
+      }
+      setTimeout(() => {
+        setMission('goToSleep', 'Ir a dormir', '¡Recibiste el regalo! Ahora descansá.');
+        setTimeOfDay('noche', 5.0);
+      }, 1500);
+    });
+  }
+}
+
 function restartCurrentDay() {
   // Close game over modal
   if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'true');
@@ -2187,6 +2588,14 @@ initCinematicEngine({
 initDoors({
   doorPrompt: ui.doorPrompt,
   onOpenLivingDoor: () => {
+    if (
+      gameState.currentDay === 4 &&
+      day4State.awaitingDelivery &&
+      !day4State.deliveryResolved
+    ) {
+      startDay4Delivery();
+      return;
+    }
     startCinematic(cutsceneLiving, () => {
       tablePhoneGroup.visible = true;
       doorState.living.open = false;
@@ -2779,7 +3188,7 @@ function renderMarketplaceProducts() {
       <div class="marketplace-product-info">
         <span class="marketplace-product-price">$${product.price.toLocaleString('es-AR')}</span>
         <span class="marketplace-product-title">${product.title}</span>
-        <span class="marketplace-product-quality quality-${product.quality.toLowerCase()}">${product.quality}</span>
+        <span class="marketplace-product-quality quality-${product.quality.toLowerCase()}">Calidad: ${product.quality}</span>
       </div>
     `;
     card.addEventListener('click', (e) => {
@@ -2810,7 +3219,7 @@ function openMarketplaceProductDetail(product) {
       <div class="marketplace-detail-info">
         <div class="marketplace-detail-title">${product.title}</div>
         <div class="marketplace-detail-price">$${product.price.toLocaleString('es-AR')}</div>
-        <span class="marketplace-detail-quality quality-${product.quality.toLowerCase()}">${product.quality}</span>
+        <span class="marketplace-detail-quality quality-${product.quality.toLowerCase()}">Calidad: ${product.quality}</span>
       </div>
       <div class="marketplace-detail-section">
         <span class="marketplace-detail-section-label">Descripción</span>
@@ -2901,20 +3310,12 @@ function confirmMarketplacePurchase() {
   ui.marketplaceConfirmBtn.textContent = 'Procesando...';
 
   setTimeout(() => {
-    if (selectedMarketplaceProduct.isScam) {
-      statsState.money = Math.max(0, statsState.money - selectedMarketplaceProduct.price);
-      statsState.calm = Math.max(0, statsState.calm - 20);
-      statsState.happiness = Math.max(0, statsState.happiness - 10);
-      updateStats(0);
-      showMarketplaceScamModal(selectedMarketplaceProduct);
-    } else {
-      statsState.money = Math.max(0, statsState.money - selectedMarketplaceProduct.price);
-      day4State.purchasedProduct = { ...selectedMarketplaceProduct };
-      updateStats(0);
-      showMarketplaceSuccessModal(selectedMarketplaceProduct);
-      if (missionsState.currentMissionId === 'buyInMarketplace' && !missionsState.completed) {
-        completeMission('buyInMarketplace');
-      }
+    statsState.money = Math.max(0, statsState.money - selectedMarketplaceProduct.price);
+    day4State.purchasedProduct = { ...selectedMarketplaceProduct };
+    updateStats(0);
+    showMarketplaceSuccessModal(selectedMarketplaceProduct);
+    if (missionsState.currentMissionId === 'buyInMarketplace' && !missionsState.completed) {
+      completeMission('buyInMarketplace');
     }
   }, 2000);
 }
@@ -2938,7 +3339,7 @@ function showMarketplaceScamModal(product) {
 function showMarketplaceSuccessModal(product) {
   if (!ui.marketplaceSuccessModal) return;
   if (ui.marketplaceSuccessText) {
-    ui.marketplaceSuccessText.textContent = `Compraste la muñeca de calidad ${product.quality} por $${product.price.toLocaleString('es-AR')}.`;
+    ui.marketplaceSuccessText.textContent = `Compraste la muñeca de calidad ${product.quality} por $${product.price.toLocaleString('es-AR')}. El pedido llegará pronto.`;
   }
   ui.marketplaceSuccessModal.setAttribute('aria-hidden', 'false');
   selectedMarketplaceProduct = null;
@@ -2956,7 +3357,9 @@ function triggerMarketpl4ceHack() {
 
 function restartDay4() {
   if (ui.marketpl4ceHackModal) ui.marketpl4ceHackModal.setAttribute('aria-hidden', 'true');
+  if (ui.postAssaultScamModal) ui.postAssaultScamModal.setAttribute('aria-hidden', 'true');
   if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
+  if (ui.damageOverlay) ui.damageOverlay.classList.remove('is-active');
 
   cinematicState.active = false;
   cinematicState.onEnd = null;
@@ -2975,6 +3378,8 @@ function restartDay4() {
 
   day4State.purchasedProduct = null;
   day4State.wasHacked = false;
+  day4State.awaitingDelivery = false;
+  day4State.deliveryResolved = false;
 
   installedApps.marketplace = false;
   installedApps.marketpl4ce = false;
@@ -2995,6 +3400,10 @@ function restartDay4() {
     ui.phonePrompt.textContent = 'T Coger teléfono';
     ui.phonePrompt.classList.remove('is-active');
   }
+
+  doorState.living.open = false;
+  hideDay4Characters();
+  selectedMarketplaceProduct = null;
 
   setTimeOfDay('dia', 0.0);
   camera.position.set(4.2, 0.72, 3.45);
@@ -3479,8 +3888,24 @@ if (ui.btnMarketplaceSuccessContinue) {
   ui.btnMarketplaceSuccessContinue.addEventListener('click', (e) => {
     e.stopPropagation();
     if (ui.marketplaceSuccessModal) ui.marketplaceSuccessModal.setAttribute('aria-hidden', 'true');
-    setMission('goToSleep', 'Ir a dormir', 'Ya compraste el regalo. Descansá para el día de la fiesta.');
-    setTimeOfDay('noche', 5.0);
+    setMission('awaitingDelivery', 'Esperar el timbre', 'Esperá el timbre: el pedido de Marketplace está en camino.');
+    day4State.awaitingDelivery = true;
+
+    if (document.pointerLockElement === canvas) {
+      document.requestPointerLock();
+    }
+
+    setTimeout(() => {
+      playDoorbellSound();
+      setMission('attendDelivery', 'Atender la puerta', '¡Timbre! Abrí la puerta para recibir tu pedido.');
+    }, 5000);
+  });
+}
+
+if (ui.btnPostAssaultRestart) {
+  ui.btnPostAssaultRestart.addEventListener('click', (e) => {
+    e.stopPropagation();
+    restartDay4();
   });
 }
 

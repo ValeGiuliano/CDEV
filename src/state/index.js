@@ -78,6 +78,8 @@ export const day3Scammed = { value: false };
 export const day4State = {
   purchasedProduct: null,
   wasHacked: false,
+  awaitingDelivery: false,
+  deliveryResolved: false,
 };
 
 export const day4InitialMoney = { value: 100000 };
