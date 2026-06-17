@@ -159,6 +159,12 @@ export const ui = {
   btnSaveUberScore: document.querySelector('#btnSaveUberScore'),
   uberLeaderboardView: document.querySelector('#uberLeaderboardView'),
   uberLeaderboardBody: document.querySelector('#uberLeaderboardBody'),
+  
+  // Final Day 5 Narration & Leaderboard Download
+  uberNarrationModal: document.querySelector('#uberNarrationModal'),
+  uberNarrationText: document.querySelector('#uberNarrationText'),
+  btnUberNarrationNext: document.querySelector('#btnUberNarrationNext'),
+  btnUberDownloadBoard: document.querySelector('#btnUberDownloadBoard'),
 };
 
 export function getEl(id) {

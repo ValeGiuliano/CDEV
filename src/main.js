@@ -61,8 +61,8 @@ import { initDayCycle, updateDayTransition, getDayTransitionOpacity, hideDaysBlo
 import { initMissions, setMission, completeMission, updateMissions, addTutorialMessage, showMartaReplyTutorial, startClaraBirthdayMission, startClaraBirthdayFlow, triggerClaraGiftDialogue, startDownloadMercadoLibreMission, startDay4BuyMission, startDownloadMarketplaceMission, startBuyMarketplaceMission, startUberMission } from './gameplay/missions.js';
 import { initUberMaze, openUberApp, updateUberMaze, setMazeInput, isUberMazeRunning, attachUberListeners, resetUberMaze } from './gameplay/uberMaze.js';
 import { initUberMapPin, startUberMapPin, resetUberMapPin, updateUberMapPin, isUberMapPinActive, setMapPinInput } from './gameplay/uberMapPin.js';
-import { calculateScoreDetails, loadLeaderboard, saveScore, renderScoreBreakdown, renderLeaderboardTable } from './gameplay/leaderboard.js';
-import { initTraffic, updateTraffic } from './gameplay/traffic.js';
+import { calculateScoreDetails, loadLeaderboard, saveScore, renderScoreBreakdown, renderLeaderboardTable, downloadLeaderboard } from './gameplay/leaderboard.js';
+import { initTraffic, updateTraffic, spawnParkedUber } from './gameplay/traffic.js';
 import {
   initPhone,
   updatePhonePrompt,
@@ -2775,6 +2775,14 @@ initDoors({
       startDay4Delivery();
       return;
     }
+    if (
+      gameState.currentDay === 4 &&
+      missionsState.currentMissionId === 'openDoorUber' &&
+      !missionsState.completed
+    ) {
+      startDay5EndCinematic();
+      return;
+    }
     startCinematic(cutsceneLiving, () => {
       tablePhoneGroup.visible = true;
       doorState.living.open = false;
@@ -3023,7 +3031,7 @@ initUberMaze({
   },
 });
 
-let lastScoreDetails = null;
+let parkedUberCar = null;
 
 initUberMapPin({
   onWin: (score, elapsed) => {
@@ -3031,36 +3039,26 @@ initUberMapPin({
       completeMission('orderUber');
     }
     
-    // Calculate final score details based on doll purchased + time taken
-    lastScoreDetails = calculateScoreDetails(elapsed);
+    // Store elapsed time
+    uberState.elapsed = elapsed;
     
     // Update player stats
-    const scorePerformance = Math.min(100, Math.round(lastScoreDetails.totalScore / 70));
+    const tempScoreDetails = calculateScoreDetails(elapsed);
+    const scorePerformance = Math.min(100, Math.round(tempScoreDetails.totalScore / 70));
     statsState.happiness = Math.min(100, statsState.happiness + Math.round(scorePerformance / 4));
     statsState.calm = Math.min(100, statsState.calm + 12);
     updateStats(0);
 
-    // Setup Success Modal Score UI
-    if (ui.uberScoreBreakdown) {
-      renderScoreBreakdown(ui.uberScoreBreakdown, lastScoreDetails);
-    }
+    // Close the phone instead of showing modal immediately
+    if (phoneState.active) togglePhone();
     
-    // Reset view visibility in modal
-    if (ui.uberLeaderboardForm) {
-      ui.uberLeaderboardForm.style.display = 'block';
-    }
-    if (ui.uberLeaderboardView) {
-      ui.uberLeaderboardView.style.display = 'none';
-    }
-    if (ui.uberPlayerName) {
-      ui.uberPlayerName.value = 'Marta';
-    }
-
-    if (ui.uberSuccessModal) {
-      setTimeout(() => {
-        ui.uberSuccessModal.setAttribute('aria-hidden', 'false');
-      }, 800);
-    }
+    // Spawn parked Uber car
+    parkedUberCar = spawnParkedUber();
+    
+    // Set next mission to open the door
+    setTimeout(() => {
+      setMission('openDoorUber', 'Tomar el Uber', 'El Uber ya llegó y te está esperando afuera. Abrí la puerta principal para subir.');
+    }, 1500);
   },
   onFail: () => {
     statsState.calm = Math.max(0, statsState.calm - 20);
@@ -3112,6 +3110,145 @@ if (ui.btnSaveUberScore) {
       if (ui.uberLeaderboardBody) {
         renderLeaderboardTable(ui.uberLeaderboardBody, updatedBoard);
       }
+    }
+  });
+}
+
+if (ui.btnUberNarrationNext) {
+  ui.btnUberNarrationNext.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.uberNarrationModal) {
+      ui.uberNarrationModal.style.display = 'none';
+      ui.uberNarrationModal.setAttribute('aria-hidden', 'true');
+    }
+
+    // Now calculate and show results modal (Success Modal with Leaderboard)
+    lastScoreDetails = calculateScoreDetails(uberState.elapsed);
+    if (ui.uberSuccessModal) {
+      if (ui.uberScoreBreakdown) {
+        renderScoreBreakdown(ui.uberScoreBreakdown, lastScoreDetails);
+      }
+      
+      // Reset submit form visibility
+      if (ui.uberLeaderboardForm) ui.uberLeaderboardForm.style.display = 'block';
+      if (ui.uberLeaderboardView) {
+        ui.uberLeaderboardView.style.display = 'none';
+      }
+      if (ui.uberPlayerName) {
+        ui.uberPlayerName.value = 'Marta';
+      }
+
+      ui.uberSuccessModal.setAttribute('aria-hidden', 'false');
+    }
+  });
+}
+
+if (ui.btnUberDownloadBoard) {
+  ui.btnUberDownloadBoard.addEventListener('click', (e) => {
+    e.stopPropagation();
+    downloadLeaderboard();
+  });
+}
+
+function getClaraReactionNarrative() {
+  const product = day4State.purchasedProduct;
+  if (!product || product.isScam) {
+    return "Marta no pudo llegar con la muñeca Barbie Mundial soñada debido a las frustrantes estafas que sufrió en línea. En su lugar, tuvo que entregarle un regalo alternativo comprado a las apuradas en el barrio.<br><br>Clara agradeció con un beso educado y un <em>'gracias abuela'</em>, pero la desilusión en sus ojitos fue evidente al no ver la Barbie Mundial de la Selección. Marta sintió una profunda mezcla de impotencia y frustración al ver cómo las trabas de la tecnología arruinaron el regalo perfecto.";
+  }
+  if (product.id === 'alta-real') {
+    return "¡La reacción de Clara fue espectacular! Al abrir el paquete y ver la Barbie Mundial nueva, original y en su caja sellada, sus ojos brillaron de alegría y empezó a saltar por toda la sala.<br><br>Corrió a abrazar a Marta con fuerza exclamando: <strong>'¡Sos la mejor abuela de todo el universo! ¡Te amo!'</strong>. A pesar de haber gastado $70.000 y lidiar con la odisea de la Play Store y los chats, la inmensa felicidad de su nieta pagó con creces cada dolor de cabeza digital.";
+  }
+  if (product.id === 'media-real') {
+    return "Clara se puso súper contenta cuando abrió el regalo. Aunque la muñeca no venía en su caja original y tenía el pelo un poco cepillado por su dueña anterior, Clara exclamó con una gran sonrisa: <strong>'¡Qué buena que está, abuela, muchas gracias! ¡Vamos a jugar ya!'</strong>.<br><br>Marta suspiró con alivio al ver que su esfuerzo por comprarla usada por $25.000 valió la pena y que Clara disfrutaba enormemente el regalo sin importarle el empaque.";
+  }
+  if (product.id === 'baja-real') {
+    return "Al abrir el paquete, Clara intentó forzar una sonrisa, pero se le notó un poco de desilusión. La muñeca venía sin caja, tenía el vestido algo desgastado y le faltaba uno de los zapatitos de fútbol.<br><br>Aunque abrazó a Marta cariñosamente y le dijo <em>'gracias'</em>, al rato la dejó a un lado para jugar con los regalos de sus amigos. Marta sintió que haber gastado solo $15.000 cuidó su jubilación, pero se quedó con la espinita de no haber podido darle a Clara lo que ella realmente soñaba.";
+  }
+  return "Marta entregó un regalo alternativo a Clara. Su nieta lo recibió con cariño, pero Marta no pudo evitar pensar en cómo la complejidad del mundo digital le impidió conseguir el regalo que tanto anhelaba para este día especial.";
+}
+
+function startDay5EndCinematic() {
+  if (!parkedUberCar) return;
+
+  // Stop pointer lock if active
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+
+  // Complete openDoorUber mission
+  completeMission('openDoorUber');
+
+  // Define end cinematic steps
+  const endSteps = [
+    {
+      duration: 3.5,
+      dialogue: { speaker: "Marta", text: "¡Ahí está el Uber! Menos mal, ya voy tarde..." },
+      sound: { freq: 440, type: 'sine', duration: 0.1 },
+      onStart: () => {
+        // Look out from doorway towards the street
+        camera.position.set(0.72, 1.48, -5.6);
+        camera.lookAt(0.0, 1.2, -12.53);
+      }
+    },
+    {
+      duration: 3.5,
+      dialogue: { speaker: "Narrador", text: "Marta sale de la casa y se sube al Uber..." },
+      onStart: () => {
+        // Move camera closer to doorway
+        camera.position.set(0.4, 1.4, -7.0);
+        camera.lookAt(0.0, 1.1, -12.53);
+        // Hide Marta to simulate she left
+        if (martaLoadedModel) martaLoadedModel.visible = false;
+        oldWomanMesh.visible = false;
+      }
+    },
+    {
+      duration: 7.0,
+      autoAdvance: true,
+      dialogue: { speaker: "Narrador", text: "El auto arranca y se aleja por la calle, llevando a Marta al cumpleaños de su nieta Clara." },
+      onStart: () => {
+        // Exterior camera view looking at the car
+        camera.position.set(4.5, 1.3, -10.0);
+        camera.lookAt(-2.0, 1.1, -12.53);
+      },
+      action: (progress, dt) => {
+        // Move car to the left
+        if (parkedUberCar && parkedUberCar.mesh) {
+          parkedUberCar.mesh.position.x -= 8.0 * dt;
+          parkedUberCar.sound.updatePosition(parkedUberCar.mesh.position, camera.position);
+        }
+        // Fade to black in the second half
+        if (progress > 0.5) {
+          const fadeVal = (progress - 0.5) * 2;
+          if (ui.dayTransitionOverlay) {
+            ui.dayTransitionOverlay.style.transition = 'none';
+            ui.dayTransitionOverlay.style.opacity = String(fadeVal);
+            ui.dayTransitionOverlay.setAttribute('aria-hidden', 'false');
+          }
+        }
+      }
+    }
+  ];
+
+  startCinematic(endSteps, () => {
+    // Cinematic has ended
+    // Clean up sounds
+    if (parkedUberCar && parkedUberCar.sound) {
+      parkedUberCar.sound.stop();
+    }
+    
+    // Hide cinematic dialogue
+    if (ui.cinematicOverlay) {
+      ui.cinematicOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    // Populate and show the Narration modal
+    if (ui.uberNarrationText) {
+      ui.uberNarrationText.innerHTML = getClaraReactionNarrative();
+    }
+    if (ui.uberNarrationModal) {
+      ui.uberNarrationModal.style.display = 'flex';
+      ui.uberNarrationModal.setAttribute('aria-hidden', 'false');
     }
   });
 }
@@ -4266,6 +4403,14 @@ if (ui.btnUberSuccessContinue) {
     resetUberMapPin();
     switchPhoneView('phoneHomeView');
     if (phoneState.active) togglePhone();
+    
+    // Fade out transition overlay to show the room again
+    if (ui.dayTransitionOverlay) {
+      ui.dayTransitionOverlay.style.transition = 'opacity 1s ease';
+      ui.dayTransitionOverlay.style.opacity = '0';
+      ui.dayTransitionOverlay.setAttribute('aria-hidden', 'true');
+    }
+
     if (ui.missionsContainer) ui.missionsContainer.setAttribute('aria-hidden', 'false');
     if (ui.missionTitle) ui.missionTitle.textContent = 'Cumpleaños de Clara';
     if (ui.missionText) ui.missionText.textContent = 'Marta llegó a tiempo y pudo compartir el cumpleaños con su nieta.';

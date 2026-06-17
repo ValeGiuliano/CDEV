@@ -173,3 +173,33 @@ function spawnCar() {
 
   console.log(`Spawned car model ${templateIdx} on lane Z=${zPos} moving direction=${direction}`);
 }
+
+export function spawnParkedUber() {
+  if (carTemplates.length === 0 || !sceneRef) return null;
+  // Pick first template
+  const template = carTemplates[0];
+  const carMesh = template.clone();
+  
+  const yOffset = template.userData.yOffset || 0.4;
+  carMesh.position.set(0, 0.015 + yOffset, -12.53);
+  carMesh.rotation.y = Math.PI; // Face left
+  
+  sceneRef.add(carMesh);
+  
+  const sound = createCarEngineSound();
+  
+  // Disable normal spawning by pushing the timer way out
+  spawnTimer = 999999;
+  
+  // Stop and remove all other active traffic cars
+  activeCars.forEach(car => {
+    if (car.sound) car.sound.stop();
+    sceneRef.remove(car.mesh);
+  });
+  activeCars = [];
+  
+  return {
+    mesh: carMesh,
+    sound: sound
+  };
+}

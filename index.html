@@ -961,6 +961,17 @@
       </div>
     </div>
 
+    <!-- Uber narration modal -->
+    <div id="uberNarrationModal" class="game-over-modal" aria-hidden="true" style="z-index: 10000; background: rgba(0,0,0,0.95); display: none;">
+      <div class="game-over-card" style="border-color:#fbbf24; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(251, 191, 36, 0.4); max-width: 460px; width: 90%; text-align: left; padding: 24px; border-radius: 12px;">
+        <h2 style="color:#fbbf24; margin-top: 0; margin-bottom: 16px; text-align: center; font-size: 1.4rem;">El Cumpleaños de Clara</h2>
+        <div id="uberNarrationText" style="line-height: 1.6; font-size: 0.95rem; margin-bottom: 24px; color: #e4e4e7; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <!-- Populated dynamically via JS -->
+        </div>
+        <button id="btnUberNarrationNext" class="dilemma-btn" style="background:#fbbf24; color:#000; width: 100%; font-weight: bold; margin: 0; padding: 12px; border-radius: 8px;">Ver Resultados</button>
+      </div>
+    </div>
+
     <!-- Uber success modal -->
     <div id="uberSuccessModal" class="game-over-modal" aria-hidden="true">
       <div class="game-over-card" style="border-color:#22c55e; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(34, 197, 94, 0.4); max-width: 420px; width: 90%;">
@@ -1006,6 +1017,7 @@
             A veces las apps parecen simples, pero para una persona mayor pueden ser un laberinto.
           </p>
           <button class="dilemma-btn" id="btnUberSuccessContinue" style="background:#22c55e; width: 100%; margin-top: 8px;">Ir al cumpleaños</button>
+          <button class="dilemma-btn" id="btnUberDownloadBoard" style="background:#4b5563; width: 100%; margin-top: 8px;">Descargar Tabla (.json)</button>
         </div>
       </div>
     </div>
