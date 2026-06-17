@@ -3036,6 +3036,7 @@ initUberMaze({
 
 let parkedUberCar = null;
 let isNearUber = false;
+let lastScoreDetails = null;
 
 initUberMapPin({
   onWin: (score, elapsed) => {
@@ -3076,21 +3077,6 @@ initUberMapPin({
 
 attachUberListeners();
 
-const skipBtn = document.getElementById('uberSkipMazeBtn') || ui.uberSkipMazeBtn;
-if (skipBtn) {
-  console.log('Registering click listener for uberSkipMazeBtn');
-  skipBtn.addEventListener('click', (e) => {
-    console.log('uberSkipMazeBtn clicked!');
-    e.stopPropagation();
-    resetUberMaze();
-    uberState.startedAt = performance.now();
-    uberState.attempts = 1;
-    startUberMapPin(0);
-  });
-} else {
-  console.error('uberSkipMazeBtn not found in DOM!');
-}
-
 if (ui.btnSaveUberScore) {
   ui.btnSaveUberScore.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -3130,14 +3116,13 @@ if (ui.btnUberNarrationNext) {
       if (ui.uberScoreBreakdown) {
         renderScoreBreakdown(ui.uberScoreBreakdown, lastScoreDetails);
       }
-      
-      // Reset submit form visibility
-      if (ui.uberLeaderboardForm) ui.uberLeaderboardForm.style.display = 'block';
-      if (ui.uberLeaderboardView) {
-        ui.uberLeaderboardView.style.display = 'none';
-      }
-      if (ui.uberPlayerName) {
-        ui.uberPlayerName.value = 'Marta';
+
+      // Auto-save the score and show the leaderboard directly
+      const updatedBoard = saveScore('Marta', lastScoreDetails);
+      if (ui.uberLeaderboardForm) ui.uberLeaderboardForm.style.display = 'none';
+      if (ui.uberLeaderboardView) ui.uberLeaderboardView.style.display = 'block';
+      if (ui.uberLeaderboardBody) {
+        renderLeaderboardTable(ui.uberLeaderboardBody, updatedBoard);
       }
 
       ui.uberSuccessModal.setAttribute('aria-hidden', 'false');
@@ -4423,19 +4408,17 @@ if (ui.btnUberSuccessContinue) {
     resetUberMapPin();
     switchPhoneView('phoneHomeView');
     if (phoneState.active) togglePhone();
-    
-    // Fade out transition overlay to show the room again
-    if (ui.dayTransitionOverlay) {
-      ui.dayTransitionOverlay.style.transition = 'opacity 1s ease';
-      ui.dayTransitionOverlay.style.opacity = '0';
-      ui.dayTransitionOverlay.setAttribute('aria-hidden', 'true');
-    }
 
-    if (ui.missionsContainer) ui.missionsContainer.setAttribute('aria-hidden', 'false');
-    if (ui.missionTitle) ui.missionTitle.textContent = 'Cumpleaños de Clara';
-    if (ui.missionText) ui.missionText.textContent = 'Marta llegó a tiempo y pudo compartir el cumpleaños con su nieta.';
-    if (ui.missionCard) ui.missionCard.classList.add('is-completed');
-    addMessageToConversation('clara', 'incoming', '¡Abuela! ¡Llegaste! 🎉 Gracias por venir a mi cumpleaños, sos la mejor. ¡Te quiero muchísimo! ❤️🎂');
+    // Hide success modal and show game complete modal
+    if (ui.uberSuccessModal) ui.uberSuccessModal.setAttribute('aria-hidden', 'true');
+    if (ui.gameCompleteModal) ui.gameCompleteModal.setAttribute('aria-hidden', 'false');
+  });
+}
+
+if (ui.btnGameCompleteRestart) {
+  ui.btnGameCompleteRestart.addEventListener('click', (e) => {
+    e.stopPropagation();
+    window.location.href = window.location.pathname;
   });
 }
 

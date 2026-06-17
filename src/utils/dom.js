@@ -140,6 +140,8 @@ export const ui = {
   btnUberSuccessContinue: document.querySelector('#btnUberSuccessContinue'),
   uberFailModal: document.querySelector('#uberFailModal'),
   btnUberFailRestart: document.querySelector('#btnUberFailRestart'),
+  gameCompleteModal: document.querySelector('#gameCompleteModal'),
+  btnGameCompleteRestart: document.querySelector('#btnGameCompleteRestart'),
   
   // Uber Map Pin elements
   uberMazeContent: document.querySelector('#uberMazeContent'),
@@ -150,7 +152,6 @@ export const ui = {
   uberMapDpad: document.querySelector('#uberMapDpad'),
   uberConfirmLocationBtn: document.querySelector('#uberConfirmLocationBtn'),
   uberCancelLocationBtn: document.querySelector('#uberCancelLocationBtn'),
-  uberSkipMazeBtn: document.querySelector('#uberSkipMazeBtn'),
   
   // Leaderboard elements
   uberScoreBreakdown: document.querySelector('#uberScoreBreakdown'),
