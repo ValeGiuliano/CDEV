@@ -2724,6 +2724,10 @@ function handleMoveKey(event, active) {
   if (active && isDoorKey(event)) {
     if (event.repeat) return;
     event.preventDefault();
+    if (isNearUber) {
+      startDay5EndCinematic();
+      return;
+    }
     if (handleDoorKey()) return;
     if (handleSleepKey()) return;
     return;
@@ -2779,7 +2783,7 @@ initDoors({
       missionsState.currentMissionId === 'openDoorUber' &&
       !missionsState.completed
     ) {
-      startDay5EndCinematic();
+      // Allow walking outside, the player will get in the Uber by pressing E near the car
       return;
     }
     startCinematic(cutsceneLiving, () => {
@@ -3031,6 +3035,7 @@ initUberMaze({
 });
 
 let parkedUberCar = null;
+let isNearUber = false;
 
 initUberMapPin({
   onWin: (score, elapsed) => {
@@ -3183,19 +3188,16 @@ function startDay5EndCinematic() {
       dialogue: { speaker: "Marta", text: "¡Ahí está el Uber! Menos mal, ya voy tarde..." },
       sound: { freq: 440, type: 'sine', duration: 0.1 },
       onStart: () => {
-        // Look out from doorway towards the street
-        camera.position.set(0.72, 1.48, -5.6);
-        camera.lookAt(0.0, 1.2, -12.53);
+        // Look at the car from close range (where the player is standing)
+        camera.position.set(2.0, 1.4, -10.0);
+        camera.lookAt(0.0, 1.1, -12.53);
       }
     },
     {
       duration: 3.5,
       autoAdvance: true,
-      dialogue: { speaker: "Narrador", text: "Marta sale de la casa y se sube al Uber..." },
+      dialogue: { speaker: "Narrador", text: "Marta se sube al Uber..." },
       onStart: () => {
-        // Move camera closer to doorway
-        camera.position.set(0.4, 1.4, -7.0);
-        camera.lookAt(0.0, 1.1, -12.53);
         // Hide Marta to simulate she left
         if (martaLoadedModel) martaLoadedModel.visible = false;
         oldWomanMesh.visible = false;
@@ -4040,6 +4042,24 @@ function updateStats(dt) {
   if (ui.phoneUI) ui.phoneUI.style.filter = filterVal;
 }
 
+function updateUberInteraction() {
+  if (gameState.currentDay === 5 && missionsState.currentMissionId === 'openDoorUber' && parkedUberCar) {
+    const carPos = parkedUberCar.mesh.position;
+    const dist = Math.hypot(camera.position.x - carPos.x, camera.position.z - carPos.z);
+    if (dist < 3.2) {
+      if (ui.doorPrompt) {
+        ui.doorPrompt.textContent = "E Subirse al Uber";
+        ui.doorPrompt.classList.add('is-visible');
+      }
+      isNearUber = true;
+    } else {
+      isNearUber = false;
+    }
+  } else {
+    isNearUber = false;
+  }
+}
+
 function animate() {
   const dt = clock.getDelta();
   updateFirstPerson(dt);
@@ -4059,6 +4079,7 @@ function animate() {
   updateUberMaze(dt);
   updateUberMapPin(dt);
   updateTraffic(dt, camera);
+  updateUberInteraction();
 
   // Actualizar mezcladores de animación esquelética
   if (martaMixer) {

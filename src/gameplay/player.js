@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { camera, lookEuler, canvas } from '../core/renderer.js';
-import { moveState, doorState, player, cinematicState, missionsState } from '../state/index.js';
+import { moveState, doorState, player, cinematicState } from '../state/index.js';
 
 const playerRadius = 0.28;
 
@@ -28,8 +28,7 @@ function isPositionAllowed(x, z) {
     return true;
   }
 
-  const isDay5Uber = missionsState.currentMissionId === 'openDoorUber' && !missionsState.completed;
-  if (isDay5Uber && doorState.living.open && inRect(x, z, outside)) return true;
+  if (doorState.living.open && inRect(x, z, outside)) return true;
   return false;
 }
 
