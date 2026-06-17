@@ -1,5 +1,5 @@
 import { ui } from '../utils/dom.js';
-import { uberState, statsState } from '../state/index.js';
+import { uberState, statsState, phoneState } from '../state/index.js';
 import { showToast } from '../utils/helpers.js';
 
 let deps = null;
@@ -58,6 +58,7 @@ export function startUberMapPin(initialTime) {
   
   mapRotation = 0;
   timeElapsed = initialTime || 0;
+  uberState.elapsed = timeElapsed;
   
   if (!uberState.startedAt || initialTime === 0) {
     uberState.startedAt = performance.now();
@@ -95,8 +96,11 @@ export function resetUberMapPin() {
 export function updateUberMapPin(dt) {
   if (!active) return;
 
-  // Increment total elapsed time
-  uberState.elapsed = (performance.now() - uberState.startedAt) / 1000;
+  const phoneUberView = document.getElementById('phoneUberView');
+  const isUberViewActive = phoneState.active && phoneUberView && phoneUberView.classList.contains('is-active');
+  if (!isUberViewActive) return;
+
+  uberState.elapsed += dt;
   updateTimerHud();
 
   if (gpsSearching) {

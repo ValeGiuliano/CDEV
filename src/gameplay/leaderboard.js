@@ -2,14 +2,8 @@ import { day4State, uberState } from '../state/index.js';
 
 const STORAGE_KEY = 'cdev_uber_leaderboard';
 
-// Default list of players
-const DEFAULT_LEADERBOARD = [
-  { name: 'Camilito', doll: 'Barbie (Marketplace)', time: '58.4s', score: 5712 },
-  { name: 'Chofer de Uber', doll: 'Barbie (Marketplace)', time: '76.2s', score: 5312 },
-  { name: 'Clarita', doll: 'Barbie Usada', time: '92.5s', score: 4081 },
-  { name: 'Vecina de enfrente', doll: 'Barbie Usada', time: '115.0s', score: 3870 },
-  { name: 'Vecina Chismosa', doll: 'Barbie Usada (Detalles)', time: '181.8s', score: 2050 }
-];
+// Default list of players (starts empty as requested: "no inventes participantes")
+const DEFAULT_LEADERBOARD = [];
 
 export function calculateScoreDetails(seconds) {
   let dollName = 'Regalo alternativo';
@@ -154,4 +148,15 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+export function downloadLeaderboard() {
+  const board = loadLeaderboard();
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(board, null, 2));
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute("href", dataStr);
+  downloadAnchor.setAttribute("download", "leaderboard.json");
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
 }

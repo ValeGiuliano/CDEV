@@ -1,5 +1,6 @@
 import { ui } from '../utils/dom.js';
-import { uberState } from '../state/index.js';
+import { uberState, phoneState } from '../state/index.js';
+import { isUberMapPinActive } from './uberMapPin.js';
 
 let deps = null;
 
@@ -374,6 +375,12 @@ export function initUberMaze(dependencies) {
 
 export function openUberApp() {
   if (deps && typeof deps.onExitPointerLock === 'function') deps.onExitPointerLock();
+  
+  if (isUberMazeRunning() || isUberMapPinActive()) {
+    if (deps && typeof deps.onSwitchView === 'function') deps.onSwitchView('phoneUberView');
+    return;
+  }
+
   resetUberMaze();
   if (ui.uberMazeContent) ui.uberMazeContent.classList.remove('is-hidden');
   if (ui.uberMapPinContent) ui.uberMapPinContent.classList.add('is-hidden');
@@ -518,7 +525,11 @@ function isGateClosed(obs) {
 export function updateUberMaze(dt) {
   if (!uberState.mazeRunning) return;
 
-  uberState.elapsed = (performance.now() - uberState.startedAt) / 1000;
+  const phoneUberView = document.getElementById('phoneUberView');
+  const isUberViewActive = phoneState.active && phoneUberView && phoneUberView.classList.contains('is-active');
+  if (!isUberViewActive) return;
+
+  uberState.elapsed += dt;
   updateHud();
 
   if (uberState.invulnTimer > 0) uberState.invulnTimer -= dt;
