@@ -28,6 +28,7 @@ import {
   day3Scammed,
   day4State,
   day4InitialMoney,
+  casinoState,
 } from './state/index.js';
 
 void dayRestarted;
@@ -49,7 +50,7 @@ import {
 import { mlProducts, marketplaceProducts } from './data/products.js';
 const fakeMLProducts = mlProducts;
 import { camiloDialogues, claraDialogues } from './data/chats/index.js';
-import { playDoorbellSound, playNotificationSound, playAlertSound, playCinematicSound } from './audio/sounds.js';
+import { playDoorbellSound, playNotificationSound, playAlertSound, playCinematicSound, playCasinoAmbientSound, playCasinoSpinSound, playCasinoWinSound, playCasinoLoseSound } from './audio/sounds.js';
 import { canvas, renderer, scene, camera, clock, lookEuler, initResizeListener, setTimeOfDay, updateTimeOfDay } from './core/renderer.js';
 import { phoneScreenCorners } from './core/phone3d.js';
 import { initPlayer, updateFirstPerson, updateLook, setLookFromEuler, clampPlayerToBounds, isDoorKey, getMoveDirection } from './gameplay/player.js';
@@ -2219,7 +2220,6 @@ const deliverySequence = [
         repartidorReady,
         repartidorActiveMesh: !!repartidorActiveMesh
       });
-      debugMarker.visible = true;
 
       if (repartidorModel && repartidorReady) {
         repartidorModel.visible = true;
@@ -2228,11 +2228,8 @@ const deliverySequence = [
         repartidorActiveMesh = repartidorModel;
         console.log('Usando modelo GLB del repartidor');
       } else {
-        repartidorPlaceholder.visible = true;
-        repartidorPlaceholder.position.set(0.72, 0, -7.5);
-        repartidorPlaceholder.rotation.set(0, 0, 0);
-        repartidorActiveMesh = repartidorPlaceholder;
-        console.log('Usando placeholder del repartidor');
+        console.warn('Modelo de repartidor no disponible; no se muestra personaje');
+        repartidorActiveMesh = null;
       }
       camera.position.set(2.2, 1.45, -5.2);
       camera.lookAt(0.72, 1.25, -6.5);
@@ -2288,7 +2285,6 @@ const assaultSequence = [
         ladronModel: !!ladronModel,
         ladronReady
       });
-      debugMarker.visible = true;
 
       if (ladronModel && ladronReady) {
         ladronModel.visible = true;
@@ -2382,6 +2378,118 @@ function startDay4Delivery() {
         setTimeOfDay('noche', 5.0);
       }, 1500);
     });
+  }
+}
+
+// --- DAY 4: APP CASINO SLOTS 8-BIT ---
+const CASINO_SYMBOLS = ['🍒', '🍋', '🍇', '7️⃣', '💎', '🍀'];
+let casinoReelInterval = null;
+
+function openCasinoApp() {
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+  updateCasinoUI();
+  switchPhoneView('phoneCasinoView');
+  playCasinoAmbientSound();
+}
+
+function updateCasinoUI() {
+  if (ui.casinoBalance) ui.casinoBalance.textContent = statsState.money.toLocaleString('es-AR');
+  if (ui.casinoBetAmount) ui.casinoBetAmount.textContent = casinoState.currentBet.toLocaleString('es-AR');
+  if (ui.casinoSpinBtn) ui.casinoSpinBtn.disabled = casinoState.spinning;
+  if (ui.casinoBetMinus) ui.casinoBetMinus.disabled = casinoState.spinning || casinoState.currentBet <= 5000;
+  if (ui.casinoBetPlus) ui.casinoBetPlus.disabled = casinoState.spinning;
+}
+
+function changeCasinoBet(delta) {
+  if (casinoState.spinning) return;
+  const newBet = casinoState.currentBet + delta;
+  if (newBet >= 5000) {
+    casinoState.currentBet = newBet;
+    updateCasinoUI();
+  }
+}
+
+function spinCasino() {
+  if (casinoState.spinning) return;
+  if (statsState.money < casinoState.currentBet) {
+    showToast('No tenés saldo suficiente');
+    return;
+  }
+
+  casinoState.spinning = true;
+  statsState.money = Math.max(0, statsState.money - casinoState.currentBet);
+  updateStats(0);
+  updateCasinoUI();
+
+  if (ui.casinoMessage) ui.casinoMessage.textContent = 'Girando...';
+  playCasinoSpinSound();
+
+  const reels = [ui.casinoReel1, ui.casinoReel2, ui.casinoReel3];
+  reels.forEach((r) => r && r.classList.add('spinning'));
+
+  let spins = 0;
+  if (casinoReelInterval) clearInterval(casinoReelInterval);
+  casinoReelInterval = setInterval(() => {
+    reels.forEach((r) => {
+      if (r) r.textContent = CASINO_SYMBOLS[Math.floor(Math.random() * CASINO_SYMBOLS.length)];
+    });
+    spins++;
+    if (spins >= 15) {
+      clearInterval(casinoReelInterval);
+      casinoReelInterval = null;
+      finishCasinoSpin();
+    }
+  }, 100);
+}
+
+function finishCasinoSpin() {
+  const won = Math.random() < 0.3;
+  const reels = [ui.casinoReel1, ui.casinoReel2, ui.casinoReel3];
+  reels.forEach((r) => r && r.classList.remove('spinning'));
+
+  const pickSymbol = () => CASINO_SYMBOLS[Math.floor(Math.random() * CASINO_SYMBOLS.length)];
+  const pickDifferent = (notSymbol) => {
+    let s = pickSymbol();
+    while (s === notSymbol) s = pickSymbol();
+    return s;
+  };
+
+  if (won) {
+    const matchSymbol = pickSymbol();
+    reels.forEach((r) => { if (r) r.textContent = matchSymbol; });
+    const winnings = casinoState.currentBet * 2;
+    statsState.money = statsState.money + winnings;
+    if (ui.casinoMessage) ui.casinoMessage.textContent = `¡Ganaste $${winnings.toLocaleString('es-AR')}!`;
+    playCasinoWinSound();
+  } else {
+    const r1 = pickSymbol();
+    let r2 = pickSymbol();
+    let r3 = pickSymbol();
+    if (r1 === r2 && r2 === r3) {
+      r3 = pickDifferent(r1);
+    }
+    if (reels[0]) reels[0].textContent = r1;
+    if (reels[1]) reels[1].textContent = r2;
+    if (reels[2]) reels[2].textContent = r3;
+    if (ui.casinoMessage) ui.casinoMessage.textContent = 'Perdiste. ¡Suerte la próxima!';
+    playCasinoLoseSound();
+  }
+
+  updateStats(0);
+  casinoState.spinning = false;
+  updateCasinoUI();
+
+  if (statsState.money <= 0) {
+    casinoState.bankrupt = true;
+    setTimeout(showCasinoBankruptModal, 1000);
+  }
+}
+
+function showCasinoBankruptModal() {
+  if (ui.casinoBankruptModal) {
+    ui.casinoBankruptModal.setAttribute('aria-hidden', 'false');
   }
 }
 
@@ -2675,6 +2783,9 @@ initPhone({
     onOpenMarketpl4ceApp: () => {
       triggerMarketpl4ceHack();
     },
+    onOpenCasinoApp: () => {
+      openCasinoApp();
+    },
     onOpenBrowserApp: () => {
       resetBrowserApp();
       switchPhoneView('phoneBrowserView');
@@ -2821,6 +2932,7 @@ function renderPlayStore(filterText) {
   const query = (filterText || '').toLowerCase();
   playstoreApps.forEach((app) => {
     if (installedApps[app.id]) return;
+    if (app.id === 'casino' && gameState.currentDay < 4) return;
     if (query && !app.name.toLowerCase().includes(query)) return;
     const card = document.createElement('div');
     card.className = 'playstore-card';
@@ -3381,10 +3493,16 @@ function restartDay4() {
   day4State.awaitingDelivery = false;
   day4State.deliveryResolved = false;
 
+  casinoState.currentBet = 5000;
+  casinoState.spinning = false;
+  casinoState.bankrupt = false;
+  if (ui.casinoBankruptModal) ui.casinoBankruptModal.setAttribute('aria-hidden', 'true');
+
   installedApps.marketplace = false;
   installedApps.marketpl4ce = false;
   installedApps.mercadolibre = false;
   installedApps.playstore = false;
+  installedApps.casino = false;
   updatePhoneHomeApps();
 
   phoneState.active = false;
@@ -3911,6 +4029,35 @@ if (ui.btnPostAssaultRestart) {
 
 if (ui.btnMarketpl4ceRewind) {
   ui.btnMarketpl4ceRewind.addEventListener('click', (e) => {
+    e.stopPropagation();
+    restartDay4();
+  });
+}
+
+// --- DAY 4: CASINO EVENT LISTENERS ---
+if (ui.casinoBetMinus) {
+  ui.casinoBetMinus.addEventListener('click', (e) => {
+    e.stopPropagation();
+    changeCasinoBet(-5000);
+  });
+}
+
+if (ui.casinoBetPlus) {
+  ui.casinoBetPlus.addEventListener('click', (e) => {
+    e.stopPropagation();
+    changeCasinoBet(5000);
+  });
+}
+
+if (ui.casinoSpinBtn) {
+  ui.casinoSpinBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    spinCasino();
+  });
+}
+
+if (ui.btnCasinoBankruptRestart) {
+  ui.btnCasinoBankruptRestart.addEventListener('click', (e) => {
     e.stopPropagation();
     restartDay4();
   });

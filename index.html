@@ -153,6 +153,17 @@
               </svg></div>
             <span>Marketpl4ce</span>
           </button>
+          <button class="phone-app-btn" data-app="casino" aria-label="Casino Slots" id="casinoAppBtn" style="display:none;">
+            <div class="app-icon bg-casino">
+              <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <rect x="2" y="3" width="20" height="18" rx="2"/>
+                <circle cx="8" cy="12" r="2"/>
+                <circle cx="16" cy="12" r="2"/>
+                <circle cx="12" cy="12" r="2"/>
+              </svg>
+            </div>
+            <span>Casino Slots</span>
+          </button>
         </div>
       </div>
 
@@ -593,6 +604,34 @@
         </div>
       </div>
 
+      <div id="phoneCasinoView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#f43f5e;font-weight:800;">Casino Slots 8-bit</span>
+        </div>
+        <div class="casino-content">
+          <div class="casino-display">
+            <div class="casino-balance">Saldo: $<span id="casinoBalance">0</span></div>
+          </div>
+          <div class="casino-slots">
+            <div class="casino-reel" id="casinoReel1">🍒</div>
+            <div class="casino-reel" id="casinoReel2">🍋</div>
+            <div class="casino-reel" id="casinoReel3">🍇</div>
+          </div>
+          <div class="casino-controls">
+            <div class="casino-bet-row">
+              <button id="casinoBetMinus" class="casino-bet-btn">- $5.000</button>
+              <div class="casino-bet-amount">$<span id="casinoBetAmount">5.000</span></div>
+              <button id="casinoBetPlus" class="casino-bet-btn">+ $5.000</button>
+            </div>
+            <button id="casinoSpinBtn" class="casino-spin-btn">GIRAR</button>
+          </div>
+          <div class="casino-message" id="casinoMessage">¡Hacé tu apuesta!</div>
+        </div>
+      </div>
+
       <!-- Custom Keyboard Overlay -->
       <div id="phoneKeyboard" class="phone-keyboard is-hidden">
         <div class="phone-keyboard-header">
@@ -831,6 +870,19 @@
           Comprá siempre en publicaciones con buena reputación, descripción clara y vendedores con cuentas antiguas.
         </p>
         <button class="dilemma-btn" id="btnPostAssaultRestart" style="background:#ef4444;">Reiniciar día</button>
+      </div>
+    </div>
+
+    <!-- Casino bankrupt modal -->
+    <div id="casinoBankruptModal" class="game-over-modal" aria-hidden="true">
+      <div class="game-over-card" style="border-color:#ef4444; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.4);">
+        <div class="game-over-icon" style="color:#ef4444;">💸</div>
+        <h2 style="color:#f87171;">¡Te quedaste sin dinero!</h2>
+        <p>Perdiste todo en el casino. Marta no puede comprarle el regalo a Clara.</p>
+        <p class="intro-description-highlight" style="color:#fcd34d; font-size:0.9rem; margin-top:8px;">
+          El juego puede generar pérdidas. Si decidís jugar, hacelo con responsabilidad.
+        </p>
+        <button class="dilemma-btn" id="btnCasinoBankruptRestart" style="background:#ef4444;">Reiniciar día</button>
       </div>
     </div>
   </div>

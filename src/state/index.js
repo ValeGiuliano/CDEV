@@ -71,6 +71,7 @@ export const installedApps = {
   browser: false,
   marketplace: false,
   marketpl4ce: false,
+  casino: false,
 };
 
 export const day3Scammed = { value: false };
@@ -84,6 +85,12 @@ export const day4State = {
 
 export const day4InitialMoney = { value: 100000 };
 
+export const casinoState = {
+  currentBet: 5000,
+  spinning: false,
+  bankrupt: false,
+};
+
 export const playstoreApps = [
   { id: 'mercad0libre', name: 'Mercad0Libre', dev: 'Mercado Libre', color: '#FFF600', label: 'M0' },
   { id: 'whatsapp', name: 'WhatsApp', dev: 'Meta Platforms', color: '#25D366', label: 'WA' },
@@ -93,6 +100,7 @@ export const playstoreApps = [
   { id: 'mercadolibre', name: 'MercadoLibre', dev: 'Mercado Libre', color: '#FFF600', label: 'ML' },
   { id: 'marketplace', name: 'Marketplace', dev: 'Meta Platforms', color: '#1877F2', label: 'Mk' },
   { id: 'marketpl4ce', name: 'Marketpl4ce', dev: 'Marktplaace Inc.', color: '#7c3aed', label: 'M4' },
+  { id: 'casino', name: 'Casino Slots 8-bit', dev: 'Lucky Games', color: '#e11d48', label: 'CS' },
 ];
 
 export const fraudDrainState = {

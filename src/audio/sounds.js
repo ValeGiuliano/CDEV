@@ -89,3 +89,57 @@ export function playCinematicSound(cfg) {
     osc.stop(t0 + (cfg.duration || 0.4) + 0.05);
   } catch (e) {}
 }
+
+function play8BitTone(freq, type, duration, peak) {
+  try {
+    ensureCtx();
+    const t0 = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(peak, t0);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  } catch (e) {}
+}
+
+export function playCasinoAmbientSound() {
+  try {
+    ensureCtx();
+    const t0 = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(110, t0);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(0.04, t0 + 0.2);
+    gain.gain.linearRampToValueAtTime(0, t0 + 1.4);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 1.5);
+  } catch (e) {}
+}
+
+export function playCasinoSpinSound() {
+  [523, 466, 415, 370, 330, 294].forEach((f, i) => {
+    setTimeout(() => play8BitTone(f, 'square', 0.09, 0.12), i * 70);
+  });
+}
+
+export function playCasinoWinSound() {
+  [523, 659, 784, 1047, 1319].forEach((f, i) => {
+    setTimeout(() => play8BitTone(f, 'square', 0.18, 0.15), i * 110);
+  });
+  setTimeout(() => play8BitTone(1047, 'square', 0.4, 0.18), 600);
+}
+
+export function playCasinoLoseSound() {
+  [330, 294, 262, 220, 196, 165].forEach((f, i) => {
+    setTimeout(() => play8BitTone(f, 'sawtooth', 0.18, 0.14), i * 130);
+  });
+}

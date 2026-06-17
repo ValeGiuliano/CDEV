@@ -68,6 +68,9 @@ function registerEventListeners() {
         if (app === 'marketpl4ce' && typeof callbacks.onOpenMarketpl4ceApp === 'function') {
           callbacks.onOpenMarketpl4ceApp();
         }
+        if (app === 'casino' && typeof callbacks.onOpenCasinoApp === 'function') {
+          callbacks.onOpenCasinoApp();
+        }
       });
     });
   }
@@ -344,6 +347,8 @@ export function updatePhoneHomeApps() {
   if (marketplaceBtn) marketplaceBtn.style.display = installedApps.marketplace ? '' : 'none';
   const marketpl4ceBtn = document.getElementById('marketpl4ceAppBtn');
   if (marketpl4ceBtn) marketpl4ceBtn.style.display = installedApps.marketpl4ce ? '' : 'none';
+  const casinoBtn = document.getElementById('casinoAppBtn');
+  if (casinoBtn) casinoBtn.style.display = installedApps.casino ? '' : 'none';
 }
 
 export function getLastPreview(contact) {

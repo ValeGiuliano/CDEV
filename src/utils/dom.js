@@ -114,6 +114,18 @@ export const ui = {
   btnMarketpl4ceRewind: document.querySelector('#btnMarketpl4ceRewind'),
   postAssaultScamModal: document.querySelector('#postAssaultScamModal'),
   btnPostAssaultRestart: document.querySelector('#btnPostAssaultRestart'),
+  casinoAppBtn: document.querySelector('#casinoAppBtn'),
+  casinoBalance: document.querySelector('#casinoBalance'),
+  casinoReel1: document.querySelector('#casinoReel1'),
+  casinoReel2: document.querySelector('#casinoReel2'),
+  casinoReel3: document.querySelector('#casinoReel3'),
+  casinoBetMinus: document.querySelector('#casinoBetMinus'),
+  casinoBetPlus: document.querySelector('#casinoBetPlus'),
+  casinoBetAmount: document.querySelector('#casinoBetAmount'),
+  casinoSpinBtn: document.querySelector('#casinoSpinBtn'),
+  casinoMessage: document.querySelector('#casinoMessage'),
+  casinoBankruptModal: document.querySelector('#casinoBankruptModal'),
+  btnCasinoBankruptRestart: document.querySelector('#btnCasinoBankruptRestart'),
 };
 
 export function getEl(id) {
