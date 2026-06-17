@@ -3683,7 +3683,7 @@ function updateStats(dt) {
       statsState.fatigue += dt;
       statsState.fatigue = Math.min(60, statsState.fatigue);
     } else {
-      statsState.fatigue -= dt * 2;
+      statsState.fatigue -= dt * 6;
       statsState.fatigue = Math.max(0, statsState.fatigue);
     }
   }
@@ -3786,6 +3786,73 @@ function animate() {
 }
 
 // --- GAME START FLOW ---
+// Parse day from query param (e.g. ?day=2) to allow easy developer testing
+const urlParams = new URLSearchParams(window.location.search);
+const dayParam = urlParams.get('day');
+const INITIAL_DAY = dayParam ? parseInt(dayParam, 10) : 1;
+
+function jumpToDay(day) {
+  // Deshabilitar el botón y quitarle el foco
+  if (ui.startBtn) {
+    ui.startBtn.disabled = true;
+    ui.startBtn.blur();
+  }
+
+  // Fade out intro overlay
+  if (ui.introOverlay) {
+    ui.introOverlay.classList.add('is-hidden');
+    setTimeout(() => {
+      ui.introOverlay.style.display = 'none';
+    }, 1000);
+  }
+
+  martaModel.visible = false;
+  doorState.living.open = false;
+
+  // Situar la cámara de juego (POV) en los ojos de Marta al despertar
+  camera.position.set(4.2, 1.48, 3.8);
+  lookEuler.set(0, 0, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  // Fade from white back to scene
+  if (ui.introFade) {
+    ui.introFade.style.transition = 'opacity 1.2s ease';
+    ui.introFade.style.opacity = '0';
+  }
+
+  // Remove intro-active class to show HUD
+  setTimeout(() => {
+    document.body.classList.remove('intro-active');
+  }, 800);
+
+  // Set the day state
+  gameState.currentDay = day;
+  if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + day;
+
+  // Configure app states based on day
+  if (day >= 3) {
+    installedApps.browser = true;
+  }
+  if (day >= 4) {
+    installedApps.playstore = true;
+    installedApps.mercadolibre = true;
+    installedApps.browser = true;
+  }
+  updatePhoneHomeApps();
+
+  // Call the wake up function
+  if (day === 2) {
+    startDay2();
+  } else if (day === 3) {
+    startDay3();
+  } else if (day === 4) {
+    startDay4();
+  }
+}
+
+// Expose jumpToDay globally for console testing
+window.jumpToDay = jumpToDay;
+
 // Add intro-active class immediately to hide HUD
 document.body.classList.add('intro-active');
 
@@ -3793,7 +3860,18 @@ document.body.classList.add('intro-active');
 if (ui.startBtn) {
   ui.startBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    startIntro();
+    
+    // Initialize AudioContext on user interaction
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (err) {}
+
+    if (INITIAL_DAY > 1) {
+      jumpToDay(INITIAL_DAY);
+    } else {
+      startIntro();
+    }
   });
 }
 

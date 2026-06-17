@@ -2829,3 +2829,428 @@ body.intro-active .day-counter {
   color: #fbbf24;
   min-height: 24px;
 }
+
+/* --- TERMINAL TECHNICAL SYSTEM DESIGN (MARTA REDESIGN) --- */
+#phoneHomeView {
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+#phoneHomeView .phone-header h2 {
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 1.15rem;
+  background: none;
+  -webkit-text-fill-color: initial;
+  color: #00ffcc !important;
+  text-shadow: 0 0 5px rgba(0, 255, 204, 0.4);
+}
+
+#phoneHomeView .phone-header p {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: #8899a6;
+}
+
+/* Redesigned Notification as high-tech System Alarm */
+.terminal-alarm-card {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+  border-radius: 8px !important;
+  padding: 10px !important;
+  margin-bottom: 16px !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.15) !important;
+}
+
+.terminal-alarm-card:hover {
+  background: rgba(239, 68, 68, 0.16) !important;
+  border-color: rgba(239, 68, 68, 0.6) !important;
+}
+
+.terminal-alarm-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.blink-red {
+  color: #ef4444;
+  animation: blinkRedText 1s infinite alternate;
+}
+
+@keyframes blinkRedText {
+  0% { opacity: 0.4; text-shadow: none; }
+  100% { opacity: 1; text-shadow: 0 0 6px rgba(239, 68, 68, 0.8); }
+}
+
+.alarm-code {
+  color: #f59e0b;
+}
+
+.terminal-alarm-sender {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.terminal-alarm-desc {
+  font-size: 0.75rem;
+  color: #d1d5db;
+  font-style: italic;
+}
+
+/* Modules list layout (stacks apps vertically) */
+.terminal-module-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  margin-top: 8px !important;
+  padding-bottom: 10px !important;
+}
+
+.terminal-module-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  background: rgba(17, 24, 39, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  transition: all 200ms ease;
+  gap: 10px;
+}
+
+.terminal-module-btn:hover {
+  transform: translateX(3px);
+  background: rgba(31, 41, 55, 0.6);
+  border-color: rgba(0, 255, 204, 0.3);
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.15);
+}
+
+.module-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.bg-pulse-green {
+  background-color: #00ff80;
+  box-shadow: 0 0 6px #00ff80;
+  animation: pulseGreen 1.5s infinite alternate;
+}
+
+.bg-pulse-orange {
+  background-color: #ffaa00;
+  box-shadow: 0 0 6px #ffaa00;
+  animation: pulseOrange 1.2s infinite alternate;
+}
+
+@keyframes pulseGreen {
+  0% { transform: scale(0.9); opacity: 0.5; box-shadow: 0 0 2px #00ff80; }
+  100% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 8px #00ff80; }
+}
+
+@keyframes pulseOrange {
+  0% { transform: scale(0.9); opacity: 0.5; box-shadow: 0 0 2px #ffaa00; }
+  100% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 8px #ffaa00; }
+}
+
+.module-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.module-title {
+  font-size: 0.65rem;
+  font-weight: bold;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.module-desc {
+  font-size: 0.55rem;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.module-arrow {
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 0.6rem;
+  transition: color 200ms;
+}
+
+.terminal-module-btn:hover .module-arrow {
+  color: #00ffcc;
+}
+
+/* --- SPATIAL SETTINGS DESIGNS --- */
+.settings-viewport {
+  width: 100%;
+  height: calc(100% - 48px);
+  overflow: auto; /* enables scrolling/panning natively */
+  scrollbar-width: none; /* Hide default scrollbars for immersive feel */
+}
+.settings-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-space {
+  width: 750px;
+  height: 750px;
+  position: relative;
+  background-color: #030712;
+  background-image: 
+    radial-gradient(circle at center, rgba(17, 24, 39, 0.8) 0%, #030712 100%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+}
+
+.settings-radar-bg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 600px;
+  height: 600px;
+  border: 1px solid rgba(0, 255, 204, 0.04);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.settings-radar-bg::before {
+  content: '';
+  position: absolute;
+  inset: 100px;
+  border: 1px dashed rgba(0, 255, 204, 0.03);
+  border-radius: 50%;
+}
+.settings-radar-bg::after {
+  content: '';
+  position: absolute;
+  inset: 200px;
+  border: 1px solid rgba(0, 255, 204, 0.02);
+  border-radius: 50%;
+}
+
+.settings-orb {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: rgba(17, 24, 39, 0.6);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.3s, background 0.3s;
+}
+
+.settings-orb:hover {
+  transform: scale(1.08) !important;
+  background: rgba(31, 41, 55, 0.75);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.orb-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.orb-title {
+  font-family: monospace;
+  font-size: 0.52rem;
+  font-weight: bold;
+  color: #e5e7eb;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.orb-sub {
+  font-size: 0.4rem;
+  color: #9ca3af;
+  margin-top: 3px;
+  line-height: 1.1;
+}
+
+.orb-checkbox {
+  opacity: 0;
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.orb-status-text {
+  font-family: monospace;
+  font-size: 0.5rem;
+  font-weight: 900;
+  margin-top: 5px;
+}
+
+/* Custom CSS dynamic state using input:checked + sibling */
+.orb-status-text::after {
+  content: 'INACTIVO';
+  color: #ef4444;
+}
+
+.orb-checkbox:checked + .orb-status-text::after {
+  content: 'ACTIVO';
+  color: #00ff80;
+  text-shadow: 0 0 6px rgba(0, 255, 128, 0.6);
+}
+
+/* Custom orb glows and styles based on checked states using :has() */
+.settings-orb:has(.orb-checkbox:checked) {
+  background: rgba(0, 255, 204, 0.08);
+  border: 1px solid #00ffcc;
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.15);
+}
+
+.settings-orb:has(.orb-checkbox:checked) .orb-title {
+  color: #00ffcc;
+  text-shadow: 0 0 5px rgba(0, 255, 204, 0.4);
+}
+
+.settings-orb:has(.orb-checkbox:checked) .orb-glow-ring {
+  opacity: 1;
+  animation: orbRadarPulse 2s infinite linear;
+}
+
+.orb-glow-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+@keyframes orbRadarPulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+
+/* Floating bobbing animations for each settings orb (independent rates) */
+.orb-wifi { animation: bobWifi 5s infinite ease-in-out; }
+.orb-notif { animation: bobNotif 6.2s infinite ease-in-out; }
+.orb-vib { animation: bobVib 4.5s infinite ease-in-out; }
+.orb-bat { animation: bobBat 5.5s infinite ease-in-out; }
+.orb-fatigue { animation: bobFatigue 4.8s infinite ease-in-out; }
+.orb-dummy1 { animation: bobDummy1 5.2s infinite ease-in-out; }
+.orb-dummy2 { animation: bobDummy2 5.8s infinite ease-in-out; }
+.orb-dummy3 { animation: bobDummy3 4.6s infinite ease-in-out; }
+.orb-dummy4 { animation: bobDummy4 6.4s infinite ease-in-out; }
+
+@keyframes bobWifi {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(2deg); }
+}
+@keyframes bobNotif {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(10px) rotate(-3deg); }
+}
+@keyframes bobVib {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-7px) rotate(-1deg); }
+}
+@keyframes bobBat {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(9px) rotate(2deg); }
+}
+@keyframes bobFatigue {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-11px) rotate(-2deg); }
+}
+@keyframes bobDummy1 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-9px) rotate(-2deg); }
+}
+@keyframes bobDummy2 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(8px) rotate(1deg); }
+}
+@keyframes bobDummy3 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(3deg); }
+}
+@keyframes bobDummy4 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(10px) rotate(-1deg); }
+}
+
+/* --- LOGOS Y VISTA LOADING EN TELÉFONO --- */
+.module-logo {
+  font-size: 1.25rem;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.loading-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+  text-align: center;
+}
+
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid rgba(0, 255, 204, 0.1);
+  border-top-color: #00ffcc;
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.15);
+}
+
+.loading-text {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  font-family: monospace;
+  line-height: 1.4;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+#phoneSettingsView {
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+#phoneSettingsView .phone-app-topbar {
+  padding: 4% 5% 2%;
+  margin-bottom: 0;
+}

@@ -9,6 +9,7 @@ import {
   installedApps,
   statsState,
   gameState,
+  visualFatigueDisabled,
 } from '../state/index.js';
 import { phoneScreenCorners } from '../core/phone3d.js';
 import { mlGiftsDilemma } from '../data/dilemmas.js';
@@ -70,6 +71,9 @@ function registerEventListeners() {
         }
         if (app === 'casino' && typeof callbacks.onOpenCasinoApp === 'function') {
           callbacks.onOpenCasinoApp();
+        }
+        if (app && app.startsWith('fake-loading')) {
+          switchPhoneView('phoneLoadingView');
         }
       });
     });
@@ -181,6 +185,69 @@ function registerEventListeners() {
     });
     messagesSearchInput.addEventListener('input', (e) => {
       renderContactList(e.target.value);
+    });
+  }
+
+  // Implementar drag-to-scroll táctil simulado para el lienzo de Ajustes Espaciales
+  const settingsViewport = document.querySelector('.settings-viewport');
+  if (settingsViewport) {
+    let isDown = false;
+    let startX, startY;
+    let scrollLeft, scrollTop;
+
+    settingsViewport.addEventListener('mousedown', (e) => {
+      isDown = true;
+      startX = e.pageX - settingsViewport.offsetLeft;
+      startY = e.pageY - settingsViewport.offsetTop;
+      scrollLeft = settingsViewport.scrollLeft;
+      scrollTop = settingsViewport.scrollTop;
+      settingsViewport.style.cursor = 'grabbing';
+    });
+
+    settingsViewport.addEventListener('mouseleave', () => {
+      isDown = false;
+      settingsViewport.style.cursor = 'default';
+    });
+
+    settingsViewport.addEventListener('mouseup', () => {
+      isDown = false;
+      settingsViewport.style.cursor = 'default';
+    });
+
+    settingsViewport.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - settingsViewport.offsetLeft;
+      const y = e.pageY - settingsViewport.offsetTop;
+      const walkX = (x - startX) * 1.5;
+      const walkY = (y - startY) * 1.5;
+      settingsViewport.scrollLeft = scrollLeft - walkX;
+      settingsViewport.scrollTop = scrollTop - walkY;
+    });
+
+    // Soporte para touch/móvil
+    settingsViewport.addEventListener('touchstart', (e) => {
+      isDown = true;
+      const touch = e.touches[0];
+      startX = touch.pageX - settingsViewport.offsetLeft;
+      startY = touch.pageY - settingsViewport.offsetTop;
+      scrollLeft = settingsViewport.scrollLeft;
+      scrollTop = settingsViewport.scrollTop;
+    });
+
+    settingsViewport.addEventListener('touchend', () => {
+      isDown = false;
+    });
+
+    settingsViewport.addEventListener('touchmove', (e) => {
+      if (!isDown) return;
+      const touch = e.touches[0];
+      const x = touch.pageX - settingsViewport.offsetLeft;
+      const y = touch.pageY - settingsViewport.offsetTop;
+      const walkX = (x - startX) * 1.5;
+      const walkY = (y - startY) * 1.5;
+      settingsViewport.scrollLeft = scrollLeft - walkX;
+      settingsViewport.scrollTop = scrollTop - walkY;
     });
   }
 }
@@ -315,6 +382,10 @@ export function switchPhoneView(viewId) {
     const wifiInput = document.getElementById('settingWifi');
     if (wifiInput) {
       wifiInput.checked = phoneState.wifiEnabled;
+    }
+    const fatigueInput = document.getElementById('settingFatigue');
+    if (fatigueInput) {
+      fatigueInput.checked = visualFatigueDisabled;
     }
   }
 

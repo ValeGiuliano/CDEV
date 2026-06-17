@@ -146,9 +146,8 @@ export function startDay2() {
       setTimeout(() => {
         playNotificationSound();
         startClaraBirthdayMission();
-        switchPhoneView('phoneMessagesView');
+        switchPhoneView('phoneHomeView');
         renderContactList();
-        openContactChat('camilo');
         startClaraBirthdayFlow();
         day2StartInProgress = false;
       }, 5000);
