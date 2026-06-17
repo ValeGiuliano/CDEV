@@ -194,3 +194,12 @@ export function startDownloadMarketplaceMission() {
 export function startBuyMarketplaceMission() {
   setMission('buyInMarketplace', 'Comprar la muñeca', 'Elegí una publicación confiable en Marketplace y comprá la muñeca para Clara.');
 }
+
+export function startUberMission() {
+  setMission('orderUber', 'Pedir un Uber', 'Hoy es el cumpleaños de Clara. Abrí la app de Uber en tu teléfono y pedí un viaje para llegar a la fiesta.');
+  addMessageSafe(
+    'camilo',
+    'incoming',
+    '¡Mamá! Hoy es el cumpleaños de Clara 🎂 y la fiesta es dentro de un rato. Te instalé la app de <strong>Uber</strong> en el celular para que puedas ir. Abrila y pedí un viaje. ¡Te espero! ❤️'
+  );
+}
