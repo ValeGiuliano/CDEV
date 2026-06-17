@@ -3055,9 +3055,7 @@ initUberMapPin({
     parkedUberCar = spawnParkedUber();
     
     // Set next mission to open the door
-    setTimeout(() => {
-      setMission('openDoorUber', 'Tomar el Uber', 'El Uber ya llegó y te está esperando afuera. Abrí la puerta principal para subir.');
-    }, 1500);
+    setMission('openDoorUber', 'Tomar el Uber', 'El Uber ya llegó y te está esperando afuera. Abrí la puerta principal para subir.');
   },
   onFail: () => {
     statsState.calm = Math.max(0, statsState.calm - 20);

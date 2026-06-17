@@ -17,6 +17,11 @@ function isPositionAllowed(x, z) {
   const living = { minX: -5.65, maxX: 5.65, minZ: -5.78, maxZ: 5.65 };
   const outside = { minX: -18.0, maxX: 18.0, minZ: -19.5, maxZ: -5.55 };
 
+  // Doorway threshold bridge (allows crossing without collision gap blocks)
+  if (doorState.living.open && x > -0.08 && x < 1.5 && z >= -6.2 && z <= -5.3) {
+    return true;
+  }
+
   if (inRect(x, z, living)) {
     if (z < -5.34 && x > -0.08 && x < 1.5) return doorState.living.open;
     if (z < -5.34 && (x <= -0.08 || x >= 1.5)) return false;
