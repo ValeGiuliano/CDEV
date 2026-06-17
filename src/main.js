@@ -471,6 +471,7 @@ gltfLoader.load(
     
     // Asegurar que la base de sus pies (min Y) descanse exactamente sobre el piso (Y = 0)
     model.position.y = 0 - min.y * scaleFactor;
+    model.userData.baseY = model.position.y;
     
     // Rotar para mirar hacia la televisión (+X)
     model.rotation.set(0, Math.PI / 2, 0); 
@@ -689,6 +690,30 @@ gltfLoader.load(
       repartidorMixer = new THREE.AnimationMixer(model);
       model.userData.animations = gltf.animations;
       console.log("Repartidor: animaciones disponibles:", gltf.animations.map(a => a.name));
+
+      const validAnimations = gltf.animations.filter(a => {
+        const name = a.name.toLowerCase();
+        return !name.includes('tpose') &&
+               !name.includes('t-pose') &&
+               !name.includes('bind') &&
+               !name.includes('default') &&
+               !name.includes('pose') &&
+               a.duration > 0.05;
+      });
+
+      const idleClip = validAnimations.find(a => a.name.toLowerCase().includes('idle') && !a.name.toLowerCase().includes('armature'))
+        || validAnimations.find(a => a.name.toLowerCase().includes('idle'))
+        || validAnimations[0];
+      if (idleClip) {
+        const action = repartidorMixer.clipAction(idleClip);
+        action.setLoop(THREE.LoopRepeat);
+        action.play();
+        model.userData.idleClip = idleClip;
+        model.userData.walkClip = validAnimations.find(a => a.name.toLowerCase().includes('walk')) || null;
+        model.userData.deliverClip = validAnimations.find(a => a.name.toLowerCase().includes('deliver')) || null;
+        model.userData.mixer = repartidorMixer;
+        console.log(`Repartidor: idle="${idleClip.name}", walk="${model.userData.walkClip?.name || 'none'}", deliver="${model.userData.deliverClip?.name || 'none'}"`);
+      }
     } else {
       model.userData.proceduralIdle = true;
     }
@@ -872,8 +897,26 @@ debugMarker.position.set(0.72, 1, -7.5);
 debugMarker.visible = false;
 room.add(debugMarker);
 
+function playRepartidorClip(clipName, options = {}) {
+  if (!repartidorModel || !repartidorModel.userData.mixer) return;
+  const ud = repartidorModel.userData;
+  const clip = clipName === 'walk' ? ud.walkClip
+             : clipName === 'deliver' ? ud.deliverClip
+             : clipName === 'idle' ? ud.idleClip
+             : null;
+  if (!clip) return;
+  const { loop = THREE.LoopRepeat, clamp = false } = options;
+  ud.mixer.stopAllAction();
+  const action = ud.mixer.clipAction(clip);
+  action.setLoop(loop);
+  action.clampWhenFinished = clamp;
+  action.reset();
+  action.fadeIn(0.2).play();
+}
+
 function hideDay4Characters() {
   if (repartidorModel) repartidorModel.visible = false;
+  if (repartidorMixer) repartidorMixer.stopAllAction();
   if (repartidorPlaceholder.parent === room) repartidorPlaceholder.visible = false;
   if (ladronPlaceholder.parent === room) ladronPlaceholder.visible = false;
   if (ladronModel && ladronModel.userData.clone1) ladronModel.userData.clone1.visible = false;
@@ -2208,67 +2251,174 @@ const day4WakeUpSequence = [
 ];
 
 // --- DAY 4: SECUENCIA DE ENTREGA (COMPRA REAL) ---
-const deliverySequence = [
-  {
-    duration: 2.5,
-    autoAdvance: true,
-    dialogue: { speaker: 'Repartidor', text: '¡Buenas! Vengo de Marketplace con su pedido.' },
-    sound: { freq: 520, type: 'triangle', duration: 0.25 },
-    onStart: () => {
-      console.log('deliverySequence start', {
-        repartidorModel: !!repartidorModel,
-        repartidorReady,
-        repartidorActiveMesh: !!repartidorActiveMesh
-      });
+// Puntos de cámara predefinidos para una transición fluida entre planos
+const DEL_CAM_WIDE        = new THREE.Vector3(2.4, 1.45, -5.0);
+const DEL_CAM_OVER_MARTA  = new THREE.Vector3(1.2, 1.45, -5.0);
+const DEL_CAM_OVER_REPART = new THREE.Vector3(1.2, 1.45, -6.8);
+const DEL_CAM_DELIVERY    = new THREE.Vector3(2.0, 1.35, -5.8);
+const DEL_CAM_LEAVE       = new THREE.Vector3(2.4, 1.45, -5.2);
 
+const DEL_LOOK_DOOR       = new THREE.Vector3(0.72, 1.25, -6.0);
+const DEL_LOOK_MARTA      = new THREE.Vector3(0.72, 1.25, -5.5);
+const DEL_LOOK_REPART     = new THREE.Vector3(0.72, 1.25, -7.0);
+
+const MARTA_DOOR_POS      = new THREE.Vector3(0.72, 0, -5.5); // y se completa con baseY
+const REPART_IDLE_POS     = new THREE.Vector3(0.72, 0, -7.3);
+const REPART_DELIVER_END  = new THREE.Vector3(0.72, 0, -6.3);
+const REPART_LEAVE_END    = new THREE.Vector3(0.72, 0, -8.5);
+
+function smoothCamStep(start, end, lookAt) {
+  return (progress) => {
+    const ease = progress * progress * (3 - 2 * progress);
+    camera.position.lerpVectors(start, end, ease);
+    if (lookAt) camera.lookAt(lookAt);
+  };
+}
+
+function smoothZStep(startZ, endZ) {
+  return (progress) => {
+    const ease = progress * progress * (3 - 2 * progress);
+    const z = THREE.MathUtils.lerp(startZ, endZ, ease);
+    if (repartidorActiveMesh === repartidorModel) {
+      repartidorModel.position.z = z;
+    } else if (repartidorActiveMesh === repartidorPlaceholder) {
+      repartidorPlaceholder.position.z = z;
+    }
+  };
+}
+
+function placeMartaForDelivery() {
+  const baseY = (martaLoadedModel && martaLoadedModel.userData && martaLoadedModel.userData.baseY) || 0;
+  if (martaLoadedModel) {
+    martaModel.visible = true;
+    martaLoadedModel.visible = true;
+    martaLoadedModel.position.set(MARTA_DOOR_POS.x, baseY, MARTA_DOOR_POS.z);
+    martaLoadedModel.rotation.set(0, Math.PI, 0);
+  } else if (typeof oldWomanMesh !== 'undefined' && oldWomanMesh) {
+    oldWomanMesh.visible = true;
+    oldWomanMesh.position.set(MARTA_DOOR_POS.x, 1.25, MARTA_DOOR_POS.z);
+    oldWomanMesh.rotation.set(0, Math.PI, 0);
+  }
+}
+
+function playMartaTalk() {
+  if (martaLoadedModel && martaMixer && martaLoadedModel.userData.talkClip) {
+    martaMixer.stopAllAction();
+    const action = martaMixer.clipAction(martaLoadedModel.userData.talkClip);
+    action.reset();
+    action.fadeIn(0.2).play();
+  }
+}
+
+function hideMartaInCinematic() {
+  if (martaModel) martaModel.visible = false;
+  if (typeof oldWomanMesh !== 'undefined' && oldWomanMesh) oldWomanMesh.visible = false;
+  if (martaMixer) martaMixer.stopAllAction();
+}
+
+const deliverySequence = [
+  // Paso 0: Plano amplio — se ven Marta (adentro) y el repartidor (afuera, idle)
+  {
+    duration: 1.8,
+    autoAdvance: true,
+    onStart: () => {
+      placeMartaForDelivery();
       if (repartidorModel && repartidorReady) {
         repartidorModel.visible = true;
-        repartidorModel.position.set(0.72, 0, -7.5);
+        repartidorModel.position.set(REPART_IDLE_POS.x, REPART_IDLE_POS.y, REPART_IDLE_POS.z);
         repartidorModel.rotation.set(0, 0, 0);
         repartidorActiveMesh = repartidorModel;
-        console.log('Usando modelo GLB del repartidor');
+        playRepartidorClip('idle');
       } else {
-        console.warn('Modelo de repartidor no disponible; no se muestra personaje');
         repartidorActiveMesh = null;
       }
-      camera.position.set(2.2, 1.45, -5.2);
-      camera.lookAt(0.72, 1.25, -6.5);
+      camera.position.copy(DEL_CAM_WIDE);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: smoothCamStep(DEL_CAM_WIDE, DEL_CAM_WIDE, DEL_LOOK_DOOR)
+  },
+  // Paso 1: Se abre la puerta — cámara se desliza hacia el hombro de Marta
+  {
+    duration: 1.5,
+    autoAdvance: true,
+    onStart: () => {
+      doorState.living.open = true;
+      camera.position.copy(DEL_CAM_WIDE);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: smoothCamStep(DEL_CAM_WIDE, DEL_CAM_OVER_MARTA, DEL_LOOK_DOOR)
+  },
+  // Paso 2: Marta: "¿Hola?" — cámara sobre el hombro de Marta mirando al repartidor
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: '¿Hola?' },
+    onStart: () => {
+      playMartaTalk();
+      camera.position.copy(DEL_CAM_OVER_MARTA);
+      camera.lookAt(DEL_LOOK_REPART);
+    },
+    action: smoothCamStep(DEL_CAM_OVER_MARTA, DEL_CAM_OVER_REPART, DEL_LOOK_REPART)
+  },
+  // Paso 3: Repartidor: "Tengo un paquete..." — cámara sobre el hombro del repartidor
+  {
+    duration: 2.8,
+    autoAdvance: true,
+    dialogue: { speaker: 'Repartidor', text: 'Tengo un paquete para Marta Gómez.' },
+    onStart: () => {
+      if (martaMixer) martaMixer.stopAllAction();
+      camera.position.copy(DEL_CAM_OVER_REPART);
+      camera.lookAt(DEL_LOOK_MARTA);
+    },
+    action: smoothCamStep(DEL_CAM_OVER_REPART, DEL_CAM_OVER_MARTA, DEL_LOOK_MARTA)
+  },
+  // Paso 4: Marta: "Soy yo." — vuelve al hombro de Marta
+  {
+    duration: 1.8,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: 'Soy yo.' },
+    onStart: () => {
+      playMartaTalk();
+      camera.position.copy(DEL_CAM_OVER_MARTA);
+      camera.lookAt(DEL_LOOK_REPART);
+    },
+    action: smoothCamStep(DEL_CAM_OVER_MARTA, DEL_CAM_OVER_REPART, DEL_LOOK_REPART)
+  },
+  // Paso 5: Repartidor entrega el paquete — plano lateral, ambos en cuadro
+  {
+    duration: 5.0,
+    autoAdvance: true,
+    dialogue: { speaker: 'Repartidor', text: 'Se lo entrego.' },
+    onStart: () => {
+      if (martaMixer) martaMixer.stopAllAction();
+      playRepartidorClip('deliver', { loop: THREE.LoopOnce, clamp: true });
+      camera.position.copy(DEL_CAM_OVER_MARTA);
+      camera.lookAt(DEL_LOOK_DOOR);
     },
     action: (progress) => {
-      const z = THREE.MathUtils.lerp(-7.5, -5.6, progress);
-      if (repartidorActiveMesh === repartidorModel) {
-        repartidorModel.position.z = z;
-      } else if (repartidorActiveMesh === repartidorPlaceholder) {
-        repartidorPlaceholder.position.z = z;
-      }
-      camera.position.x = THREE.MathUtils.lerp(2.2, 1.9, progress);
-      camera.lookAt(0.72, 1.25, -5.8);
+      smoothZStep(REPART_IDLE_POS.z, REPART_DELIVER_END.z)(progress);
+      smoothCamStep(DEL_CAM_OVER_MARTA, DEL_CAM_DELIVERY, DEL_LOOK_DOOR)(progress);
     }
   },
+  // Paso 6: Marta: "Gracias." — el repartidor se da vuelta y se va caminando
   {
-    duration: 2.0,
+    duration: 2.8,
     autoAdvance: true,
-    dialogue: { speaker: 'Marta', text: '¡Ay, gracias hijo! Pasó rápido.' },
-    onStart: () => {},
-    action: (progress) => {
-      camera.position.x = THREE.MathUtils.lerp(1.9, 1.85, progress);
-      camera.lookAt(0.72, 1.25, -5.8);
-    }
-  },
-  {
-    duration: 2.0,
-    autoAdvance: true,
-    dialogue: { speaker: 'Repartidor', text: 'Que tenga un buen día. ¡Saludos!' },
-    onStart: () => {},
-    action: (progress) => {
-      const z = THREE.MathUtils.lerp(-5.6, -8.5, progress);
+    dialogue: { speaker: 'Marta', text: 'Gracias.' },
+    onStart: () => {
+      playMartaTalk();
       if (repartidorActiveMesh === repartidorModel) {
-        repartidorModel.position.z = z;
+        repartidorModel.rotation.y = Math.PI;
       } else if (repartidorActiveMesh === repartidorPlaceholder) {
-        repartidorPlaceholder.position.z = z;
+        repartidorPlaceholder.rotation.y = Math.PI;
       }
-      camera.position.x = THREE.MathUtils.lerp(1.85, 1.75, progress);
-      camera.lookAt(0.72, 1.25, -6.0);
+      playRepartidorClip('walk');
+      camera.position.copy(DEL_CAM_DELIVERY);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: (progress) => {
+      smoothZStep(REPART_DELIVER_END.z, REPART_LEAVE_END.z)(progress);
+      smoothCamStep(DEL_CAM_DELIVERY, DEL_CAM_LEAVE, DEL_LOOK_DOOR)(progress);
     }
   }
 ];
@@ -2352,6 +2502,7 @@ const assaultSequence = [
 
 function startDay4Delivery() {
   hideDay4Characters();
+  doorState.living.open = false;
   if (ui.damageOverlay) {
     ui.damageOverlay.classList.remove('is-active');
     void ui.damageOverlay.offsetWidth;
@@ -2370,6 +2521,7 @@ function startDay4Delivery() {
       day4State.deliveryResolved = true;
       day4State.awaitingDelivery = false;
       hideDay4Characters();
+      hideMartaInCinematic();
       if (missionsState.currentMissionId === 'attendDelivery' && !missionsState.completed) {
         completeMission('attendDelivery');
       }
@@ -2491,6 +2643,143 @@ function showCasinoBankruptModal() {
   if (ui.casinoBankruptModal) {
     ui.casinoBankruptModal.setAttribute('aria-hidden', 'false');
   }
+}
+
+// --- DEBUG CONSOLE (tecla L) ---
+let debugConsoleOpen = false;
+
+function logToConsole(msg, type = 'info') {
+  const log = document.getElementById('debugConsoleLog');
+  if (!log) return;
+  const line = document.createElement('div');
+  line.className = `log-${type}`;
+  line.textContent = `> ${msg}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearConsoleLog() {
+  const log = document.getElementById('debugConsoleLog');
+  if (log) log.innerHTML = '';
+}
+
+function toggleDebugConsole(force) {
+  const el = document.getElementById('debugConsole');
+  if (!el) return;
+  const next = typeof force === 'boolean' ? force : !debugConsoleOpen;
+  debugConsoleOpen = next;
+  if (debugConsoleOpen) {
+    if (document.pointerLockElement === canvas) {
+      document.exitPointerLock();
+    }
+    el.classList.add('is-open');
+    el.setAttribute('aria-hidden', 'false');
+    const input = document.getElementById('debugConsoleInput');
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+    logToConsole('Consola de debug abierta. Escribí "help" para ver comandos.', 'system');
+  } else {
+    el.classList.remove('is-open');
+    el.setAttribute('aria-hidden', 'true');
+    canvas.focus();
+  }
+}
+
+function startDay1() {
+  camera.position.set(-0.7, 1.48, -2.3);
+  lookEuler.set(0, -Math.PI / 2, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  setTimeOfDay('dia', 0.0);
+  doorState.living.open = false;
+  hideDay4Characters();
+
+  setMission('doorbell', 'Atiende la puerta', 'Alguien toca el timbre. Ve a abrir la puerta de entrada.');
+}
+
+function jumpToDay(day) {
+  cinematicState.active = false;
+  cinematicState.onEnd = null;
+  cinematicState.timer = 0;
+  cinematicState.currentStep = 0;
+  cinematicState.waitingForSpace = false;
+  cinematicState.sequence = null;
+  dayTransitionState.active = false;
+  dayTransitionState.progress = 0;
+  dayTransitionState.phase = 'fade-in';
+  document.body.classList.remove('cinematic-active');
+  if (ui.cinematicOverlay) ui.cinematicOverlay.setAttribute('aria-hidden', 'true');
+  if (ui.cinematicPrompt) ui.cinematicPrompt.classList.remove('is-visible');
+
+  if (phoneState.active) {
+    togglePhone();
+  }
+
+  if (ui.marketpl4ceHackModal) ui.marketpl4ceHackModal.setAttribute('aria-hidden', 'true');
+  if (ui.postAssaultScamModal) ui.postAssaultScamModal.setAttribute('aria-hidden', 'true');
+  if (ui.daysBlockedModal) ui.daysBlockedModal.setAttribute('aria-hidden', 'true');
+  if (ui.damageOverlay) ui.damageOverlay.classList.remove('is-active');
+  if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
+  if (ui.casinoBankruptModal) ui.casinoBankruptModal.setAttribute('aria-hidden', 'true');
+
+  hideDay4Characters();
+
+  gameState.currentDay = day;
+  if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + day;
+
+  try {
+    if (day === 1) {
+      startDay1();
+    } else if (day === 2) {
+      startDay2();
+    } else if (day === 3) {
+      startDay3();
+    } else if (day === 4) {
+      startDay4();
+    } else if (day === 5) {
+      startDay5();
+    }
+    logToConsole(`Cambiado al día ${day} (estado conservado)`, 'system');
+  } catch (e) {
+    logToConsole(`Error al cambiar de día: ${e.message}`, 'error');
+  }
+}
+
+function processConsoleCommand(raw) {
+  const text = raw.trim();
+  if (!text) return;
+  logToConsole(text);
+  const parts = text.split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+  const arg = parts[1];
+
+  if (cmd === 'day') {
+    const n = parseInt(arg, 10);
+    if (isNaN(n) || n < 1 || n > 5) {
+      logToConsole('Uso: day <1-5>', 'error');
+      return;
+    }
+    jumpToDay(n);
+    return;
+  }
+  if (cmd === 'help' || cmd === '?') {
+    logToConsole('Comandos disponibles:', 'system');
+    logToConsole('  day <1-5>  Cambia al día indicado (conserva estado)');
+    logToConsole('  clear      Limpia el log');
+    logToConsole('  help       Muestra esta ayuda');
+    return;
+  }
+  if (cmd === 'clear' || cmd === 'cls') {
+    clearConsoleLog();
+    return;
+  }
+  if (cmd === 'close' || cmd === 'exit') {
+    toggleDebugConsole(false);
+    return;
+  }
+  logToConsole(`Comando no reconocido: ${cmd}`, 'error');
 }
 
 function restartCurrentDay() {
@@ -2636,6 +2925,7 @@ function startIntro() {
 }
 
 function handleMoveKey(event, active) {
+  if (debugConsoleOpen) return;
   if (cinematicState.active) {
     if (active && (event.code === 'Space' || event.key === ' ')) {
       if (event.repeat) return;
@@ -3736,6 +4026,9 @@ function animate() {
   if (sonMixer) {
     sonMixer.update(dt);
   }
+  if (repartidorMixer) {
+    repartidorMixer.update(dt);
+  }
 
   // Sincronizar visibilidad y animar a Marta en 3D importada
   if (martaLoadedModel) {
@@ -4062,6 +4355,35 @@ if (ui.btnCasinoBankruptRestart) {
     restartDay4();
   });
 }
+
+// --- DEBUG CONSOLE LISTENERS ---
+const debugConsoleInputEl = document.getElementById('debugConsoleInput');
+if (debugConsoleInputEl) {
+  debugConsoleInputEl.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const cmd = debugConsoleInputEl.value;
+      debugConsoleInputEl.value = '';
+      processConsoleCommand(cmd);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      toggleDebugConsole(false);
+    }
+    event.stopPropagation();
+  });
+  debugConsoleInputEl.addEventListener('keyup', (e) => e.stopPropagation());
+  debugConsoleInputEl.addEventListener('keypress', (e) => e.stopPropagation());
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.repeat) return;
+  const key = (event.key || '').toLowerCase();
+  if (key !== 'ñ') return;
+  const tag = (event.target && event.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  event.preventDefault();
+  toggleDebugConsole();
+}, { capture: true });
 
 // Start the render loop (scene renders behind intro overlay)
 animate();

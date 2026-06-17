@@ -106,8 +106,7 @@ export function sleepToNextDay() {
 
 export function startDay2() {
   if (!deps) return;
-  if (day2StartInProgress) return;
-  day2StartInProgress = true;
+  day2StartInProgress = false;
   const {
     camera,
     lookEuler,
