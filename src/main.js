@@ -4438,7 +4438,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const dayParam = urlParams.get('day');
 const INITIAL_DAY = dayParam ? parseInt(dayParam, 10) : 1;
 
-function jumpToDay(day) {
+function startGameAtDay(day) {
   // Deshabilitar el botón y quitarle el foco
   if (ui.startBtn) {
     ui.startBtn.disabled = true;
@@ -4515,7 +4515,7 @@ if (ui.startBtn) {
     } catch (err) {}
 
     if (INITIAL_DAY > 1) {
-      jumpToDay(INITIAL_DAY);
+      startGameAtDay(INITIAL_DAY);
     } else {
       startIntro();
     }
