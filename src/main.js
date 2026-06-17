@@ -476,6 +476,7 @@ gltfLoader.load(
     
     // Asegurar que la base de sus pies (min Y) descanse exactamente sobre el piso (Y = 0)
     model.position.y = 0 - min.y * scaleFactor;
+    model.userData.baseY = model.position.y;
     
     // Rotar para mirar hacia la televisión (+X)
     model.rotation.set(0, Math.PI / 2, 0); 
@@ -694,6 +695,30 @@ gltfLoader.load(
       repartidorMixer = new THREE.AnimationMixer(model);
       model.userData.animations = gltf.animations;
       console.log("Repartidor: animaciones disponibles:", gltf.animations.map(a => a.name));
+
+      const validAnimations = gltf.animations.filter(a => {
+        const name = a.name.toLowerCase();
+        return !name.includes('tpose') &&
+               !name.includes('t-pose') &&
+               !name.includes('bind') &&
+               !name.includes('default') &&
+               !name.includes('pose') &&
+               a.duration > 0.05;
+      });
+
+      const idleClip = validAnimations.find(a => a.name.toLowerCase().includes('idle') && !a.name.toLowerCase().includes('armature'))
+        || validAnimations.find(a => a.name.toLowerCase().includes('idle'))
+        || validAnimations[0];
+      if (idleClip) {
+        const action = repartidorMixer.clipAction(idleClip);
+        action.setLoop(THREE.LoopRepeat);
+        action.play();
+        model.userData.idleClip = idleClip;
+        model.userData.walkClip = validAnimations.find(a => a.name.toLowerCase().includes('walk')) || null;
+        model.userData.deliverClip = validAnimations.find(a => a.name.toLowerCase().includes('deliver')) || null;
+        model.userData.mixer = repartidorMixer;
+        console.log(`Repartidor: idle="${idleClip.name}", walk="${model.userData.walkClip?.name || 'none'}", deliver="${model.userData.deliverClip?.name || 'none'}"`);
+      }
     } else {
       model.userData.proceduralIdle = true;
     }
@@ -729,6 +754,66 @@ gltfLoader.load(
     model.userData.centerZ = (box.min.z + box.max.z) / 2;
     model.scale.setScalar(scale);
     model.updateMatrixWorld(true);
+
+    // Cubo paquete (entrega con ambas manos) atado al hueso del torso
+    // para que siga el root motion de la animación deliver
+    const deliveryPackage = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.4, 0.25),
+      new THREE.MeshStandardMaterial({ color: 0xc68642, emissive: 0xc68642, emissiveIntensity: 0.3, roughness: 0.8 })
+    );
+    deliveryPackage.castShadow = true;
+    deliveryPackage.receiveShadow = true;
+    deliveryPackage.visible = false;
+    // Compensar la escala del modelo para que el cubo quede en metros reales
+    deliveryPackage.scale.setScalar(1 / scale);
+
+    // Buscar hueso del pecho para anclar el paquete
+    let chestBone = null;
+    model.traverse((child) => {
+      if (child.isBone && !chestBone) {
+        const n = child.name.toLowerCase();
+        if (n.includes('spine2') || n.includes('chest')) chestBone = child;
+      }
+    });
+    if (!chestBone) {
+      model.traverse((child) => {
+        if (child.isBone && !chestBone) {
+          const n = child.name.toLowerCase();
+          if (n.includes('spine1')) chestBone = child;
+        }
+      });
+    }
+    if (!chestBone) {
+      model.traverse((child) => {
+        if (child.isBone && !chestBone) {
+          const n = child.name.toLowerCase();
+          if (n.includes('spine')) chestBone = child;
+        }
+      });
+    }
+
+    if (chestBone) {
+      chestBone.add(deliveryPackage);
+      // Compensar la escala real del esqueleto (incluye el nodo padre "idle" con escala ~0.004)
+      // para que el cubo se vea con tamaño real en metros.
+      model.updateMatrixWorld(true);
+      const boneWorldScale = chestBone.getWorldScale(new THREE.Vector3()).x;
+      deliveryPackage.scale.setScalar(1 / boneWorldScale);
+      // Adelante del torso en eje local (Mixamo: +Z = frente)
+      deliveryPackage.position.set(0, 0, 0.5 / boneWorldScale);
+      deliveryPackage.rotation.set(0, 0, 0);
+      console.log(`Repartidor: paquete atado al hueso ${chestBone.name} (worldScale=${boneWorldScale.toFixed(4)})`);
+    } else {
+      // Fallback: root del modelo
+      model.add(deliveryPackage);
+      model.updateMatrixWorld(true);
+      const rootWorldScale = model.getWorldScale(new THREE.Vector3()).x;
+      deliveryPackage.scale.setScalar(1 / rootWorldScale);
+      deliveryPackage.position.set(0, 1.0 / rootWorldScale, 0.5 / rootWorldScale);
+      console.warn('Repartidor: no se encontró hueso del torso, paquete atado al root');
+    }
+    model.userData.packageMesh = deliveryPackage;
+
     repartidorReady = true;
     console.log("Repartidor listo. Escala:", scale, "size.y:", size.y);
   },
@@ -763,7 +848,31 @@ gltfLoader.load(
     if (gltf.animations && gltf.animations.length > 0) {
       ladronMixer = new THREE.AnimationMixer(model);
       model.userData.animations = gltf.animations;
+      model.userData.mixer = ladronMixer;
       console.log("Ladrón: animaciones disponibles:", gltf.animations.map(a => a.name));
+
+      const validAnimations = gltf.animations.filter(a => {
+        const name = a.name.toLowerCase();
+        return !name.includes('tpose') &&
+               !name.includes('t-pose') &&
+               !name.includes('bind') &&
+               !name.includes('default') &&
+               !name.includes('pose') &&
+               a.duration > 0.05;
+      });
+
+      const idleClip = validAnimations.find(a => a.name.toLowerCase().includes('idle')) || validAnimations[0];
+      const attackClip =
+        validAnimations.find(a => {
+          const n = a.name.toLowerCase();
+          return n.includes('attack') || n.includes('hit') || n.includes('punch') || n.includes('assault') || n.includes('aggressive');
+        }) ||
+        validAnimations.find(a => a !== idleClip) ||
+        validAnimations[0];
+
+      model.userData.idleClip = idleClip || null;
+      model.userData.attackClip = attackClip || null;
+      console.log(`Ladrón: idle="${idleClip?.name || 'none'}", attack="${attackClip?.name || 'none'}"`);
     } else {
       model.userData.proceduralIdle = true;
     }
@@ -830,11 +939,13 @@ const repartidorPlaceholder = new THREE.Group();
   const armR = armL.clone();
   armR.position.x = 0.35;
   const package_ = new THREE.Mesh(
-    new THREE.BoxGeometry(0.35, 0.3, 0.2),
+    new THREE.BoxGeometry(0.5, 0.4, 0.25),
     new THREE.MeshStandardMaterial({ color: 0xc68642, emissive: 0xc68642, emissiveIntensity: 0.3, roughness: 0.8 })
   );
-  package_.position.set(0.4, 0.85, 0.15);
+  package_.position.set(0, 1.0, 0.25);
+  package_.visible = false;
   repartidorPlaceholder.add(body, head, armL, armR, package_);
+  repartidorPlaceholder.userData.packageMesh = package_;
   repartidorPlaceholder.visible = false;
   room.add(repartidorPlaceholder);
 }
@@ -877,15 +988,61 @@ debugMarker.position.set(0.72, 1, -7.5);
 debugMarker.visible = false;
 room.add(debugMarker);
 
+function playRepartidorClip(clipName, options = {}) {
+  if (!repartidorModel || !repartidorModel.userData.mixer) return;
+  const ud = repartidorModel.userData;
+  const clip = clipName === 'walk' ? ud.walkClip
+             : clipName === 'deliver' ? ud.deliverClip
+             : clipName === 'idle' ? ud.idleClip
+             : null;
+  if (!clip) return;
+  const { loop = THREE.LoopRepeat, clamp = false } = options;
+  ud.mixer.stopAllAction();
+  const action = ud.mixer.clipAction(clip);
+  action.setLoop(loop);
+  action.clampWhenFinished = clamp;
+  action.reset();
+  action.fadeIn(0.2).play();
+}
+
+function playLadronClip(clipName, options = {}) {
+  if (!ladronModel || !ladronModel.userData.mixer) return;
+  const ud = ladronModel.userData;
+  const clip = clipName === 'attack' ? ud.attackClip
+             : clipName === 'idle' ? ud.idleClip
+             : null;
+  if (!clip) return;
+  const { loop = THREE.LoopRepeat, clamp = false } = options;
+  ud.mixer.stopAllAction();
+  const action = ud.mixer.clipAction(clip);
+  action.setLoop(loop);
+  action.clampWhenFinished = clamp;
+  action.reset();
+  action.fadeIn(0.2).play();
+}
+
+function setDeliveryPackageVisible(visible) {
+  if (repartidorModel && repartidorModel.userData && repartidorModel.userData.packageMesh) {
+    repartidorModel.userData.packageMesh.visible = visible;
+  }
+  if (repartidorPlaceholder && repartidorPlaceholder.userData && repartidorPlaceholder.userData.packageMesh) {
+    repartidorPlaceholder.userData.packageMesh.visible = visible;
+  }
+}
+
 function hideDay4Characters() {
   if (repartidorModel) repartidorModel.visible = false;
+  if (repartidorMixer) repartidorMixer.stopAllAction();
   if (repartidorPlaceholder.parent === room) repartidorPlaceholder.visible = false;
   if (ladronPlaceholder.parent === room) ladronPlaceholder.visible = false;
+  if (ladronModel) ladronModel.visible = false;
+  if (ladronMixer) ladronMixer.stopAllAction();
   if (ladronModel && ladronModel.userData.clone1) ladronModel.userData.clone1.visible = false;
   if (ladronModel && ladronModel.userData.clone2) ladronModel.userData.clone2.visible = false;
   repartidorPlaceholder.visible = false;
   ladronPlaceholder.visible = false;
   if (repartidorActiveMesh) repartidorActiveMesh.visible = false;
+  setDeliveryPackageVisible(false);
   debugMarker.visible = false;
   repartidorActiveMesh = null;
 }
@@ -2260,150 +2417,292 @@ const day5WakeUpSequence = [
 ];
 
 // --- DAY 4: SECUENCIA DE ENTREGA (COMPRA REAL) ---
+// Puntos de cámara predefinidos para una transición fluida entre planos
+const DEL_CAM_WIDE          = new THREE.Vector3(2.4, 1.45, -5.0);
+const DEL_CAM_MEDIUM        = new THREE.Vector3(1.8, 1.40, -5.4);
+const DEL_CAM_BEHIND_MARTA  = new THREE.Vector3(1.5, 1.45, -4.5);
+const DEL_CAM_DELIVERY      = new THREE.Vector3(2.0, 1.35, -5.8);
+const DEL_CAM_LEAVE         = new THREE.Vector3(2.4, 1.45, -5.0);
+
+const DEL_LOOK_DOOR   = new THREE.Vector3(0.72, 1.25, -6.3);
+const DEL_LOOK_CENTER = new THREE.Vector3(0.72, 1.25, -6.9);
+const DEL_LOOK_VISITOR = new THREE.Vector3(0.72, 1.25, -7.5);
+
+const MARTA_DOOR_POS     = new THREE.Vector3(0.72, 0, -5.3); // y se completa con baseY
+const REPART_IDLE_POS    = new THREE.Vector3(0.72, 0, -8.5);
+const REPART_DELIVER_END = new THREE.Vector3(0.72, 0, -7.3);
+const REPART_LEAVE_END   = new THREE.Vector3(0.72, 0, -10.0);
+
+function smoothCamStep(start, end, lookAt) {
+  return (progress) => {
+    const ease = progress * progress * (3 - 2 * progress);
+    camera.position.lerpVectors(start, end, ease);
+    if (lookAt) camera.lookAt(lookAt);
+  };
+}
+
+function smoothMoveZStep(mesh, startZ, endZ) {
+  return (progress) => {
+    if (!mesh) return;
+    const ease = progress * progress * (3 - 2 * progress);
+    mesh.position.z = THREE.MathUtils.lerp(startZ, endZ, ease);
+  };
+}
+
+function placeMartaAtDoor() {
+  const baseY = (martaLoadedModel && martaLoadedModel.userData && martaLoadedModel.userData.baseY) || 0;
+  if (martaLoadedModel) {
+    martaModel.visible = true;
+    martaLoadedModel.visible = true;
+    martaLoadedModel.position.set(MARTA_DOOR_POS.x, baseY, MARTA_DOOR_POS.z);
+    martaLoadedModel.rotation.set(0, Math.PI, 0);
+  } else if (typeof oldWomanMesh !== 'undefined' && oldWomanMesh) {
+    oldWomanMesh.visible = true;
+    oldWomanMesh.position.set(MARTA_DOOR_POS.x, 1.25, MARTA_DOOR_POS.z);
+    oldWomanMesh.rotation.set(0, Math.PI, 0);
+  }
+}
+
+function playMartaTalk() {
+  if (martaLoadedModel && martaMixer && martaLoadedModel.userData.talkClip) {
+    martaMixer.stopAllAction();
+    const action = martaMixer.clipAction(martaLoadedModel.userData.talkClip);
+    action.reset();
+    action.fadeIn(0.2).play();
+  }
+}
+
+function hideMartaInCinematic() {
+  if (martaModel) martaModel.visible = false;
+  if (typeof oldWomanMesh !== 'undefined' && oldWomanMesh) oldWomanMesh.visible = false;
+  if (martaMixer) martaMixer.stopAllAction();
+}
+
 const deliverySequence = [
+  // Paso 0: Plano amplio estático — ambos visibles, puerta cerrada
+  {
+    duration: 1.6,
+    autoAdvance: true,
+    onStart: () => {
+      placeMartaAtDoor();
+      if (repartidorModel && repartidorReady) {
+        repartidorModel.visible = true;
+        repartidorModel.position.set(REPART_IDLE_POS.x, REPART_IDLE_POS.y, REPART_IDLE_POS.z);
+        repartidorModel.rotation.set(0, 0, 0);
+        repartidorActiveMesh = repartidorModel;
+        playRepartidorClip('idle');
+      } else if (repartidorPlaceholder) {
+        repartidorPlaceholder.visible = true;
+        repartidorPlaceholder.position.set(REPART_IDLE_POS.x, REPART_IDLE_POS.y, REPART_IDLE_POS.z);
+        repartidorPlaceholder.rotation.set(0, 0, 0);
+        repartidorActiveMesh = repartidorPlaceholder;
+      } else {
+        repartidorActiveMesh = null;
+      }
+      camera.position.copy(DEL_CAM_WIDE);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: smoothCamStep(DEL_CAM_WIDE, DEL_CAM_WIDE, DEL_LOOK_DOOR)
+  },
+  // Paso 1: Se abre la puerta — cámara estática
+  {
+    duration: 1.4,
+    autoAdvance: true,
+    onStart: () => {
+      doorState.living.open = true;
+      camera.position.copy(DEL_CAM_WIDE);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: smoothCamStep(DEL_CAM_WIDE, DEL_CAM_WIDE, DEL_LOOK_DOOR)
+  },
+  // Paso 2: Marta: "¿Hola?" — cámara se mueve detrás de Marta para ver al repartidor
+  {
+    duration: 1.8,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: '¿Hola?' },
+    onStart: () => {
+      playMartaTalk();
+      camera.position.copy(DEL_CAM_MEDIUM);
+      camera.lookAt(DEL_LOOK_CENTER);
+    },
+    action: smoothCamStep(DEL_CAM_MEDIUM, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 3: Repartidor: "Tengo un paquete..." — cámara detrás de Marta, mirando al repartidor
   {
     duration: 2.5,
     autoAdvance: true,
-    dialogue: { speaker: 'Repartidor', text: '¡Buenas! Vengo de Marketplace con su pedido.' },
-    sound: { freq: 520, type: 'triangle', duration: 0.25 },
+    dialogue: { speaker: 'Repartidor', text: 'Tengo un paquete para Marta Gómez.' },
     onStart: () => {
-      console.log('deliverySequence start', {
-        repartidorModel: !!repartidorModel,
-        repartidorReady,
-        repartidorActiveMesh: !!repartidorActiveMesh
-      });
-
-      if (repartidorModel && repartidorReady) {
-        repartidorModel.visible = true;
-        repartidorModel.position.set(0.72, 0, -7.5);
-        repartidorModel.rotation.set(0, 0, 0);
-        repartidorActiveMesh = repartidorModel;
-        console.log('Usando modelo GLB del repartidor');
-      } else {
-        console.warn('Modelo de repartidor no disponible; no se muestra personaje');
-        repartidorActiveMesh = null;
-      }
-      camera.position.set(2.2, 1.45, -5.2);
-      camera.lookAt(0.72, 1.25, -6.5);
+      if (martaMixer) martaMixer.stopAllAction();
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
+    },
+    action: smoothCamStep(DEL_CAM_BEHIND_MARTA, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 4: Marta: "Soy yo." — cámara detrás de Marta
+  {
+    duration: 1.6,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: 'Soy yo.' },
+    onStart: () => {
+      playMartaTalk();
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
+    },
+    action: smoothCamStep(DEL_CAM_BEHIND_MARTA, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 5: Repartidor entrega el paquete — cámara pasa al plano lateral
+  {
+    duration: 5.0,
+    autoAdvance: true,
+    dialogue: { speaker: 'Repartidor', text: 'Se lo entrego.' },
+    onStart: () => {
+      if (martaMixer) martaMixer.stopAllAction();
+      playRepartidorClip('deliver', { loop: THREE.LoopOnce, clamp: true });
+      setDeliveryPackageVisible(true);
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
     },
     action: (progress) => {
-      const z = THREE.MathUtils.lerp(-7.5, -5.6, progress);
-      if (repartidorActiveMesh === repartidorModel) {
-        repartidorModel.position.z = z;
-      } else if (repartidorActiveMesh === repartidorPlaceholder) {
-        repartidorPlaceholder.position.z = z;
-      }
-      camera.position.x = THREE.MathUtils.lerp(2.2, 1.9, progress);
-      camera.lookAt(0.72, 1.25, -5.8);
+      smoothMoveZStep(repartidorActiveMesh, REPART_IDLE_POS.z, REPART_DELIVER_END.z)(progress);
+      smoothCamStep(DEL_CAM_BEHIND_MARTA, DEL_CAM_DELIVERY, DEL_LOOK_DOOR)(progress);
     }
   },
+  // Paso 6: Marta: "Gracias." — el repartidor se da vuelta y se va caminando
   {
-    duration: 2.0,
+    duration: 2.8,
     autoAdvance: true,
-    dialogue: { speaker: 'Marta', text: '¡Ay, gracias hijo! Pasó rápido.' },
-    onStart: () => {},
-    action: (progress) => {
-      camera.position.x = THREE.MathUtils.lerp(1.9, 1.85, progress);
-      camera.lookAt(0.72, 1.25, -5.8);
-    }
-  },
-  {
-    duration: 2.0,
-    autoAdvance: true,
-    dialogue: { speaker: 'Repartidor', text: 'Que tenga un buen día. ¡Saludos!' },
-    onStart: () => {},
-    action: (progress) => {
-      const z = THREE.MathUtils.lerp(-5.6, -8.5, progress);
+    dialogue: { speaker: 'Marta', text: 'Gracias.' },
+    onStart: () => {
+      playMartaTalk();
       if (repartidorActiveMesh === repartidorModel) {
-        repartidorModel.position.z = z;
+        repartidorModel.rotation.y = Math.PI;
       } else if (repartidorActiveMesh === repartidorPlaceholder) {
-        repartidorPlaceholder.position.z = z;
+        repartidorPlaceholder.rotation.y = Math.PI;
       }
-      camera.position.x = THREE.MathUtils.lerp(1.85, 1.75, progress);
-      camera.lookAt(0.72, 1.25, -6.0);
+      playRepartidorClip('walk');
+      setDeliveryPackageVisible(false);
+      camera.position.copy(DEL_CAM_DELIVERY);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: (progress) => {
+      smoothMoveZStep(repartidorActiveMesh, REPART_DELIVER_END.z, REPART_LEAVE_END.z)(progress);
+      smoothCamStep(DEL_CAM_DELIVERY, DEL_CAM_LEAVE, DEL_LOOK_DOOR)(progress);
     }
   }
 ];
 
 // --- DAY 4: SECUENCIA DE ASALTO (COMPRA ESTAFA) ---
-const assaultSequence = [
-  {
-    duration: 1.8,
-    autoAdvance: true,
-    dialogue: { speaker: 'Ladrón', text: '¡Hola, buenas! ¿Marta?' },
-    sound: { freq: 200, type: 'sawtooth', duration: 0.4 },
-    onStart: () => {
-      console.log('assaultSequence start', {
-        ladronModel: !!ladronModel,
-        ladronReady
-      });
+const LADRON_IDLE_POS    = new THREE.Vector3(0.72, 0, -8.0);
+const LADRON_ATTACK_END  = new THREE.Vector3(0.72, 0, -5.5);
+const ASSAULT_CAM_WIDE   = DEL_CAM_WIDE;
+const ASSAULT_CAM_MEDIUM = DEL_CAM_MEDIUM;
+const ASSAULT_CAM_ATTACK = new THREE.Vector3(1.5, 1.30, -5.5);
 
+const assaultSequence = [
+  // Paso 0: Ladrón idle afuera, Marta adentro, puerta cerrada
+  {
+    duration: 1.4,
+    autoAdvance: true,
+    onStart: () => {
+      placeMartaAtDoor();
       if (ladronModel && ladronReady) {
         ladronModel.visible = true;
         const offset = ladronModel.userData.baseOffset || 0;
-        ladronModel.position.set(0.72, offset, -7.5);
+        ladronModel.position.set(LADRON_IDLE_POS.x, offset, LADRON_IDLE_POS.z);
         ladronModel.rotation.set(0, 0, 0);
         repartidorActiveMesh = ladronModel;
-        console.log('Usando modelo GLB del ladrón');
-      } else {
+        playLadronClip('idle');
+      } else if (ladronPlaceholder) {
         ladronPlaceholder.visible = true;
-        ladronPlaceholder.position.set(0.72, 0, -7.5);
+        ladronPlaceholder.position.set(LADRON_IDLE_POS.x, LADRON_IDLE_POS.y, LADRON_IDLE_POS.z);
         ladronPlaceholder.rotation.set(0, 0, 0);
         repartidorActiveMesh = ladronPlaceholder;
-        console.log('Usando placeholder del ladrón');
+      } else {
+        repartidorActiveMesh = null;
       }
-      camera.position.set(2.2, 1.45, -5.2);
-      camera.lookAt(0.72, 1.25, -6.5);
+      camera.position.copy(ASSAULT_CAM_WIDE);
+      camera.lookAt(DEL_LOOK_DOOR);
     },
-    action: (progress) => {
-      const z = THREE.MathUtils.lerp(-7.5, -6.5, progress);
-      if (repartidorActiveMesh === ladronModel) {
-        const offset = ladronModel.userData.baseOffset || 0;
-        ladronModel.position.set(0.72, offset, z);
-      } else if (repartidorActiveMesh === ladronPlaceholder) {
-        ladronPlaceholder.position.z = z;
-      }
-      camera.position.x = THREE.MathUtils.lerp(2.2, 1.9, progress);
-      camera.lookAt(0.72, 1.25, -6.0);
-    }
+    action: smoothCamStep(ASSAULT_CAM_WIDE, ASSAULT_CAM_WIDE, DEL_LOOK_DOOR)
   },
+  // Paso 1: Marta abre la puerta
+  {
+    duration: 1.4,
+    autoAdvance: true,
+    onStart: () => {
+      doorState.living.open = true;
+      camera.position.copy(ASSAULT_CAM_WIDE);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: smoothCamStep(ASSAULT_CAM_WIDE, ASSAULT_CAM_MEDIUM, DEL_LOOK_CENTER)
+  },
+  // Paso 2: Marta: "Hola" — cámara se mueve detrás de Marta
+  {
+    duration: 1.8,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: 'Hola' },
+    onStart: () => {
+      playMartaTalk();
+      camera.position.copy(ASSAULT_CAM_MEDIUM);
+      camera.lookAt(DEL_LOOK_CENTER);
+    },
+    action: smoothCamStep(ASSAULT_CAM_MEDIUM, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 3: Ladrón: "¿Es usted, Marta Gómez?" — cámara detrás de Marta
+  {
+    duration: 2.5,
+    autoAdvance: true,
+    dialogue: { speaker: '???', text: '¿Es usted, Marta Gómez?' },
+    sound: { freq: 200, type: 'sawtooth', duration: 0.4 },
+    onStart: () => {
+      if (martaMixer) martaMixer.stopAllAction();
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
+    },
+    action: smoothCamStep(DEL_CAM_BEHIND_MARTA, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 4: Marta: "Sí" — cámara detrás de Marta
+  {
+    duration: 1.4,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: 'Sí' },
+    onStart: () => {
+      playMartaTalk();
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
+    },
+    action: smoothCamStep(DEL_CAM_BEHIND_MARTA, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 5: El ladrón ataca — cámara pasa al plano de ataque con shake
   {
     duration: 1.5,
-    autoAdvance: true,
-    dialogue: { speaker: 'Marta', text: '¿Sí? ¿Quién es?' },
-    action: (progress) => {
-      camera.position.x = THREE.MathUtils.lerp(1.9, 1.7, progress);
-      camera.position.z = THREE.MathUtils.lerp(-5.2, -5.5, progress);
-      camera.lookAt(0.72, 1.25, -6.0);
-    }
-  },
-  {
-    duration: 2.0,
     autoAdvance: true,
     dialogue: { speaker: 'Ladrón', text: '¡ENTREGATE!' },
     sound: { freq: 100, type: 'sawtooth', duration: 0.6 },
     onStart: () => {
-      if (ladronModel) {
-        ladronModel.visible = true;
-        const offset = ladronModel.userData.baseOffset || 0;
-        ladronModel.position.set(0.72, offset, -5.8);
-        ladronModel.rotation.set(0, 0, 0);
-      } else {
-        ladronPlaceholder.visible = true;
-        ladronPlaceholder.position.set(0.72, 0, -5.8);
-        ladronPlaceholder.rotation.set(0, 0, 0);
-      }
+      if (martaMixer) martaMixer.stopAllAction();
+      playLadronClip('attack', { loop: THREE.LoopOnce, clamp: true });
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
     },
     action: (progress) => {
-      const shake = (Math.sin(progress * Math.PI * 20)) * 0.15;
-      camera.position.set(1.5 + shake, 1.2 - progress * 0.4, -5.5);
-      camera.lookAt(0.72, 1.1, -5.6);
+      smoothMoveZStep(repartidorActiveMesh, LADRON_IDLE_POS.z, LADRON_ATTACK_END.z)(progress);
+      const shake = Math.sin(progress * Math.PI * 22) * 0.18;
+      const from = DEL_CAM_BEHIND_MARTA;
+      const to = ASSAULT_CAM_ATTACK;
+      const x = THREE.MathUtils.lerp(from.x, to.x, progress) + shake;
+      const y = THREE.MathUtils.lerp(from.y, to.y, progress) - progress * 0.15;
+      const z = THREE.MathUtils.lerp(from.z, to.z, progress);
+      camera.position.set(x, y, z);
+      camera.lookAt(DEL_LOOK_DOOR);
     }
   }
 ];
 
 function startDay4Delivery() {
   hideDay4Characters();
+  doorState.living.open = false;
   if (ui.damageOverlay) {
     ui.damageOverlay.classList.remove('is-active');
     void ui.damageOverlay.offsetWidth;
@@ -2413,6 +2712,8 @@ function startDay4Delivery() {
     startCinematic(assaultSequence, () => {
       day4State.deliveryResolved = true;
       day4State.awaitingDelivery = false;
+      hideDay4Characters();
+      hideMartaInCinematic();
       if (ui.postAssaultScamModal) {
         ui.postAssaultScamModal.setAttribute('aria-hidden', 'false');
       }
@@ -2422,6 +2723,7 @@ function startDay4Delivery() {
       day4State.deliveryResolved = true;
       day4State.awaitingDelivery = false;
       hideDay4Characters();
+      hideMartaInCinematic();
       if (missionsState.currentMissionId === 'attendDelivery' && !missionsState.completed) {
         completeMission('attendDelivery');
       }
@@ -2543,6 +2845,143 @@ function showCasinoBankruptModal() {
   if (ui.casinoBankruptModal) {
     ui.casinoBankruptModal.setAttribute('aria-hidden', 'false');
   }
+}
+
+// --- DEBUG CONSOLE (tecla L) ---
+let debugConsoleOpen = false;
+
+function logToConsole(msg, type = 'info') {
+  const log = document.getElementById('debugConsoleLog');
+  if (!log) return;
+  const line = document.createElement('div');
+  line.className = `log-${type}`;
+  line.textContent = `> ${msg}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearConsoleLog() {
+  const log = document.getElementById('debugConsoleLog');
+  if (log) log.innerHTML = '';
+}
+
+function toggleDebugConsole(force) {
+  const el = document.getElementById('debugConsole');
+  if (!el) return;
+  const next = typeof force === 'boolean' ? force : !debugConsoleOpen;
+  debugConsoleOpen = next;
+  if (debugConsoleOpen) {
+    if (document.pointerLockElement === canvas) {
+      document.exitPointerLock();
+    }
+    el.classList.add('is-open');
+    el.setAttribute('aria-hidden', 'false');
+    const input = document.getElementById('debugConsoleInput');
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+    logToConsole('Consola de debug abierta. Escribí "help" para ver comandos.', 'system');
+  } else {
+    el.classList.remove('is-open');
+    el.setAttribute('aria-hidden', 'true');
+    canvas.focus();
+  }
+}
+
+function startDay1() {
+  camera.position.set(-0.7, 1.48, -2.3);
+  lookEuler.set(0, -Math.PI / 2, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  setTimeOfDay('dia', 0.0);
+  doorState.living.open = false;
+  hideDay4Characters();
+
+  setMission('doorbell', 'Atiende la puerta', 'Alguien toca el timbre. Ve a abrir la puerta de entrada.');
+}
+
+function jumpToDay(day) {
+  cinematicState.active = false;
+  cinematicState.onEnd = null;
+  cinematicState.timer = 0;
+  cinematicState.currentStep = 0;
+  cinematicState.waitingForSpace = false;
+  cinematicState.sequence = null;
+  dayTransitionState.active = false;
+  dayTransitionState.progress = 0;
+  dayTransitionState.phase = 'fade-in';
+  document.body.classList.remove('cinematic-active');
+  if (ui.cinematicOverlay) ui.cinematicOverlay.setAttribute('aria-hidden', 'true');
+  if (ui.cinematicPrompt) ui.cinematicPrompt.classList.remove('is-visible');
+
+  if (phoneState.active) {
+    togglePhone();
+  }
+
+  if (ui.marketpl4ceHackModal) ui.marketpl4ceHackModal.setAttribute('aria-hidden', 'true');
+  if (ui.postAssaultScamModal) ui.postAssaultScamModal.setAttribute('aria-hidden', 'true');
+  if (ui.daysBlockedModal) ui.daysBlockedModal.setAttribute('aria-hidden', 'true');
+  if (ui.damageOverlay) ui.damageOverlay.classList.remove('is-active');
+  if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
+  if (ui.casinoBankruptModal) ui.casinoBankruptModal.setAttribute('aria-hidden', 'true');
+
+  hideDay4Characters();
+
+  gameState.currentDay = day;
+  if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + day;
+
+  try {
+    if (day === 1) {
+      startDay1();
+    } else if (day === 2) {
+      startDay2();
+    } else if (day === 3) {
+      startDay3();
+    } else if (day === 4) {
+      startDay4();
+    } else if (day === 5) {
+      startDay5();
+    }
+    logToConsole(`Cambiado al día ${day} (estado conservado)`, 'system');
+  } catch (e) {
+    logToConsole(`Error al cambiar de día: ${e.message}`, 'error');
+  }
+}
+
+function processConsoleCommand(raw) {
+  const text = raw.trim();
+  if (!text) return;
+  logToConsole(text);
+  const parts = text.split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+  const arg = parts[1];
+
+  if (cmd === 'day') {
+    const n = parseInt(arg, 10);
+    if (isNaN(n) || n < 1 || n > 5) {
+      logToConsole('Uso: day <1-5>', 'error');
+      return;
+    }
+    jumpToDay(n);
+    return;
+  }
+  if (cmd === 'help' || cmd === '?') {
+    logToConsole('Comandos disponibles:', 'system');
+    logToConsole('  day <1-5>  Cambia al día indicado (conserva estado)');
+    logToConsole('  clear      Limpia el log');
+    logToConsole('  help       Muestra esta ayuda');
+    return;
+  }
+  if (cmd === 'clear' || cmd === 'cls') {
+    clearConsoleLog();
+    return;
+  }
+  if (cmd === 'close' || cmd === 'exit') {
+    toggleDebugConsole(false);
+    return;
+  }
+  logToConsole(`Comando no reconocido: ${cmd}`, 'error');
 }
 
 function restartCurrentDay() {
@@ -4073,6 +4512,12 @@ function animate() {
   if (sonMixer) {
     sonMixer.update(dt);
   }
+  if (repartidorMixer) {
+    repartidorMixer.update(dt);
+  }
+  if (ladronMixer) {
+    ladronMixer.update(dt);
+  }
 
   // Sincronizar visibilidad y animar a Marta en 3D importada
   if (martaLoadedModel) {
@@ -4128,7 +4573,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const dayParam = urlParams.get('day');
 const INITIAL_DAY = dayParam ? parseInt(dayParam, 10) : 1;
 
-function jumpToDay(day) {
+function startGameAtDay(day) {
   // Deshabilitar el botón y quitarle el foco
   if (ui.startBtn) {
     ui.startBtn.disabled = true;
@@ -4205,7 +4650,7 @@ if (ui.startBtn) {
     } catch (err) {}
 
     if (INITIAL_DAY > 1) {
-      jumpToDay(INITIAL_DAY);
+      startGameAtDay(INITIAL_DAY);
     } else {
       startIntro();
     }
