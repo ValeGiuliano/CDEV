@@ -2688,13 +2688,10 @@ function startIntro() {
 }
 
 function handleMoveKey(event, active) {
-  if (isUberMazeRunning() || isUberMapPinActive()) {
+  if (phoneState.active && (isUberMazeRunning() || isUberMapPinActive())) {
     if (active && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
       if (event.repeat) return;
       event.preventDefault();
-      resetUberMaze();
-      resetUberMapPin();
-      switchPhoneView('phoneHomeView');
       togglePhone();
       return;
     }
@@ -2721,10 +2718,6 @@ function handleMoveKey(event, active) {
   if (active && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
     if (event.repeat) return;
     event.preventDefault();
-    if (phoneState.active && document.querySelector('.phone-view.is-active')?.id === 'phoneUberView') {
-      resetUberMaze();
-      switchPhoneView('phoneHomeView');
-    }
     togglePhone();
     return;
   }
