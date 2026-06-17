@@ -62,6 +62,12 @@ function registerEventListeners() {
         if (app === 'browser' && typeof callbacks.onOpenBrowserApp === 'function') {
           callbacks.onOpenBrowserApp();
         }
+        if (app === 'marketplace' && typeof callbacks.onOpenMarketplaceApp === 'function') {
+          callbacks.onOpenMarketplaceApp();
+        }
+        if (app === 'marketpl4ce' && typeof callbacks.onOpenMarketpl4ceApp === 'function') {
+          callbacks.onOpenMarketpl4ceApp();
+        }
       });
     });
   }
@@ -324,6 +330,10 @@ export function updatePhoneHomeApps() {
   if (fakeBtn) fakeBtn.style.display = installedApps.mercad0libre ? '' : 'none';
   const browserBtn = document.getElementById('browserAppBtn');
   if (browserBtn) browserBtn.style.display = installedApps.browser ? '' : 'none';
+  const marketplaceBtn = document.getElementById('marketplaceAppBtn');
+  if (marketplaceBtn) marketplaceBtn.style.display = installedApps.marketplace ? '' : 'none';
+  const marketpl4ceBtn = document.getElementById('marketpl4ceAppBtn');
+  if (marketpl4ceBtn) marketpl4ceBtn.style.display = installedApps.marketpl4ce ? '' : 'none';
 }
 
 export function getLastPreview(contact) {

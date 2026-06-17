@@ -69,9 +69,18 @@ export const installedApps = {
   mercadolibre: false,
   mercad0libre: false,
   browser: false,
+  marketplace: false,
+  marketpl4ce: false,
 };
 
 export const day3Scammed = { value: false };
+
+export const day4State = {
+  purchasedProduct: null,
+  wasHacked: false,
+};
+
+export const day4InitialMoney = { value: 100000 };
 
 export const playstoreApps = [
   { id: 'mercad0libre', name: 'Mercad0Libre', dev: 'Mercado Libre', color: '#FFF600', label: 'M0' },
@@ -80,6 +89,8 @@ export const playstoreApps = [
   { id: 'spotify', name: 'Spotify', dev: 'Spotify AB', color: '#1DB954', label: 'Sp' },
   { id: 'netflix', name: 'Netflix', dev: 'Netflix, Inc.', color: '#E50914', label: 'N' },
   { id: 'mercadolibre', name: 'MercadoLibre', dev: 'Mercado Libre', color: '#FFF600', label: 'ML' },
+  { id: 'marketplace', name: 'Marketplace', dev: 'Meta Platforms', color: '#1877F2', label: 'Mk' },
+  { id: 'marketpl4ce', name: 'Marketpl4ce', dev: 'Marktplaace Inc.', color: '#7c3aed', label: 'M4' },
 ];
 
 export const fraudDrainState = {

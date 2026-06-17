@@ -26,6 +26,8 @@ import {
   visualFatigueDisabled,
   doorState,
   day3Scammed,
+  day4State,
+  day4InitialMoney,
 } from './state/index.js';
 
 void dayRestarted;
@@ -44,7 +46,7 @@ import {
   INSTALL_DELAY_MS,
 } from './config/constants.js';
 
-import { mlProducts } from './data/products.js';
+import { mlProducts, marketplaceProducts } from './data/products.js';
 const fakeMLProducts = mlProducts;
 import { camiloDialogues, claraDialogues } from './data/chats/index.js';
 import { playDoorbellSound, playNotificationSound, playAlertSound, playCinematicSound } from './audio/sounds.js';
@@ -53,8 +55,8 @@ import { phoneScreenCorners } from './core/phone3d.js';
 import { initPlayer, updateFirstPerson, updateLook, setLookFromEuler, clampPlayerToBounds, isDoorKey, getMoveDirection } from './gameplay/player.js';
 import { initDoors, handleDoorKey, updateDoors } from './gameplay/doors.js';
 import { initBed, handleSleepKey, updateBedPrompt, showCamiloBedMessage } from './gameplay/bed.js';
-import { initDayCycle, updateDayTransition, getDayTransitionOpacity, hideDaysBlockedModal, startDay2, sleepToNextDay as sleepToNextDayFn } from './gameplay/dayCycle.js';
-import { initMissions, setMission, completeMission, updateMissions, addTutorialMessage, showMartaReplyTutorial, startClaraBirthdayMission, startClaraBirthdayFlow, triggerClaraGiftDialogue, startDownloadMercadoLibreMission } from './gameplay/missions.js';
+import { initDayCycle, updateDayTransition, getDayTransitionOpacity, hideDaysBlockedModal, startDay2, startDay4, sleepToNextDay as sleepToNextDayFn } from './gameplay/dayCycle.js';
+import { initMissions, setMission, completeMission, updateMissions, addTutorialMessage, showMartaReplyTutorial, startClaraBirthdayMission, startClaraBirthdayFlow, triggerClaraGiftDialogue, startDownloadMercadoLibreMission, startDay4BuyMission, startDownloadMarketplaceMission, startBuyMarketplaceMission } from './gameplay/missions.js';
 import {
   initPhone,
   updatePhonePrompt,
@@ -1935,6 +1937,53 @@ const day3WakeUpSequence = [
   }
 ];
 
+// --- DAY 4 WAKE-UP SEQUENCE ---
+const day4WakeUpSequence = [
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Al día siguiente…' },
+    onStart: () => {
+      camera.position.set(4.2, 0.72, 3.45);
+      camera.lookAt(4.2, 2.5, 3.45);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.transition = 'none';
+        ui.dayTransitionOverlay.style.opacity = '1';
+        ui.dayTransitionOverlay.setAttribute('aria-hidden', 'false');
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(1 - ease * 0.7);
+      }
+      camera.position.y = THREE.MathUtils.lerp(0.72, 0.78, ease);
+    }
+  },
+  {
+    duration: 3.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Hoy tengo que conseguirle la muñeca a Clara. ¡Manos a la obra!' },
+    sound: { freq: 320, type: 'sine', duration: 0.4 },
+    onStart: () => {
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = '0.3';
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(0.3 * (1 - ease));
+      }
+      const startTarget = new THREE.Vector3(4.2, 2.5, 3.45);
+      const endTarget = new THREE.Vector3(4.2, 1.4, 0);
+      const currentTarget = new THREE.Vector3().lerpVectors(startTarget, endTarget, ease);
+      camera.lookAt(currentTarget);
+      camera.position.y = THREE.MathUtils.lerp(0.78, 0.82, ease);
+    }
+  }
+];
+
 function restartCurrentDay() {
   // Close game over modal
   if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'true');
@@ -2168,6 +2217,7 @@ initDayCycle({
   startCinematic,
   day2WakeUpSequence,
   day3WakeUpSequence,
+  day4WakeUpSequence,
   setDayRestarted,
   playNotificationSound,
   startClaraBirthdayMission,
@@ -2209,6 +2259,12 @@ initPhone({
     },
     onOpenMercad0LibreApp: () => {
       openFakeMLProducts();
+    },
+    onOpenMarketplaceApp: () => {
+      openMarketplaceProducts();
+    },
+    onOpenMarketpl4ceApp: () => {
+      triggerMarketpl4ceHack();
     },
     onOpenBrowserApp: () => {
       resetBrowserApp();
@@ -2390,6 +2446,19 @@ function installApp(appId, btn) {
     const app = playstoreApps.find((a) => a.id === appId);
     if (app) showToast(app.name + ' instalado');
     updatePhoneHomeApps();
+
+    if (appId === 'marketpl4ce') {
+      setTimeout(triggerMarketpl4ceHack, 500);
+      setTimeout(() => renderPlayStore(document.getElementById('playstoreSearchInput')?.value || ''), 500);
+      return;
+    }
+
+    if (appId === 'marketplace') {
+      if (missionsState.currentMissionId === 'downloadMarketplace' && !missionsState.completed) {
+        completeMission('downloadMarketplace');
+        setTimeout(() => startBuyMarketplaceMission(), 1500);
+      }
+    }
 
     if (appId === 'mercadolibre' || appId === 'mercad0libre') {
       if (missionsState.currentMissionId === 'downloadMercadoLibre' && !missionsState.completed) {
@@ -2594,7 +2663,15 @@ function renderMLProducts() {
     card.addEventListener('click', (e) => {
       e.stopPropagation();
       if (product.id === 'barbie') {
-        openMLCheckout();
+        if (gameState.currentDay >= 4) {
+          showToast('Sin stock disponible');
+          if (missionsState.currentMissionId === 'buyGiftDay4' && !missionsState.completed) {
+            completeMission('buyGiftDay4');
+            setTimeout(() => startDownloadMarketplaceMission(), 1500);
+          }
+        } else {
+          openMLCheckout();
+        }
       } else {
         showToast('Esta funcionalidad no está disponible');
       }
@@ -2684,6 +2761,253 @@ function completeMLPurchaseAndMission() {
     setMission('goToSleep', 'Ir a dormir', 'Ya es tarde y tuviste un día largo. Ve a la cama a descansar.');
     setTimeOfDay('noche', 5.0);
   }, 1500);
+}
+
+// --- DAY 4: MARKETPLACE ---
+let selectedMarketplaceProduct = null;
+
+function renderMarketplaceProducts() {
+  const list = ui.marketplaceProducts;
+  if (!list) return;
+  list.innerHTML = '';
+
+  marketplaceProducts.forEach((product) => {
+    const card = document.createElement('div');
+    card.className = 'marketplace-product-card';
+    card.innerHTML = `
+      <div class="marketplace-product-img" style="background:${product.gradient};"></div>
+      <div class="marketplace-product-info">
+        <span class="marketplace-product-price">$${product.price.toLocaleString('es-AR')}</span>
+        <span class="marketplace-product-title">${product.title}</span>
+        <span class="marketplace-product-quality quality-${product.quality.toLowerCase()}">${product.quality}</span>
+      </div>
+    `;
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openMarketplaceProductDetail(product);
+    });
+    list.appendChild(card);
+  });
+}
+
+function openMarketplaceProducts() {
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+  renderMarketplaceProducts();
+  switchPhoneView('phoneMarketplaceView');
+}
+
+function openMarketplaceProductDetail(product) {
+  selectedMarketplaceProduct = product;
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+
+  if (ui.marketplaceDetailContent) {
+    ui.marketplaceDetailContent.innerHTML = `
+      <div class="marketplace-detail-image" style="background:${product.gradient};"></div>
+      <div class="marketplace-detail-info">
+        <div class="marketplace-detail-title">${product.title}</div>
+        <div class="marketplace-detail-price">$${product.price.toLocaleString('es-AR')}</div>
+        <span class="marketplace-detail-quality quality-${product.quality.toLowerCase()}">${product.quality}</span>
+      </div>
+      <div class="marketplace-detail-section">
+        <span class="marketplace-detail-section-label">Descripción</span>
+        <p class="marketplace-detail-description">${product.description}</p>
+      </div>
+      <div class="marketplace-detail-section">
+        <span class="marketplace-detail-section-label">Vendedor</span>
+        <div class="marketplace-detail-seller">${product.seller}</div>
+        <div class="marketplace-detail-meta">${product.rating}</div>
+        <div class="marketplace-detail-meta">${product.accountAge}</div>
+      </div>
+      <button class="marketplace-detail-buy-btn" id="marketplaceDetailBuyBtn">Comprar</button>
+    `;
+
+    const buyBtn = document.getElementById('marketplaceDetailBuyBtn');
+    if (buyBtn) {
+      buyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openMarketplaceCheckout(product);
+      });
+    }
+  }
+
+  switchPhoneView('phoneMarketplaceProductDetailView');
+}
+
+function openMarketplaceCheckout(product) {
+  selectedMarketplaceProduct = product;
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+
+  if (ui.marketplaceCheckoutProduct) {
+    ui.marketplaceCheckoutProduct.innerHTML = `
+      <div class="marketplace-product-img" style="background:${product.gradient}; width:64px; height:64px; flex-shrink:0;"></div>
+      <div>
+        <div style="font-weight:700;color:#fff;font-size:0.95rem;">${product.title}</div>
+        <div style="color:#ffd700;font-weight:800;font-size:1.1rem;margin-top:4px;">$${product.price.toLocaleString('es-AR')}</div>
+        <div style="color:#9ca3af;font-size:0.75rem;margin-top:2px;">${product.quality} · ${product.seller}</div>
+      </div>
+    `;
+  }
+
+  if (ui.marketplaceCardNumber) ui.marketplaceCardNumber.value = '';
+  if (ui.marketplaceCardName) ui.marketplaceCardName.value = '';
+  if (ui.marketplaceCardExp) ui.marketplaceCardExp.value = '';
+  if (ui.marketplaceCardCvv) ui.marketplaceCardCvv.value = '';
+  if (ui.marketplaceLoadCardBtn) {
+    ui.marketplaceLoadCardBtn.disabled = false;
+    ui.marketplaceLoadCardBtn.style.opacity = '1';
+    ui.marketplaceLoadCardBtn.textContent = 'Cargar datos de tarjeta';
+  }
+  if (ui.marketplaceConfirmBtn) {
+    ui.marketplaceConfirmBtn.disabled = true;
+    ui.marketplaceConfirmBtn.style.opacity = '0.5';
+    ui.marketplaceConfirmBtn.textContent = 'Confirmar compra';
+  }
+
+  switchPhoneView('phoneMarketplaceCheckoutView');
+}
+
+function loadMarketplaceCardData() {
+  if (ui.marketplaceCardNumber) ui.marketplaceCardNumber.value = '4509 9535 6623 4188';
+  if (ui.marketplaceCardName) ui.marketplaceCardName.value = 'MARTA GOMEZ';
+  if (ui.marketplaceCardExp) ui.marketplaceCardExp.value = '08/29';
+  if (ui.marketplaceCardCvv) ui.marketplaceCardCvv.value = '324';
+  if (ui.marketplaceLoadCardBtn) {
+    ui.marketplaceLoadCardBtn.disabled = true;
+    ui.marketplaceLoadCardBtn.style.opacity = '0.5';
+    ui.marketplaceLoadCardBtn.textContent = 'Datos cargados';
+  }
+  if (ui.marketplaceConfirmBtn) {
+    ui.marketplaceConfirmBtn.disabled = false;
+    ui.marketplaceConfirmBtn.style.opacity = '1';
+  }
+}
+
+function confirmMarketplacePurchase() {
+  if (!selectedMarketplaceProduct || !ui.marketplaceConfirmBtn || ui.marketplaceConfirmBtn.disabled) return;
+
+  if (statsState.money < selectedMarketplaceProduct.price) {
+    showToast('No tenés saldo suficiente');
+    return;
+  }
+
+  ui.marketplaceConfirmBtn.disabled = true;
+  ui.marketplaceConfirmBtn.style.opacity = '0.5';
+  ui.marketplaceConfirmBtn.textContent = 'Procesando...';
+
+  setTimeout(() => {
+    if (selectedMarketplaceProduct.isScam) {
+      statsState.money = Math.max(0, statsState.money - selectedMarketplaceProduct.price);
+      statsState.calm = Math.max(0, statsState.calm - 20);
+      statsState.happiness = Math.max(0, statsState.happiness - 10);
+      updateStats(0);
+      showMarketplaceScamModal(selectedMarketplaceProduct);
+    } else {
+      statsState.money = Math.max(0, statsState.money - selectedMarketplaceProduct.price);
+      day4State.purchasedProduct = { ...selectedMarketplaceProduct };
+      updateStats(0);
+      showMarketplaceSuccessModal(selectedMarketplaceProduct);
+      if (missionsState.currentMissionId === 'buyInMarketplace' && !missionsState.completed) {
+        completeMission('buyInMarketplace');
+      }
+    }
+  }, 2000);
+}
+
+function showMarketplaceScamModal(product) {
+  if (!ui.marketplaceScamModal) return;
+  if (ui.marketplaceScamText) {
+    ui.marketplaceScamText.textContent = `Pagaste $${product.price.toLocaleString('es-AR')} al vendedor "${product.seller}", pero nunca envió el producto.`;
+  }
+  if (ui.marketplaceScamImpact) {
+    ui.marketplaceScamImpact.innerHTML = `
+      <span class="impact-badge neg">Dinero -$${product.price.toLocaleString('es-AR')}</span>
+      <span class="impact-badge neg">Calma -20%</span>
+      <span class="impact-badge neg">Felicidad -10%</span>
+    `;
+  }
+  ui.marketplaceScamModal.setAttribute('aria-hidden', 'false');
+  selectedMarketplaceProduct = null;
+}
+
+function showMarketplaceSuccessModal(product) {
+  if (!ui.marketplaceSuccessModal) return;
+  if (ui.marketplaceSuccessText) {
+    ui.marketplaceSuccessText.textContent = `Compraste la muñeca de calidad ${product.quality} por $${product.price.toLocaleString('es-AR')}.`;
+  }
+  ui.marketplaceSuccessModal.setAttribute('aria-hidden', 'false');
+  selectedMarketplaceProduct = null;
+}
+
+function triggerMarketpl4ceHack() {
+  day4State.wasHacked = true;
+  statsState.calm = Math.max(0, statsState.calm - 30);
+  statsState.happiness = Math.max(0, statsState.happiness - 20);
+  updateStats(0);
+  if (ui.marketpl4ceHackModal) {
+    ui.marketpl4ceHackModal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function restartDay4() {
+  if (ui.marketpl4ceHackModal) ui.marketpl4ceHackModal.setAttribute('aria-hidden', 'true');
+  if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
+
+  cinematicState.active = false;
+  cinematicState.onEnd = null;
+  dayTransitionState.active = false;
+
+  statsState.fatigue = 0;
+  statsState.money = day4InitialMoney.value;
+  statsState.happiness = 80;
+  statsState.calm = 75;
+  updateStats(0);
+
+  missionsState.currentMissionId = null;
+  missionsState.active = false;
+  missionsState.completed = false;
+  if (ui.missionsContainer) ui.missionsContainer.setAttribute('aria-hidden', 'true');
+
+  day4State.purchasedProduct = null;
+  day4State.wasHacked = false;
+
+  installedApps.marketplace = false;
+  installedApps.marketpl4ce = false;
+  installedApps.mercadolibre = false;
+  installedApps.playstore = false;
+  updatePhoneHomeApps();
+
+  phoneState.active = false;
+  phoneState.progress = 0;
+  phoneState.wakeTimer = 0;
+  phoneState.sleepTimer = 0;
+  switchPhoneView('phoneHomeView');
+  if (ui.phoneUI) {
+    ui.phoneUI.classList.remove('is-visible');
+    ui.phoneUI.setAttribute('aria-hidden', 'true');
+  }
+  if (ui.phonePrompt) {
+    ui.phonePrompt.textContent = 'T Coger teléfono';
+    ui.phonePrompt.classList.remove('is-active');
+  }
+
+  setTimeOfDay('dia', 0.0);
+  camera.position.set(4.2, 0.72, 3.45);
+  lookEuler.set(0, 0, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  if (typeof sleepToNextDayFn === 'function') {
+    setTimeout(() => {
+      gameState.currentDay = 4;
+      if (ui.dayCounter) ui.dayCounter.textContent = 'Día 4';
+      startDay4();
+    }, 400);
+  }
 }
 
 function startFraudDrain() {
@@ -3119,12 +3443,51 @@ if (ui.btnContinuePhishing) {
   ui.btnContinuePhishing.addEventListener('click', (e) => {
     e.stopPropagation();
     if (ui.phishingModal) ui.phishingModal.setAttribute('aria-hidden', 'true');
-    
+
     day3Scammed.value = true;
     setMission('fixBankCard', 'Buscar sitio oficial', 'Vuelve a buscar "Banco Nación" en Google, pero esta vez ingresa únicamente al sitio web oficial (www.bna.com.ar).');
-    
+
     resetBrowserApp();
     switchPhoneView('phoneBrowserView');
+  });
+}
+
+// --- DAY 4 EVENT LISTENERS ---
+if (ui.marketplaceLoadCardBtn) {
+  ui.marketplaceLoadCardBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    loadMarketplaceCardData();
+  });
+}
+
+if (ui.marketplaceConfirmBtn) {
+  ui.marketplaceConfirmBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    confirmMarketplacePurchase();
+  });
+}
+
+if (ui.btnMarketplaceScamContinue) {
+  ui.btnMarketplaceScamContinue.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.marketplaceScamModal) ui.marketplaceScamModal.setAttribute('aria-hidden', 'true');
+    openMarketplaceProducts();
+  });
+}
+
+if (ui.btnMarketplaceSuccessContinue) {
+  ui.btnMarketplaceSuccessContinue.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.marketplaceSuccessModal) ui.marketplaceSuccessModal.setAttribute('aria-hidden', 'true');
+    setMission('goToSleep', 'Ir a dormir', 'Ya compraste el regalo. Descansá para el día de la fiesta.');
+    setTimeOfDay('noche', 5.0);
+  });
+}
+
+if (ui.btnMarketpl4ceRewind) {
+  ui.btnMarketpl4ceRewind.addEventListener('click', (e) => {
+    e.stopPropagation();
+    restartDay4();
   });
 }
 

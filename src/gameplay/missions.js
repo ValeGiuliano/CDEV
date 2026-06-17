@@ -174,3 +174,23 @@ export function startDownloadMercadoLibreMission() {
     deps.updateHome();
   }
 }
+
+export function startDay4BuyMission() {
+  setMission('buyGiftDay4', 'Comprar la muñeca', 'Entrá a MercadoLibre y comprá la muñeca para Clara.');
+
+  if (deps.installedAppsRef) {
+    deps.installedAppsRef.playstore = true;
+    deps.installedAppsRef.mercadolibre = true;
+  }
+  if (typeof deps.updateHome === 'function') {
+    deps.updateHome();
+  }
+}
+
+export function startDownloadMarketplaceMission() {
+  setMission('downloadMarketplace', 'Descargar Marketplace', 'MercadoLibre no tiene stock. Buscá la app oficial "Marketplace" en la Play Store y descargala.');
+}
+
+export function startBuyMarketplaceMission() {
+  setMission('buyInMarketplace', 'Comprar la muñeca', 'Elegí una publicación confiable en Marketplace y comprá la muñeca para Clara.');
+}

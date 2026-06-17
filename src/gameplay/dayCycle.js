@@ -5,9 +5,12 @@ import {
   dayTransitionState,
   phoneState,
   installedApps,
+  day4State,
+  day4InitialMoney,
+  statsState,
 } from '../state/index.js';
 import { ui } from '../utils/dom.js';
-import { completeMission, setMission } from './missions.js';
+import { completeMission, setMission, startDay4BuyMission } from './missions.js';
 import { setTimeOfDay } from '../core/renderer.js';
 import { updatePhoneHomeApps } from '../phone/index.js';
 
@@ -95,6 +98,8 @@ export function sleepToNextDay() {
       startDay3();
     } else if (gameState.currentDay === 4) {
       startDay4();
+    } else if (gameState.currentDay === 5) {
+      startDay5();
     }
   });
 }
@@ -192,10 +197,48 @@ export function startDay3() {
 }
 
 export function startDay4() {
+  if (!deps) return;
+  const { camera, lookEuler, startCinematic, day4WakeUpSequence, playNotificationSound } = deps;
+
+  camera.position.set(4.2, 0.72, 3.45);
+  lookEuler.set(0, 0, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  day4InitialMoney.value = statsState.money;
+
+  setTimeOfDay('dia', 0.0);
+
+  function waitForTransition() {
+    if (dayTransitionState.active) {
+      requestAnimationFrame(waitForTransition);
+      return;
+    }
+
+    startCinematic(day4WakeUpSequence, () => {
+      camera.position.set(4.2, 1.48, 3.8);
+      lookEuler.set(0, 0, 0);
+      camera.quaternion.setFromEuler(lookEuler);
+
+      installedApps.playstore = true;
+      installedApps.mercadolibre = true;
+      updatePhoneHomeApps();
+
+      setTimeout(() => {
+        playNotificationSound();
+        startDay4BuyMission();
+      }, 4000);
+    });
+  }
+
+  waitForTransition();
+}
+
+export function startDay5() {
+  if (!deps) return;
   if (ui.missionsContainer) {
     ui.missionsContainer.setAttribute('aria-hidden', 'false');
-    if (ui.missionTitle) ui.missionTitle.textContent = 'Experiencia Completada';
-    if (ui.missionText) ui.missionText.textContent = '¡Felicitaciones! Has completado la experiencia sobre la brecha digital en la tercera edad. Marta logró superar los obstáculos y resolver sus problemas con el apoyo de su familia. ❤️';
-    if (ui.missionCard) ui.missionCard.classList.add('is-completed');
+    if (ui.missionTitle) ui.missionTitle.textContent = 'Día 5 — Cumpleaños de Clara';
+    if (ui.missionText) ui.missionText.textContent = '¡Hoy es el cumpleaños de Clara! Continuará...';
+    if (ui.missionCard) ui.missionCard.classList.remove('is-completed');
   }
 }
