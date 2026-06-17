@@ -126,6 +126,39 @@ export const ui = {
   casinoMessage: document.querySelector('#casinoMessage'),
   casinoBankruptModal: document.querySelector('#casinoBankruptModal'),
   btnCasinoBankruptRestart: document.querySelector('#btnCasinoBankruptRestart'),
+  uberAppBtn: document.querySelector('#uberAppBtn'),
+  phoneUberView: document.querySelector('#phoneUberView'),
+  uberCanvas: document.querySelector('#uberCanvas'),
+  uberStartBtn: document.querySelector('#uberStartBtn'),
+  uberLevel: document.querySelector('#uberLevel'),
+  uberLives: document.querySelector('#uberLives'),
+  uberTimer: document.querySelector('#uberTimer'),
+  uberMessage: document.querySelector('#uberMessage'),
+  uberDpad: document.querySelector('#uberDpad'),
+  uberSuccessModal: document.querySelector('#uberSuccessModal'),
+  uberScoreText: document.querySelector('#uberScoreText'),
+  btnUberSuccessContinue: document.querySelector('#btnUberSuccessContinue'),
+  uberFailModal: document.querySelector('#uberFailModal'),
+  btnUberFailRestart: document.querySelector('#btnUberFailRestart'),
+  
+  // Uber Map Pin elements
+  uberMazeContent: document.querySelector('#uberMazeContent'),
+  uberMapPinContent: document.querySelector('#uberMapPinContent'),
+  uberMapGpsSearch: document.querySelector('#uberMapGpsSearch'),
+  uberSuggestedPopup: document.querySelector('#uberSuggestedPopup'),
+  uberMapTimer: document.querySelector('#uberMapTimer'),
+  uberMapDpad: document.querySelector('#uberMapDpad'),
+  uberConfirmLocationBtn: document.querySelector('#uberConfirmLocationBtn'),
+  uberCancelLocationBtn: document.querySelector('#uberCancelLocationBtn'),
+  uberSkipMazeBtn: document.querySelector('#uberSkipMazeBtn'),
+  
+  // Leaderboard elements
+  uberScoreBreakdown: document.querySelector('#uberScoreBreakdown'),
+  uberLeaderboardForm: document.querySelector('#uberLeaderboardForm'),
+  uberPlayerName: document.querySelector('#uberPlayerName'),
+  btnSaveUberScore: document.querySelector('#btnSaveUberScore'),
+  uberLeaderboardView: document.querySelector('#uberLeaderboardView'),
+  uberLeaderboardBody: document.querySelector('#uberLeaderboardBody'),
 };
 
 export function getEl(id) {

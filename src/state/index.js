@@ -72,6 +72,22 @@ export const installedApps = {
   marketplace: false,
   marketpl4ce: false,
   casino: false,
+  uber: false,
+};
+
+export const uberState = {
+  mazeActive: false,
+  mazeRunning: false,
+  lives: 3,
+  startedAt: 0,
+  elapsed: 0,
+  score: 0,
+  finished: false,
+  failed: false,
+  player: { x: 0, y: 0, vx: 0, vy: 0, invuln: 0 },
+  currentCheckpoint: { col: 0, row: 0 },
+  invulnTimer: 0,
+  attempts: 1,
 };
 
 export const day3Scammed = { value: false };

@@ -29,6 +29,7 @@ import {
   day4State,
   day4InitialMoney,
   casinoState,
+  uberState,
 } from './state/index.js';
 
 void dayRestarted;
@@ -57,7 +58,11 @@ import { initPlayer, updateFirstPerson, updateLook, setLookFromEuler, clampPlaye
 import { initDoors, handleDoorKey, updateDoors } from './gameplay/doors.js';
 import { initBed, handleSleepKey, updateBedPrompt, showCamiloBedMessage } from './gameplay/bed.js';
 import { initDayCycle, updateDayTransition, getDayTransitionOpacity, hideDaysBlockedModal, startDay2, startDay4, sleepToNextDay as sleepToNextDayFn } from './gameplay/dayCycle.js';
-import { initMissions, setMission, completeMission, updateMissions, addTutorialMessage, showMartaReplyTutorial, startClaraBirthdayMission, startClaraBirthdayFlow, triggerClaraGiftDialogue, startDownloadMercadoLibreMission, startDay4BuyMission, startDownloadMarketplaceMission, startBuyMarketplaceMission } from './gameplay/missions.js';
+import { initMissions, setMission, completeMission, updateMissions, addTutorialMessage, showMartaReplyTutorial, startClaraBirthdayMission, startClaraBirthdayFlow, triggerClaraGiftDialogue, startDownloadMercadoLibreMission, startDay4BuyMission, startDownloadMarketplaceMission, startBuyMarketplaceMission, startUberMission } from './gameplay/missions.js';
+import { initUberMaze, openUberApp, updateUberMaze, setMazeInput, isUberMazeRunning, attachUberListeners, resetUberMaze } from './gameplay/uberMaze.js';
+import { initUberMapPin, startUberMapPin, resetUberMapPin, updateUberMapPin, isUberMapPinActive, setMapPinInput } from './gameplay/uberMapPin.js';
+import { calculateScoreDetails, loadLeaderboard, saveScore, renderScoreBreakdown, renderLeaderboardTable } from './gameplay/leaderboard.js';
+import { initTraffic, updateTraffic } from './gameplay/traffic.js';
 import {
   initPhone,
   updatePhonePrompt,
@@ -2207,6 +2212,53 @@ const day4WakeUpSequence = [
   }
 ];
 
+// --- DAY 5 WAKE-UP SEQUENCE ---
+const day5WakeUpSequence = [
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Al día siguiente…' },
+    onStart: () => {
+      camera.position.set(4.2, 0.72, 3.45);
+      camera.lookAt(4.2, 2.5, 3.45);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.transition = 'none';
+        ui.dayTransitionOverlay.style.opacity = '1';
+        ui.dayTransitionOverlay.setAttribute('aria-hidden', 'false');
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(1 - ease * 0.7);
+      }
+      camera.position.y = THREE.MathUtils.lerp(0.72, 0.78, ease);
+    }
+  },
+  {
+    duration: 3.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: '¡Hoy es el cumpleaños de Clara! Tengo que llegar a la fiesta.' },
+    sound: { freq: 320, type: 'sine', duration: 0.4 },
+    onStart: () => {
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = '0.3';
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(0.3 * (1 - ease));
+      }
+      const startTarget = new THREE.Vector3(4.2, 2.5, 3.45);
+      const endTarget = new THREE.Vector3(4.2, 1.4, 0);
+      const currentTarget = new THREE.Vector3().lerpVectors(startTarget, endTarget, ease);
+      camera.lookAt(currentTarget);
+      camera.position.y = THREE.MathUtils.lerp(0.78, 0.82, ease);
+    }
+  }
+];
+
 // --- DAY 4: SECUENCIA DE ENTREGA (COMPRA REAL) ---
 const deliverySequence = [
   {
@@ -2636,6 +2688,28 @@ function startIntro() {
 }
 
 function handleMoveKey(event, active) {
+  if (isUberMazeRunning() || isUberMapPinActive()) {
+    if (active && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
+      if (event.repeat) return;
+      event.preventDefault();
+      resetUberMaze();
+      resetUberMapPin();
+      switchPhoneView('phoneHomeView');
+      togglePhone();
+      return;
+    }
+    const dir = getMoveDirection(event);
+    if (dir) {
+      event.preventDefault();
+      const mazeDir = dir === 'forward' ? 'up' : dir === 'back' ? 'down' : dir;
+      if (isUberMazeRunning()) {
+        setMazeInput(mazeDir, active);
+      } else {
+        setMapPinInput(mazeDir, active);
+      }
+    }
+    return;
+  }
   if (cinematicState.active) {
     if (active && (event.code === 'Space' || event.key === ' ')) {
       if (event.repeat) return;
@@ -2647,6 +2721,10 @@ function handleMoveKey(event, active) {
   if (active && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
     if (event.repeat) return;
     event.preventDefault();
+    if (phoneState.active && document.querySelector('.phone-view.is-active')?.id === 'phoneUberView') {
+      resetUberMaze();
+      switchPhoneView('phoneHomeView');
+    }
     togglePhone();
     return;
   }
@@ -2735,6 +2813,7 @@ initDayCycle({
   day2WakeUpSequence,
   day3WakeUpSequence,
   day4WakeUpSequence,
+  day5WakeUpSequence,
   setDayRestarted,
   playNotificationSound,
   startClaraBirthdayMission,
@@ -2742,6 +2821,7 @@ initDayCycle({
   renderContactList,
   openContactChat,
   startClaraBirthdayFlow,
+  startUberMission,
 });
 
 initMissions({
@@ -2785,6 +2865,9 @@ initPhone({
     },
     onOpenCasinoApp: () => {
       openCasinoApp();
+    },
+    onOpenUberApp: () => {
+      openUberApp();
     },
     onOpenBrowserApp: () => {
       resetBrowserApp();
@@ -2924,6 +3007,121 @@ initPhone({
     },
   },
 });
+
+initUberMaze({
+  onExitPointerLock: () => {
+    if (document.pointerLockElement === canvas) {
+      document.exitPointerLock();
+    }
+  },
+  onSwitchView: (viewId) => switchPhoneView(viewId),
+  onMazeCompleted: (elapsed) => {
+    startUberMapPin(elapsed);
+  },
+  onFail: () => {
+    statsState.calm = Math.max(0, statsState.calm - 20);
+    statsState.happiness = Math.max(0, statsState.happiness - 15);
+    updateStats(0);
+    if (ui.uberFailModal) {
+      setTimeout(() => {
+        ui.uberFailModal.setAttribute('aria-hidden', 'false');
+      }, 600);
+    }
+  },
+});
+
+let lastScoreDetails = null;
+
+initUberMapPin({
+  onWin: (score, elapsed) => {
+    if (missionsState.currentMissionId === 'orderUber' && !missionsState.completed) {
+      completeMission('orderUber');
+    }
+    
+    // Calculate final score details based on doll purchased + time taken
+    lastScoreDetails = calculateScoreDetails(elapsed);
+    
+    // Update player stats
+    const scorePerformance = Math.min(100, Math.round(lastScoreDetails.totalScore / 70));
+    statsState.happiness = Math.min(100, statsState.happiness + Math.round(scorePerformance / 4));
+    statsState.calm = Math.min(100, statsState.calm + 12);
+    updateStats(0);
+
+    // Setup Success Modal Score UI
+    if (ui.uberScoreBreakdown) {
+      renderScoreBreakdown(ui.uberScoreBreakdown, lastScoreDetails);
+    }
+    
+    // Reset view visibility in modal
+    if (ui.uberLeaderboardForm) {
+      ui.uberLeaderboardForm.style.display = 'block';
+    }
+    if (ui.uberLeaderboardView) {
+      ui.uberLeaderboardView.style.display = 'none';
+    }
+    if (ui.uberPlayerName) {
+      ui.uberPlayerName.value = 'Marta';
+    }
+
+    if (ui.uberSuccessModal) {
+      setTimeout(() => {
+        ui.uberSuccessModal.setAttribute('aria-hidden', 'false');
+      }, 800);
+    }
+  },
+  onFail: () => {
+    statsState.calm = Math.max(0, statsState.calm - 20);
+    statsState.happiness = Math.max(0, statsState.happiness - 15);
+    updateStats(0);
+    if (ui.uberFailModal) {
+      setTimeout(() => {
+        ui.uberFailModal.setAttribute('aria-hidden', 'false');
+      }, 600);
+    }
+  },
+});
+
+attachUberListeners();
+
+const skipBtn = document.getElementById('uberSkipMazeBtn') || ui.uberSkipMazeBtn;
+if (skipBtn) {
+  console.log('Registering click listener for uberSkipMazeBtn');
+  skipBtn.addEventListener('click', (e) => {
+    console.log('uberSkipMazeBtn clicked!');
+    e.stopPropagation();
+    resetUberMaze();
+    uberState.startedAt = performance.now();
+    uberState.attempts = 1;
+    startUberMapPin(0);
+  });
+} else {
+  console.error('uberSkipMazeBtn not found in DOM!');
+}
+
+if (ui.btnSaveUberScore) {
+  ui.btnSaveUberScore.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const nameInput = ui.uberPlayerName ? ui.uberPlayerName.value : 'Marta';
+    const finalName = nameInput.trim() || 'Marta';
+    
+    if (lastScoreDetails) {
+      const updatedBoard = saveScore(finalName, lastScoreDetails);
+      
+      // Hide submit form, show leaderboard rankings list
+      if (ui.uberLeaderboardForm) {
+        ui.uberLeaderboardForm.style.display = 'none';
+      }
+      if (ui.uberLeaderboardView) {
+        ui.uberLeaderboardView.style.display = 'block';
+      }
+      
+      // Render Table
+      if (ui.uberLeaderboardBody) {
+        renderLeaderboardTable(ui.uberLeaderboardBody, updatedBoard);
+      }
+    }
+  });
+}
 
 function renderPlayStore(filterText) {
   const list = document.getElementById('playstoreAppList');
@@ -3680,7 +3878,8 @@ function submitBrowserSearch(query) {
 function updateStats(dt) {
   if (!visualFatigueDisabled) {
     if (phoneState.active) {
-      statsState.fatigue += dt;
+      const fatigueRate = isUberMazeRunning() ? 0.4 : 1;
+      statsState.fatigue += dt * fatigueRate;
       statsState.fatigue = Math.min(60, statsState.fatigue);
     } else {
       statsState.fatigue -= dt * 6;
@@ -3728,6 +3927,9 @@ function animate() {
   updateCinematic(dt);
   updateFraudDrain(dt);
   updateTimeOfDay(dt);
+  updateUberMaze(dt);
+  updateUberMapPin(dt);
+  updateTraffic(dt, camera);
 
   // Actualizar mezcladores de animación esquelética
   if (martaMixer) {
@@ -4140,6 +4342,69 @@ if (ui.btnCasinoBankruptRestart) {
     restartDay4();
   });
 }
+
+if (ui.btnUberSuccessContinue) {
+  ui.btnUberSuccessContinue.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.uberSuccessModal) ui.uberSuccessModal.setAttribute('aria-hidden', 'true');
+    resetUberMaze();
+    resetUberMapPin();
+    switchPhoneView('phoneHomeView');
+    if (phoneState.active) togglePhone();
+    if (ui.missionsContainer) ui.missionsContainer.setAttribute('aria-hidden', 'false');
+    if (ui.missionTitle) ui.missionTitle.textContent = 'Cumpleaños de Clara';
+    if (ui.missionText) ui.missionText.textContent = 'Marta llegó a tiempo y pudo compartir el cumpleaños con su nieta.';
+    if (ui.missionCard) ui.missionCard.classList.add('is-completed');
+    addMessageToConversation('clara', 'incoming', '¡Abuela! ¡Llegaste! 🎉 Gracias por venir a mi cumpleaños, sos la mejor. ¡Te quiero muchísimo! ❤️🎂');
+  });
+}
+
+if (ui.btnUberFailRestart) {
+  ui.btnUberFailRestart.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.uberFailModal) ui.uberFailModal.setAttribute('aria-hidden', 'true');
+    resetUberMaze();
+    resetUberMapPin();
+    uberState.attempts = (uberState.attempts || 1) + 1;
+    openUberApp();
+  });
+}
+
+// Debug skip: ?day=5 inicia directo en el día 5 (solo desarrollo)
+(function debugSkipDay() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const day = parseInt(params.get('day'), 10);
+    if (!(day >= 2 && day <= 5)) return;
+
+    // Saltar intro
+    if (ui.introOverlay) {
+      ui.introOverlay.classList.add('is-hidden');
+      ui.introOverlay.style.display = 'none';
+    }
+    if (ui.introFade) ui.introFade.style.opacity = '0';
+    document.body.classList.remove('intro-active');
+    if (martaLoadedModel) martaLoadedModel.visible = false;
+    doorState.living.open = false;
+
+    camera.position.set(-0.7, 1.48, -2.3);
+    lookEuler.set(0, -Math.PI / 2, 0);
+    camera.quaternion.setFromEuler(lookEuler);
+
+    gameState.currentDay = day - 1;
+    if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + (day - 1);
+    missionsState.completed = true;
+
+    setTimeout(() => {
+      sleepToNextDayFn();
+    }, 200);
+  } catch (err) {
+    console.warn('debug skip failed', err);
+  }
+})();
+
+// Initialize traffic system (asynchronously loads GLB in background)
+initTraffic(scene);
 
 // Start the render loop (scene renders behind intro overlay)
 animate();

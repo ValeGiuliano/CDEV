@@ -75,6 +75,9 @@ function registerEventListeners() {
         if (app && app.startsWith('fake-loading')) {
           switchPhoneView('phoneLoadingView');
         }
+        if (app === 'uber' && typeof callbacks.onOpenUberApp === 'function') {
+          callbacks.onOpenUberApp();
+        }
       });
     });
   }
@@ -263,7 +266,12 @@ export function togglePhone() {
       document.exitPointerLock();
     }
   } else {
-    canvas.requestPointerLock();
+    try {
+      const lockRequest = canvas.requestPointerLock();
+      if (lockRequest && typeof lockRequest.catch === 'function') lockRequest.catch(() => {});
+    } catch (e) {
+      // Algunos navegadores rechazan pointer lock si el documento perdió foco.
+    }
   }
   if (ui.phonePrompt) {
     ui.phonePrompt.textContent = phoneState.active ? 'T Guardar teléfono' : 'T Coger teléfono';
@@ -420,6 +428,8 @@ export function updatePhoneHomeApps() {
   if (marketpl4ceBtn) marketpl4ceBtn.style.display = installedApps.marketpl4ce ? '' : 'none';
   const casinoBtn = document.getElementById('casinoAppBtn');
   if (casinoBtn) casinoBtn.style.display = installedApps.casino ? '' : 'none';
+  const uberBtn = document.getElementById('uberAppBtn');
+  if (uberBtn) uberBtn.style.display = installedApps.uber ? '' : 'none';
 }
 
 export function getLastPreview(contact) {
