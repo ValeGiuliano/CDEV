@@ -69,9 +69,43 @@ export const installedApps = {
   mercadolibre: false,
   mercad0libre: false,
   browser: false,
+  marketplace: false,
+  marketpl4ce: false,
+  casino: false,
+  uber: false,
+};
+
+export const uberState = {
+  mazeActive: false,
+  mazeRunning: false,
+  lives: 3,
+  startedAt: 0,
+  elapsed: 0,
+  score: 0,
+  finished: false,
+  failed: false,
+  player: { x: 0, y: 0, vx: 0, vy: 0, invuln: 0 },
+  currentCheckpoint: { col: 0, row: 0 },
+  invulnTimer: 0,
+  attempts: 1,
 };
 
 export const day3Scammed = { value: false };
+
+export const day4State = {
+  purchasedProduct: null,
+  wasHacked: false,
+  awaitingDelivery: false,
+  deliveryResolved: false,
+};
+
+export const day4InitialMoney = { value: 100000 };
+
+export const casinoState = {
+  currentBet: 5000,
+  spinning: false,
+  bankrupt: false,
+};
 
 export const playstoreApps = [
   { id: 'mercad0libre', name: 'Mercad0Libre', dev: 'Mercado Libre', color: '#FFF600', label: 'M0' },
@@ -80,6 +114,9 @@ export const playstoreApps = [
   { id: 'spotify', name: 'Spotify', dev: 'Spotify AB', color: '#1DB954', label: 'Sp' },
   { id: 'netflix', name: 'Netflix', dev: 'Netflix, Inc.', color: '#E50914', label: 'N' },
   { id: 'mercadolibre', name: 'MercadoLibre', dev: 'Mercado Libre', color: '#FFF600', label: 'ML' },
+  { id: 'marketplace', name: 'Marketplace', dev: 'Meta Platforms', color: '#1877F2', label: 'Mk' },
+  { id: 'marketpl4ce', name: 'Marketpl4ce', dev: 'Marktplaace Inc.', color: '#7c3aed', label: 'M4' },
+  { id: 'casino', name: 'Casino Slots 8-bit', dev: 'Lucky Games', color: '#e11d48', label: 'CS' },
 ];
 
 export const fraudDrainState = {

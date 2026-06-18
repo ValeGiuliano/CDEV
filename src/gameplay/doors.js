@@ -25,11 +25,14 @@ function toggleNearbyDoor() {
   if (!nearby) return;
   nearby.door.open = !nearby.door.open;
 
+  const currentMission = missionsState.currentMissionId;
+  const isDay4Delivery = currentMission === 'attendDelivery' && !missionsState.completed;
+  const isDay1Doorbell = currentMission === 'doorbell' && !missionsState.completed;
+
   if (
     nearby.id === 'living' &&
     nearby.door.open &&
-    missionsState.currentMissionId === 'doorbell' &&
-    !missionsState.completed &&
+    (isDay1Doorbell || isDay4Delivery) &&
     typeof onOpenLivingDoor === 'function'
   ) {
     onOpenLivingDoor();

@@ -11,7 +11,7 @@ export const MONEY_BARBIE = 42999;
 
 export const FATIGUE_MAX = 60;
 export const FATIGUE_INCREASE_PER_SEC = 1;
-export const FATIGUE_DECREASE_PER_SEC = 2;
+export const FATIGUE_DECREASE_PER_SEC = 10;
 
 export const BARBIE_PRODUCT_GRADIENT = 'linear-gradient(135deg, #ff5e7e 0%, #ffd93d 100%)';
 

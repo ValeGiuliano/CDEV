@@ -74,69 +74,163 @@
           </svg>
         </div>
       </div>
-
       <div id="phoneHomeView" class="phone-view is-active">
         <div class="phone-header">
-          <h2>Hola, Marta</h2>
-          <p>Sábado, 16 de Mayo</p>
+          <h2>ID: MARTA_SYS_78</h2>
+          <p>Sistema Operativo: En línea</p>
         </div>
-        <div class="phone-notification-card" id="openMessagesBtn">
-          <div class="notification-title">MENSAJE NUEVO</div>
-          <div class="notification-sender">Hijo</div>
-          <div class="notification-preview">Hola mamá, ¿cómo estás? Te dejé las llaves...</div>
+
+        <div class="phone-notification-card terminal-alarm-card" id="openMessagesBtn">
+          <div class="terminal-alarm-header">
+            <span class="blink-red">⚠️ ALERTA: ENLACE ENTRANTE</span>
+            <span class="alarm-code">[PORT_SMS]</span>
+          </div>
+          <div class="terminal-alarm-sender">Remitente: Hijo</div>
+          <div class="terminal-alarm-desc">
+            "Hola mamá, ¿cómo estás? Te dejé las llaves..."
+          </div>
         </div>
-        <div class="phone-app-grid">
-          <button class="phone-app-btn" data-app="messages" aria-label="Mensajes">
-            <div class="app-icon bg-emerald"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-              </svg></div>
-            <span>Mensajes</span>
+
+        <div class="phone-app-grid terminal-module-list">
+          <button class="phone-app-btn terminal-module-btn" data-app="messages" aria-label="Mensajes">
+            <div class="module-logo">🦆</div>
+            <div class="module-info">
+              <span class="module-title">ENLACE SMS</span>
+              <span class="module-desc">Transmisión de tramas de texto asíncronas</span>
+            </div>
+            <div class="module-arrow">▶</div>
           </button>
-          <button class="phone-app-btn" data-app="map" aria-label="Mapa">
-            <div class="app-icon bg-blue"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
-                <line x1="8" y1="2" x2="8" y2="18"></line>
-                <line x1="16" y1="6" x2="16" y2="22"></line>
-              </svg></div>
-            <span>Mapa</span>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="fake-loading-1" aria-label="Co-procesador">
+            <div class="module-logo">🧬</div>
+            <div class="module-info">
+              <span class="module-title">CO-PROCESADOR DE SUBRUTINAS</span>
+              <span class="module-desc">Cálculo de coma flotante de registros locales</span>
+            </div>
+            <div class="module-arrow">▶</div>
           </button>
-          <button class="phone-app-btn" data-app="settings" aria-label="Ajustes">
-            <div class="app-icon bg-amber"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path
-                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
-                </path>
-              </svg></div>
-            <span>Ajustes</span>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="map" aria-label="Mapa">
+            <div class="module-logo">✏️</div>
+            <div class="module-info">
+              <span class="module-title">GEOLOCALIZACIÓN CARTOGRÁFICA</span>
+              <span class="module-desc">Trazado de coordenadas físicas satelitales</span>
+            </div>
+            <div class="module-arrow">▶</div>
           </button>
-          <button class="phone-app-btn" data-app="browser" aria-label="Internet" id="browserAppBtn" style="display:none;">
-            <div class="app-icon bg-google"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg></div>
-            <span>Google</span>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="fake-loading-2" aria-label="Optimizador">
+            <div class="module-logo">🔋</div>
+            <div class="module-info">
+              <span class="module-title">OPTIMIZADOR DE ANCHO DE BANDA</span>
+              <span class="module-desc">Compresión de paquetes y filtrado de colas</span>
+            </div>
+            <div class="module-arrow">▶</div>
           </button>
-          <button class="phone-app-btn" data-app="playstore" aria-label="Play Store" id="playstoreAppBtn" style="display:none;">
-            <div class="app-icon bg-playstore"><svg viewBox="0 0 24 24" fill="white" stroke="none">
-                <polygon points="3,2 12,12 3,22" opacity="0.9"/>
-                <polygon points="12,12 21,7 15,2" opacity="0.7"/>
-                <polygon points="12,12 21,17 15,22" opacity="0.8"/>
-                <polygon points="3,2 12,12 21,7 15,2" opacity="0.6"/>
-              </svg></div>
-            <span>Play Store</span>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="settings" aria-label="Ajustes">
+            <div class="module-logo">⚽</div>
+            <div class="module-info">
+              <span class="module-title">KERNEL</span>
+              <span class="module-desc">Parámetros del bus del sistema y hardware</span>
+            </div>
+            <div class="module-arrow">▶</div>
           </button>
-          <button class="phone-app-btn" data-app="mercadolibre" aria-label="MercadoLibre" id="mercadolibreAppBtn" style="display:none;">
-            <div class="app-icon bg-ml"><svg viewBox="0 0 24 24" fill="white" stroke="none">
-                <text x="4" y="17" font-size="12" font-weight="bold" fill="white">ML</text>
-              </svg></div>
-            <span>MercadoLibre</span>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="fake-loading-3" aria-label="Recolector">
+            <div class="module-logo">🗑️</div>
+            <div class="module-info">
+              <span class="module-title">RECOLECTOR DE HILOS</span>
+              <span class="module-desc">Limpieza y defragmentación de pila volátil</span>
+            </div>
+            <div class="module-arrow">▶</div>
           </button>
-          <button class="phone-app-btn" data-app="mercad0libre" aria-label="Mercad0Libre" id="mercad0libreAppBtn" style="display:none;">
-            <div class="app-icon bg-ml-fake"><svg viewBox="0 0 24 24" fill="white" stroke="none">
-                <text x="4" y="17" font-size="12" font-weight="bold" fill="white">M0</text>
-              </svg></div>
-            <span>Mercad0Libre</span>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="browser" aria-label="Internet" id="browserAppBtn" style="display:none;">
+            <div class="module-logo">🪐</div>
+            <div class="module-info">
+              <span class="module-title">NAVEGADOR NODOS WEB</span>
+              <span class="module-desc">Intérprete HTTP/HTTPS y cliente DNS</span>
+            </div>
+            <div class="module-arrow">▶</div>
           </button>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="playstore" aria-label="Play Store" id="playstoreAppBtn" style="display:none;">
+            <div class="module-logo">🛍️</div>
+            <div class="module-info">
+              <span class="module-title">REPOSITORIO DIGITAL</span>
+              <span class="module-desc">Gestor de descargas oficial de aplicaciones</span>
+            </div>
+            <div class="module-arrow">▶</div>
+          </button>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="mercadolibre" aria-label="MercadoLibre" id="mercadolibreAppBtn" style="display:none;">
+            <div class="module-logo">🤝</div>
+            <div class="module-info">
+              <span class="module-title">MercadoLibre</span>
+              <span class="module-desc">Portal verificado de compra y venta</span>
+            </div>
+            <div class="module-arrow">▶</div>
+          </button>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="mercad0libre" aria-label="Mercad0Libre" id="mercad0libreAppBtn" style="display:none;">
+            <div class="module-logo">🤝</div>
+            <div class="module-info">
+              <span class="module-title">Mercad0Libre</span>
+              <span class="module-desc">Ofertas exclusivas y remates rápidos</span>
+            </div>
+            <div class="module-arrow">▶</div>
+          </button>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="marketplace" aria-label="Marketplace" id="marketplaceAppBtn" style="display:none;">
+            <div class="module-logo">🏪</div>
+            <div class="module-info">
+              <span class="module-title">Marketplace</span>
+              <span class="module-desc">Tablón de anuncios clasificados directos</span>
+            </div>
+            <div class="module-arrow">▶</div>
+          </button>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="marketpl4ce" aria-label="Marketpl4ce" id="marketpl4ceAppBtn" style="display:none;">
+            <div class="module-logo">🏪</div>
+            <div class="module-info">
+              <span class="module-title">Marketpl4ce</span>
+              <span class="module-desc">Clasificados locales sin restricciones</span>
+            </div>
+            <div class="module-arrow">▶</div>
+          </button>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="casino" aria-label="Casino Slots" id="casinoAppBtn" style="display:none;">
+            <div class="module-logo">🎰</div>
+            <div class="module-info">
+              <span class="module-title">Casino Slots 8-bit</span>
+              <span class="module-desc">Software recreativo de apuestas virtuales</span>
+            </div>
+            <div class="module-arrow">▶</div>
+          </button>
+
+          <button class="phone-app-btn terminal-module-btn" data-app="uber" aria-label="Uber" id="uberAppBtn" style="display:none;">
+            <div class="module-logo">🚗</div>
+            <div class="module-info">
+              <span class="module-title">SOLICITUD VEHICULAR</span>
+              <span class="module-desc">Servicio de transporte privado geolocalizado (Uber)</span>
+            </div>
+            <div class="module-arrow">▶</div>
+          </button>
+        </div>
+      </div>
+
+      <div id="phoneLoadingView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span>SISTEMA: EJECUTANDO</span>
+        </div>
+        <div class="loading-container">
+          <div class="spinner"></div>
+          <p class="loading-text">Conectando con el servidor remoto...</p>
         </div>
       </div>
 
@@ -189,28 +283,93 @@
               stroke-width="2">
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg></button>
-          <span>Ajustes</span>
+          <span>KERNEL: AJUSTES</span>
         </div>
-        <div class="phone-settings-container">
-          <div class="setting-item">
-            <span>Wi-Fi</span>
-            <input type="checkbox" id="settingWifi" checked />
-          </div>
-          <div class="setting-item">
-            <span>Notificaciones</span>
-            <input type="checkbox" id="settingNotif" checked />
-          </div>
-          <div class="setting-item">
-            <span>Vibración háptica</span>
-            <input type="checkbox" id="settingVib" checked />
-          </div>
-          <div class="setting-item">
-            <span>Ahorro de batería</span>
-            <input type="checkbox" id="settingBat" />
-          </div>
-          <div class="setting-item">
-            <span>Desactivar fatiga visual</span>
-            <input type="checkbox" id="settingFatigue" />
+        <div class="settings-viewport">
+          <div class="settings-space">
+            <div class="settings-radar-bg"></div>
+            
+            <div class="settings-orb orb-wifi" style="top: 600px; left: 600px;">
+              <label class="orb-label" for="settingWifi">
+                <span class="orb-title">TRANSCEPTOR RF (WI-FI)</span>
+                <span class="orb-sub">Módulo Inalámbrico 802.11</span>
+                <input type="checkbox" id="settingWifi" checked class="orb-checkbox" />
+                <span class="orb-status-text"></span>
+              </label>
+              <div class="orb-glow-ring"></div>
+            </div>
+
+            <div class="settings-orb orb-notif" style="top: 100px; left: 400px;">
+              <label class="orb-label" for="settingNotif">
+                <span class="orb-title">DAEMON HILOS E/S</span>
+                <span class="orb-sub">Cola de Notificaciones</span>
+                <input type="checkbox" id="settingNotif" checked class="orb-checkbox" />
+                <span class="orb-status-text"></span>
+              </label>
+              <div class="orb-glow-ring"></div>
+            </div>
+
+            <div class="settings-orb orb-bat" style="top: 520px; left: 160px;">
+              <label class="orb-label" for="settingBat">
+                <span class="orb-title">TELEMETRÍA ENERGÍA</span>
+                <span class="orb-sub">Límite Celda Li-on (Ahorro)</span>
+                <input type="checkbox" id="settingBat" class="orb-checkbox" />
+                <span class="orb-status-text"></span>
+              </label>
+              <div class="orb-glow-ring"></div>
+            </div>
+
+            <div class="settings-orb orb-fatigue" style="top: 300px; left: 250px;">
+              <label class="orb-label" for="settingFatigue">
+                <span class="orb-title">ATENUACIÓN CANDEAS</span>
+                <span class="orb-sub">Filtro de Fatiga Visual (Blur)</span>
+                <input type="checkbox" id="settingFatigue" class="orb-checkbox" />
+                <span class="orb-status-text"></span>
+              </label>
+              <div class="orb-glow-ring"></div>
+            </div>
+
+            <!-- Dummy settings orbs (no functional effect) -->
+            <div class="settings-orb orb-dummy1" style="top: 250px; left: 550px;">
+              <label class="orb-label" for="settingDummy1">
+                <span class="orb-title">MODULADOR FRECUENCIA</span>
+                <span class="orb-sub">Oscilador de Referencia PLL</span>
+                <input type="checkbox" id="settingDummy1" checked class="orb-checkbox" />
+                <span class="orb-status-text"></span>
+              </label>
+              <div class="orb-glow-ring"></div>
+            </div>
+
+            <div class="settings-orb orb-dummy2" style="top: 450px; left: 450px;">
+              <label class="orb-label" for="settingDummy2">
+                <span class="orb-title">DIVISOR DE CICLOS</span>
+                <span class="orb-sub">Bucle de Captura de Fase</span>
+                <input type="checkbox" id="settingDummy2" class="orb-checkbox" />
+                <span class="orb-status-text"></span>
+              </label>
+              <div class="orb-glow-ring"></div>
+            </div>
+
+            <div class="settings-orb orb-dummy3" style="top: 50px; left: 60px;">
+              <label class="orb-label" for="settingDummy3">
+                <span class="orb-title">SECTORIZACIÓN LÓGICA</span>
+                <span class="orb-sub">Páginas de Desbordamiento L1</span>
+                <input type="checkbox" id="settingDummy3" checked class="orb-checkbox" />
+                <span class="orb-status-text"></span>
+              </label>
+              <div class="orb-glow-ring"></div>
+            </div>
+
+            <div class="settings-orb orb-dummy4" style="top: 460px; left: 30px;">
+              <label class="orb-label" for="settingDummy4">
+                <span class="orb-title">ENRUTADOR DE BUS</span>
+                <span class="orb-sub">Priorización de Tráfico FIFO</span>
+                <input type="checkbox" id="settingDummy4" class="orb-checkbox" />
+                <span class="orb-status-text"></span>
+              </label>
+              <div class="orb-glow-ring"></div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -511,6 +670,164 @@
         </div>
       </div>
 
+      <div id="phoneMarketplaceView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#60a5fa;font-weight:800;">Marketplace</span>
+        </div>
+        <div class="marketplace-content">
+          <div class="marketplace-search-bar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" value="Barbie futbolista edición mundial 2026" readonly />
+          </div>
+          <h4 style="color:#f3f4f6;margin:12px 14px 8px;font-size:0.95rem;">Publicaciones similares</h4>
+          <div id="marketplaceProducts" class="marketplace-products"></div>
+        </div>
+      </div>
+
+      <div id="phoneMarketplaceProductDetailView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#60a5fa;font-weight:800;">Publicación</span>
+        </div>
+        <div class="marketplace-detail-content" id="marketplaceDetailContent">
+        </div>
+      </div>
+
+      <div id="phoneMarketplaceCheckoutView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#60a5fa;font-weight:800;">Finalizar compra</span>
+        </div>
+        <div class="marketplace-checkout-content">
+          <div id="marketplaceCheckoutProduct" class="marketplace-checkout-product"></div>
+          <div class="marketplace-checkout-section">
+            <h4 style="color:#60a5fa;margin:0 0 10px;font-size:0.9rem;">Datos de la tarjeta</h4>
+            <div class="marketplace-field">
+              <label>Número de tarjeta</label>
+              <input type="text" id="marketplaceCardNumber" readonly placeholder="**** **** **** ****" />
+            </div>
+            <div class="marketplace-field">
+              <label>Nombre y apellido</label>
+              <input type="text" id="marketplaceCardName" readonly placeholder="Como figura en la tarjeta" />
+            </div>
+            <div class="marketplace-field-row">
+              <div class="marketplace-field">
+                <label>Vencimiento</label>
+                <input type="text" id="marketplaceCardExp" readonly placeholder="MM/AA" />
+              </div>
+              <div class="marketplace-field">
+                <label>Código de seguridad</label>
+                <input type="text" id="marketplaceCardCvv" readonly placeholder="CVV" />
+              </div>
+            </div>
+            <button id="marketplaceLoadCardBtn" class="marketplace-btn-secondary">Cargar datos de tarjeta</button>
+            <button id="marketplaceConfirmBtn" class="marketplace-btn-primary" disabled>Confirmar compra</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="phoneCasinoView" class="phone-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#f43f5e;font-weight:800;">Casino Slots 8-bit</span>
+        </div>
+        <div class="casino-content">
+          <div class="casino-display">
+            <div class="casino-balance">Saldo: $<span id="casinoBalance">0</span></div>
+          </div>
+          <div class="casino-slots">
+            <div class="casino-reel" id="casinoReel1">🍒</div>
+            <div class="casino-reel" id="casinoReel2">🍋</div>
+            <div class="casino-reel" id="casinoReel3">🍇</div>
+          </div>
+          <div class="casino-controls">
+            <div class="casino-bet-row">
+              <button id="casinoBetMinus" class="casino-bet-btn">- $5.000</button>
+              <div class="casino-bet-amount">$<span id="casinoBetAmount">5.000</span></div>
+              <button id="casinoBetPlus" class="casino-bet-btn">+ $5.000</button>
+            </div>
+            <button id="casinoSpinBtn" class="casino-spin-btn">GIRAR</button>
+          </div>
+          <div class="casino-message" id="casinoMessage">¡Hacé tu apuesta!</div>
+        </div>
+      </div>
+
+      <div id="phoneUberView" class="phone-view phone-uber-view">
+        <div class="phone-app-topbar">
+          <button class="phone-back-btn" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg></button>
+          <span style="color:#000;font-weight:800;">Uber</span>
+        </div>
+        <div class="uber-content" id="uberMazeContent">
+          <div class="uber-hud">
+            <div class="uber-hud-item">Nivel: <span id="uberLevel">1/3</span></div>
+            <div class="uber-hud-item">Vidas: <span id="uberLives">3</span></div>
+            <div class="uber-hud-item">Tiempo: <span id="uberTimer">0.0s</span></div>
+          </div>
+          <div class="uber-canvas-wrap">
+            <canvas id="uberCanvas" width="320" height="420"></canvas>
+            <div class="uber-overlay-msg" id="uberMessage"></div>
+          </div>
+          <button id="uberStartBtn" class="uber-start-btn">Iniciar viaje</button>
+          <div class="uber-dpad" id="uberDpad">
+            <button class="uber-dpad-btn uber-dpad-up" data-uber-dir="up" aria-label="Arriba">▲</button>
+            <button class="uber-dpad-btn uber-dpad-left" data-uber-dir="left" aria-label="Izquierda">◀</button>
+            <button class="uber-dpad-btn uber-dpad-down" data-uber-dir="down" aria-label="Abajo">▼</button>
+            <button class="uber-dpad-btn uber-dpad-right" data-uber-dir="right" aria-label="Derecha">▶</button>
+          </div>
+        </div>
+
+        <div class="uber-mappin-content is-hidden" id="uberMapPinContent">
+          <div class="uber-hud">
+            <div class="uber-hud-item">Confirmar Punto de Recogida</div>
+            <div class="uber-hud-item">Tiempo: <span id="uberMapTimer">0.0s</span></div>
+          </div>
+          <div class="uber-map-canvas-wrap">
+            <canvas id="uberMapCanvas" width="320" height="240"></canvas>
+            
+            <div id="uberMapGpsSearch" class="uber-gps-search-overlay">
+              <div class="uber-gps-spinner"></div>
+              <p>Buscando señal GPS...</p>
+            </div>
+
+            <div id="uberSuggestedPopup" class="uber-suggested-popup is-hidden">
+              <div class="uber-suggested-header">
+                <span>Sugerencia del sistema</span>
+                <button id="uberSuggestedClose" class="uber-suggested-close">×</button>
+              </div>
+              <p>Mejor punto de encuentro sugerido para abordar más rápido.</p>
+              <button id="uberSuggestedAccept" class="uber-suggested-accept">Aceptar sugerencia</button>
+            </div>
+          </div>
+
+          <div class="uber-dpad" id="uberMapDpad">
+            <button class="uber-dpad-btn uber-dpad-up" data-map-dir="up" aria-label="Mover Arriba">▲</button>
+            <button class="uber-dpad-btn uber-dpad-left" data-map-dir="left" aria-label="Mover Izquierda">◀</button>
+            <button class="uber-dpad-btn uber-dpad-down" data-map-dir="down" aria-label="Mover Abajo">▼</button>
+            <button class="uber-dpad-btn uber-dpad-right" data-map-dir="right" aria-label="Mover Derecha">▶</button>
+          </div>
+
+          <div class="uber-map-buttons" id="uberMapButtons">
+            <button id="uberCancelLocationBtn" class="uber-map-btn">Cancelar Ubicación</button>
+            <button id="uberConfirmLocationBtn" class="uber-map-btn">Confirmar Ubicación</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Custom Keyboard Overlay -->
       <div id="phoneKeyboard" class="phone-keyboard is-hidden">
         <div class="phone-keyboard-header">
@@ -693,6 +1010,165 @@
         </p>
         <button class="dilemma-btn" id="btnContinuePhishing" style="background:#f59e0b;">Buscar en sitio oficial</button>
       </div>
+    </div>
+
+    <!-- Marketplace Hack Modal -->
+    <div id="marketpl4ceHackModal" class="game-over-modal" aria-hidden="true">
+      <div class="game-over-card" style="border-color:#ef4444; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.4);">
+        <div class="game-over-icon" style="color:#ef4444;">💀</div>
+        <h2 style="color:#f87171;">¡Teléfono hackeado!</h2>
+        <p>Instalaste <strong>Marketpl4ce</strong>, una app falsa. Robó tus datos personales al abrirla.</p>
+        <div class="impact-badges large">
+          <span class="impact-badge neg" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4);">Calma -30%</span>
+          <span class="impact-badge neg" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4);">Felicidad -20%</span>
+        </div>
+        <p class="intro-description-highlight" style="color:#fcd34d; font-size:0.9rem; margin-top:8px;">
+          Descargá apps solo desde tiendas oficiales. Revisá bien el nombre y el desarrollador antes de instalar.
+        </p>
+        <button class="dilemma-btn" id="btnMarketpl4ceRewind" style="background:#ef4444;">Reiniciar día</button>
+      </div>
+    </div>
+
+    <!-- Marketplace Scam Modal -->
+    <div id="marketplaceScamModal" class="game-over-modal" aria-hidden="true">
+      <div class="game-over-card" style="border-color:#ef4444; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.4);">
+        <div class="game-over-icon" style="color:#ef4444;">⚠️</div>
+        <h2 style="color:#f87171;">¡Estafa!</h2>
+        <p id="marketplaceScamText">Pagaste al vendedor pero nunca envió el producto.</p>
+        <div class="impact-badges large" id="marketplaceScamImpact"></div>
+        <p class="intro-description-highlight" style="color:#fcd34d; font-size:0.9rem; margin-top:8px;">
+          En Marketplace, desconfiá de precios muy bajos, vendedores sin reputación y pagos fuera de la plataforma.
+        </p>
+        <button class="dilemma-btn" id="btnMarketplaceScamContinue" style="background:#f59e0b;">Volver a Marketplace</button>
+      </div>
+    </div>
+
+    <!-- Marketplace Success Modal -->
+    <div id="marketplaceSuccessModal" class="game-over-modal" aria-hidden="true">
+      <div class="game-over-card" style="border-color:#22c55e; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(34, 197, 94, 0.4);">
+        <div class="game-over-icon" style="color:#22c55e;">🎁</div>
+        <h2 style="color:#4ade80;">¡Compra realizada con éxito!</h2>
+        <p id="marketplaceSuccessText">Tu pedido llegará pronto.</p>
+        <p class="intro-description-highlight" style="color:#86efac; font-size:0.9rem; margin-top:8px;">
+          Quedate atenta: el repartidor pasará por tu casa.
+        </p>
+        <button class="dilemma-btn" id="btnMarketplaceSuccessContinue" style="background:#22c55e;">Esperar el pedido</button>
+      </div>
+    </div>
+
+    <!-- Post-assault scam modal -->
+    <div id="postAssaultScamModal" class="game-over-modal" aria-hidden="true">
+      <div class="game-over-card" style="border-color:#ef4444; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.4);">
+        <div class="game-over-icon" style="color:#ef4444;">💀</div>
+        <h2 style="color:#f87171;">¡La muñeca era una estafa!</h2>
+        <p>Lamentablemente, la compra que realizaste en Marketplace era una estafa. Las personas que entraron a tu casa eran cómplices de la publicación.</p>
+        <p class="intro-description-highlight" style="color:#fcd34d; font-size:0.9rem; margin-top:8px;">
+          Comprá siempre en publicaciones con buena reputación, descripción clara y vendedores con cuentas antiguas.
+        </p>
+        <button class="dilemma-btn" id="btnPostAssaultRestart" style="background:#ef4444;">Reiniciar día</button>
+      </div>
+    </div>
+
+    <!-- Casino bankrupt modal -->
+    <div id="casinoBankruptModal" class="game-over-modal" aria-hidden="true">
+      <div class="game-over-card" style="border-color:#ef4444; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.4);">
+        <div class="game-over-icon" style="color:#ef4444;">💸</div>
+        <h2 style="color:#f87171;">¡Te quedaste sin dinero!</h2>
+        <p>Perdiste todo en el casino. Marta no puede comprarle el regalo a Clara.</p>
+        <p class="intro-description-highlight" style="color:#fcd34d; font-size:0.9rem; margin-top:8px;">
+          El juego puede generar pérdidas. Si decidís jugar, hacelo con responsabilidad.
+        </p>
+        <button class="dilemma-btn" id="btnCasinoBankruptRestart" style="background:#ef4444;">Reiniciar día</button>
+      </div>
+    </div>
+
+    <!-- Uber narration modal -->
+    <div id="uberNarrationModal" class="game-over-modal" aria-hidden="true" style="z-index: 10000; background: rgba(0,0,0,0.95); display: none;">
+      <div class="game-over-card" style="border-color:#fbbf24; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(251, 191, 36, 0.4); max-width: 460px; width: 90%; text-align: left; padding: 24px; border-radius: 12px;">
+        <h2 style="color:#fbbf24; margin-top: 0; margin-bottom: 16px; text-align: center; font-size: 1.4rem;">El Cumpleaños de Clara</h2>
+        <div id="uberNarrationText" style="line-height: 1.6; font-size: 0.95rem; margin-bottom: 24px; color: #e4e4e7; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <!-- Populated dynamically via JS -->
+        </div>
+        <button id="btnUberNarrationNext" class="dilemma-btn" style="background:#fbbf24; color:#000; width: 100%; font-weight: bold; margin: 0; padding: 12px; border-radius: 8px;">Ver Resultados</button>
+      </div>
+    </div>
+
+    <!-- Uber success modal -->
+    <div id="uberSuccessModal" class="game-over-modal" aria-hidden="true" style="z-index: 10000;">
+      <div class="game-over-card" style="border-color:#22c55e; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(34, 197, 94, 0.4); max-width: 420px; width: 90%;">
+        <div class="game-over-icon" style="color:#22c55e; margin-bottom: 8px;">🏆</div>
+        <h2 style="color:#4ade80; margin-bottom: 4px;">¡Viaje confirmado!</h2>
+        <p style="margin-bottom: 12px; font-size: 0.9rem;">Lograste pedir el Uber. Marta va camino al cumpleaños de Clara. 🎂</p>
+        
+        <!-- Score Breakdown Section -->
+        <div id="uberScoreBreakdown" class="uber-score-breakdown">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <!-- Leaderboard Submit Form -->
+        <div id="uberLeaderboardForm" class="uber-leaderboard-form">
+          <p style="font-size:0.85rem; color:#a1a1aa; margin: 8px 0;">¡Registrá tu puntuación en la tabla de posiciones!</p>
+          <div style="display: flex; gap: 8px; width: 100%; justify-content: center; margin-bottom: 8px;">
+            <input type="text" id="uberPlayerName" class="uber-leaderboard-input" placeholder="Tu nombre" value="Marta" maxlength="15" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #3f3f46; background: #27272a; color: #fff; font-size: 0.9rem;">
+            <button id="btnSaveUberScore" class="dilemma-btn" style="background:#22c55e; margin: 0; padding: 10px 16px; font-size: 0.9rem;">Guardar</button>
+          </div>
+        </div>
+
+        <!-- Leaderboard View Section -->
+        <div id="uberLeaderboardView" class="uber-leaderboard-view is-hidden" style="width: 100%; display: none;">
+          <h3 style="color:#fbbf24; font-size: 1.05rem; margin: 12px 0 8px; text-align: center;">Tabla de Posiciones</h3>
+          <div class="uber-table-wrapper" style="overflow-x: auto; width: 100%;">
+            <table class="uber-leaderboard-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left; color: #e4e4e7;">
+              <thead>
+                <tr style="border-bottom: 2px solid #3f3f46; color: #a1a1aa;">
+                  <th style="padding: 6px 4px;">Puesto</th>
+                  <th style="padding: 6px 4px;">Nombre</th>
+                  <th style="padding: 6px 4px;">Muñeca</th>
+                  <th style="padding: 6px 4px;">Tiempo</th>
+                  <th style="padding: 6px 4px; text-align: right;">Total</th>
+                </tr>
+              </thead>
+              <tbody id="uberLeaderboardBody">
+                <!-- Populated dynamically via JS -->
+              </tbody>
+            </table>
+          </div>
+          
+          <p class="intro-description-highlight" style="color:#86efac; font-size:0.8rem; margin: 12px 0 8px;">
+            A veces las apps parecen simples, pero para una persona mayor pueden ser un laberinto.
+          </p>
+          <button class="dilemma-btn" id="btnUberSuccessContinue" style="background:#22c55e; width: 100%; margin-top: 8px;">Ir al cumpleaños</button>
+          <button class="dilemma-btn" id="btnUberDownloadBoard" style="background:#4b5563; width: 100%; margin-top: 8px;">Descargar Tabla (.json)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Uber fail modal (final malo) -->
+    <div id="uberFailModal" class="game-over-modal" aria-hidden="true" style="z-index: 10000;">
+      <div class="game-over-card" style="border-color:#ef4444; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.4);">
+        <div class="game-over-icon" style="color:#ef4444;">💔</div>
+        <h2 style="color:#f87171;">Marta no llegó al cumpleaños</h2>
+        <p>No lograste pedir el Uber a tiempo. Agotaste tus intentos y Marta se perdió el cumpleaños de Clara.</p>
+        <p class="intro-description-highlight" style="color:#fcd34d; font-size:0.9rem; margin-top:8px;">
+          La tecnología, cuando es confusa o mal diseñada, puede dejar a las personas solas. La brecha digital también aísla.
+        </p>
+        <button class="dilemma-btn" id="btnUberFailRestart" style="background:#ef4444;">Reintentar</button>
+      </div>
+    </div>
+
+    <!-- Game complete modal (final del juego) -->
+    <div id="gameCompleteModal" class="game-over-modal" aria-hidden="true" style="z-index: 10001;">
+      <div class="game-over-card" style="border-color:#22c55e; background:#1c1917; box-shadow: 0 25px 50px -12px rgba(34, 197, 94, 0.4); max-width: 460px; width: 90%; text-align: center;">
+        <div class="game-over-icon" style="color:#22c55e; font-size: 3rem;">🎂</div>
+        <h2 style="color:#4ade80; margin-bottom: 8px;">¡Fin del juego!</h2>
+        <p style="margin-bottom: 12px; font-size: 0.95rem; color: #e4e4e7;">Marta llegó al cumpleaños de Clara. A través de sus 5 días, aprendiste sobre los desafíos que las personas mayores enfrentan con la tecnología: estafas, apps confusas, seguridad digital y la brecha digital.</p>
+        <p class="intro-description-highlight" style="color:#86efac; font-size:0.85rem; margin: 12px 0;">
+          La tecnología debería incluir, no excluir. Sé paciente y ayudá a quienes más lo necesitan.
+        </p>
+        <button class="dilemma-btn" id="btnGameCompleteRestart" style="background:#22c55e; margin-top: 12px;">Jugar de nuevo</button>
+      </div>
+    </div>
+  </div>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>

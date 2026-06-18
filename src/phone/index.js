@@ -9,6 +9,7 @@ import {
   installedApps,
   statsState,
   gameState,
+  visualFatigueDisabled,
 } from '../state/index.js';
 import { phoneScreenCorners } from '../core/phone3d.js';
 import { mlGiftsDilemma } from '../data/dilemmas.js';
@@ -62,6 +63,21 @@ function registerEventListeners() {
         if (app === 'browser' && typeof callbacks.onOpenBrowserApp === 'function') {
           callbacks.onOpenBrowserApp();
         }
+        if (app === 'marketplace' && typeof callbacks.onOpenMarketplaceApp === 'function') {
+          callbacks.onOpenMarketplaceApp();
+        }
+        if (app === 'marketpl4ce' && typeof callbacks.onOpenMarketpl4ceApp === 'function') {
+          callbacks.onOpenMarketpl4ceApp();
+        }
+        if (app === 'casino' && typeof callbacks.onOpenCasinoApp === 'function') {
+          callbacks.onOpenCasinoApp();
+        }
+        if (app && app.startsWith('fake-loading')) {
+          switchPhoneView('phoneLoadingView');
+        }
+        if (app === 'uber' && typeof callbacks.onOpenUberApp === 'function') {
+          callbacks.onOpenUberApp();
+        }
       });
     });
   }
@@ -79,6 +95,16 @@ function registerEventListeners() {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const view = btn.closest('.phone-view');
+
+        if (view && view.id === 'phoneMarketplaceProductDetailView') {
+          switchPhoneView('phoneMarketplaceView');
+          return;
+        }
+        if (view && view.id === 'phoneMarketplaceCheckoutView') {
+          switchPhoneView('phoneMarketplaceProductDetailView');
+          return;
+        }
+
         if (view && view.id === 'phoneMessagesView' && currentContact !== null) {
           renderContactList();
         } else {
@@ -164,6 +190,69 @@ function registerEventListeners() {
       renderContactList(e.target.value);
     });
   }
+
+  // Implementar drag-to-scroll táctil simulado para el lienzo de Ajustes Espaciales
+  const settingsViewport = document.querySelector('.settings-viewport');
+  if (settingsViewport) {
+    let isDown = false;
+    let startX, startY;
+    let scrollLeft, scrollTop;
+
+    settingsViewport.addEventListener('mousedown', (e) => {
+      isDown = true;
+      startX = e.pageX - settingsViewport.offsetLeft;
+      startY = e.pageY - settingsViewport.offsetTop;
+      scrollLeft = settingsViewport.scrollLeft;
+      scrollTop = settingsViewport.scrollTop;
+      settingsViewport.style.cursor = 'grabbing';
+    });
+
+    settingsViewport.addEventListener('mouseleave', () => {
+      isDown = false;
+      settingsViewport.style.cursor = 'default';
+    });
+
+    settingsViewport.addEventListener('mouseup', () => {
+      isDown = false;
+      settingsViewport.style.cursor = 'default';
+    });
+
+    settingsViewport.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - settingsViewport.offsetLeft;
+      const y = e.pageY - settingsViewport.offsetTop;
+      const walkX = (x - startX) * 1.5;
+      const walkY = (y - startY) * 1.5;
+      settingsViewport.scrollLeft = scrollLeft - walkX;
+      settingsViewport.scrollTop = scrollTop - walkY;
+    });
+
+    // Soporte para touch/móvil
+    settingsViewport.addEventListener('touchstart', (e) => {
+      isDown = true;
+      const touch = e.touches[0];
+      startX = touch.pageX - settingsViewport.offsetLeft;
+      startY = touch.pageY - settingsViewport.offsetTop;
+      scrollLeft = settingsViewport.scrollLeft;
+      scrollTop = settingsViewport.scrollTop;
+    });
+
+    settingsViewport.addEventListener('touchend', () => {
+      isDown = false;
+    });
+
+    settingsViewport.addEventListener('touchmove', (e) => {
+      if (!isDown) return;
+      const touch = e.touches[0];
+      const x = touch.pageX - settingsViewport.offsetLeft;
+      const y = touch.pageY - settingsViewport.offsetTop;
+      const walkX = (x - startX) * 1.5;
+      const walkY = (y - startY) * 1.5;
+      settingsViewport.scrollLeft = scrollLeft - walkX;
+      settingsViewport.scrollTop = scrollTop - walkY;
+    });
+  }
 }
 
 export function togglePhone() {
@@ -177,7 +266,12 @@ export function togglePhone() {
       document.exitPointerLock();
     }
   } else {
-    canvas.requestPointerLock();
+    try {
+      const lockRequest = canvas.requestPointerLock();
+      if (lockRequest && typeof lockRequest.catch === 'function') lockRequest.catch(() => {});
+    } catch (e) {
+      // Algunos navegadores rechazan pointer lock si el documento perdió foco.
+    }
   }
   if (ui.phonePrompt) {
     ui.phonePrompt.textContent = phoneState.active ? 'T Guardar teléfono' : 'T Coger teléfono';
@@ -297,6 +391,10 @@ export function switchPhoneView(viewId) {
     if (wifiInput) {
       wifiInput.checked = phoneState.wifiEnabled;
     }
+    const fatigueInput = document.getElementById('settingFatigue');
+    if (fatigueInput) {
+      fatigueInput.checked = visualFatigueDisabled;
+    }
   }
 
   if (viewId === 'phonePlayStoreView') {
@@ -324,6 +422,14 @@ export function updatePhoneHomeApps() {
   if (fakeBtn) fakeBtn.style.display = installedApps.mercad0libre ? '' : 'none';
   const browserBtn = document.getElementById('browserAppBtn');
   if (browserBtn) browserBtn.style.display = installedApps.browser ? '' : 'none';
+  const marketplaceBtn = document.getElementById('marketplaceAppBtn');
+  if (marketplaceBtn) marketplaceBtn.style.display = installedApps.marketplace ? '' : 'none';
+  const marketpl4ceBtn = document.getElementById('marketpl4ceAppBtn');
+  if (marketpl4ceBtn) marketpl4ceBtn.style.display = installedApps.marketpl4ce ? '' : 'none';
+  const casinoBtn = document.getElementById('casinoAppBtn');
+  if (casinoBtn) casinoBtn.style.display = installedApps.casino ? '' : 'none';
+  const uberBtn = document.getElementById('uberAppBtn');
+  if (uberBtn) uberBtn.style.display = installedApps.uber ? '' : 'none';
 }
 
 export function getLastPreview(contact) {

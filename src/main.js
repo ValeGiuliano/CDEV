@@ -26,6 +26,10 @@ import {
   visualFatigueDisabled,
   doorState,
   day3Scammed,
+  day4State,
+  day4InitialMoney,
+  casinoState,
+  uberState,
 } from './state/index.js';
 
 void dayRestarted;
@@ -44,17 +48,21 @@ import {
   INSTALL_DELAY_MS,
 } from './config/constants.js';
 
-import { mlProducts } from './data/products.js';
+import { mlProducts, marketplaceProducts } from './data/products.js';
 const fakeMLProducts = mlProducts;
 import { camiloDialogues, claraDialogues } from './data/chats/index.js';
-import { playDoorbellSound, playNotificationSound, playAlertSound, playCinematicSound } from './audio/sounds.js';
+import { playDoorbellSound, playNotificationSound, playAlertSound, playCinematicSound, playCasinoAmbientSound, playCasinoSpinSound, playCasinoWinSound, playCasinoLoseSound } from './audio/sounds.js';
 import { canvas, renderer, scene, camera, clock, lookEuler, initResizeListener, setTimeOfDay, updateTimeOfDay } from './core/renderer.js';
 import { phoneScreenCorners } from './core/phone3d.js';
 import { initPlayer, updateFirstPerson, updateLook, setLookFromEuler, clampPlayerToBounds, isDoorKey, getMoveDirection } from './gameplay/player.js';
 import { initDoors, handleDoorKey, updateDoors } from './gameplay/doors.js';
 import { initBed, handleSleepKey, updateBedPrompt, showCamiloBedMessage } from './gameplay/bed.js';
-import { initDayCycle, updateDayTransition, getDayTransitionOpacity, hideDaysBlockedModal, startDay2, sleepToNextDay as sleepToNextDayFn } from './gameplay/dayCycle.js';
-import { initMissions, setMission, completeMission, updateMissions, addTutorialMessage, showMartaReplyTutorial, startClaraBirthdayMission, startClaraBirthdayFlow, triggerClaraGiftDialogue, startDownloadMercadoLibreMission } from './gameplay/missions.js';
+import { initDayCycle, updateDayTransition, getDayTransitionOpacity, hideDaysBlockedModal, startDay2, startDay4, sleepToNextDay as sleepToNextDayFn } from './gameplay/dayCycle.js';
+import { initMissions, setMission, completeMission, updateMissions, addTutorialMessage, showMartaReplyTutorial, startClaraBirthdayMission, startClaraBirthdayFlow, triggerClaraGiftDialogue, startDownloadMercadoLibreMission, startDay4BuyMission, startDownloadMarketplaceMission, startBuyMarketplaceMission, startUberMission } from './gameplay/missions.js';
+import { initUberMaze, openUberApp, updateUberMaze, setMazeInput, isUberMazeRunning, attachUberListeners, resetUberMaze } from './gameplay/uberMaze.js';
+import { initUberMapPin, startUberMapPin, resetUberMapPin, updateUberMapPin, isUberMapPinActive, setMapPinInput } from './gameplay/uberMapPin.js';
+import { calculateScoreDetails, loadLeaderboard, saveScore, renderScoreBreakdown, renderLeaderboardTable, downloadLeaderboard } from './gameplay/leaderboard.js';
+import { initTraffic, updateTraffic, spawnParkedUber } from './gameplay/traffic.js';
 import {
   initPhone,
   updatePhonePrompt,
@@ -468,6 +476,7 @@ gltfLoader.load(
     
     // Asegurar que la base de sus pies (min Y) descanse exactamente sobre el piso (Y = 0)
     model.position.y = 0 - min.y * scaleFactor;
+    model.userData.baseY = model.position.y;
     
     // Rotar para mirar hacia la televisión (+X)
     model.rotation.set(0, Math.PI / 2, 0); 
@@ -659,6 +668,384 @@ gltfLoader.load(
     console.warn("No se encontró o no se pudo cargar hijo.glb en la carpeta public. Usando fallback procedural cilíndrico.", error);
   }
 );
+
+// --- CARGA ASÍNCRONA DEL REPARTIDOR (CON FALLBACK PROCEDURAL) ---
+let repartidorModel = null;
+let repartidorMixer = null;
+let repartidorActiveMesh = null;
+let repartidorReady = false;
+
+gltfLoader.load(
+  '/repartidor.glb',
+  (gltf) => {
+    const model = gltf.scene;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) child.material.side = THREE.DoubleSide;
+      }
+    });
+    repartidorModel = model;
+    room.add(model);
+    model.visible = false;
+    model.updateMatrixWorld(true);
+
+    if (gltf.animations && gltf.animations.length > 0) {
+      repartidorMixer = new THREE.AnimationMixer(model);
+      model.userData.animations = gltf.animations;
+      console.log("Repartidor: animaciones disponibles:", gltf.animations.map(a => a.name));
+
+      const validAnimations = gltf.animations.filter(a => {
+        const name = a.name.toLowerCase();
+        return !name.includes('tpose') &&
+               !name.includes('t-pose') &&
+               !name.includes('bind') &&
+               !name.includes('default') &&
+               !name.includes('pose') &&
+               a.duration > 0.05;
+      });
+
+      const idleClip = validAnimations.find(a => a.name.toLowerCase().includes('idle') && !a.name.toLowerCase().includes('armature'))
+        || validAnimations.find(a => a.name.toLowerCase().includes('idle'))
+        || validAnimations[0];
+      if (idleClip) {
+        const action = repartidorMixer.clipAction(idleClip);
+        action.setLoop(THREE.LoopRepeat);
+        action.play();
+        model.userData.idleClip = idleClip;
+        model.userData.walkClip = validAnimations.find(a => a.name.toLowerCase().includes('walk')) || null;
+        model.userData.deliverClip = validAnimations.find(a => a.name.toLowerCase().includes('deliver')) || null;
+        model.userData.mixer = repartidorMixer;
+        console.log(`Repartidor: idle="${idleClip.name}", walk="${model.userData.walkClip?.name || 'none'}", deliver="${model.userData.deliverClip?.name || 'none'}"`);
+      }
+    } else {
+      model.userData.proceduralIdle = true;
+    }
+
+    const box = new THREE.Box3();
+    let hasMeshes = false;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.updateMatrixWorld(true);
+        box.expandByObject(child);
+        hasMeshes = true;
+      }
+    });
+    if (!hasMeshes) box.setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const min = box.min;
+
+    const targetHeight = 1.7;
+    let scale = targetHeight / Math.max(size.y, 0.001);
+
+    if (scale < 0.5 || scale > 3) {
+      console.warn(`Repartidor GLB con escala anómala (size.y=${size.y}, scale=${scale}). Se forzará escala 1.0.`);
+      scale = 1.0;
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      model.position.sub(center);
+      model.position.y -= min.y;
+    }
+
+    model.userData.scaleFactor = scale;
+    model.userData.baseOffset = min.y * scale;
+    model.userData.centerX = (box.min.x + box.max.x) / 2;
+    model.userData.centerZ = (box.min.z + box.max.z) / 2;
+    model.scale.setScalar(scale);
+    model.updateMatrixWorld(true);
+
+    // Cubo paquete (entrega con ambas manos) atado al hueso del torso
+    // para que siga el root motion de la animación deliver
+    const deliveryPackage = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.4, 0.25),
+      new THREE.MeshStandardMaterial({ color: 0xc68642, emissive: 0xc68642, emissiveIntensity: 0.3, roughness: 0.8 })
+    );
+    deliveryPackage.castShadow = true;
+    deliveryPackage.receiveShadow = true;
+    deliveryPackage.visible = false;
+    // Compensar la escala del modelo para que el cubo quede en metros reales
+    deliveryPackage.scale.setScalar(1 / scale);
+
+    // Buscar hueso del pecho para anclar el paquete
+    let chestBone = null;
+    model.traverse((child) => {
+      if (child.isBone && !chestBone) {
+        const n = child.name.toLowerCase();
+        if (n.includes('spine2') || n.includes('chest')) chestBone = child;
+      }
+    });
+    if (!chestBone) {
+      model.traverse((child) => {
+        if (child.isBone && !chestBone) {
+          const n = child.name.toLowerCase();
+          if (n.includes('spine1')) chestBone = child;
+        }
+      });
+    }
+    if (!chestBone) {
+      model.traverse((child) => {
+        if (child.isBone && !chestBone) {
+          const n = child.name.toLowerCase();
+          if (n.includes('spine')) chestBone = child;
+        }
+      });
+    }
+
+    if (chestBone) {
+      chestBone.add(deliveryPackage);
+      // Compensar la escala real del esqueleto (incluye el nodo padre "idle" con escala ~0.004)
+      // para que el cubo se vea con tamaño real en metros.
+      model.updateMatrixWorld(true);
+      const boneWorldScale = chestBone.getWorldScale(new THREE.Vector3()).x;
+      deliveryPackage.scale.setScalar(1 / boneWorldScale);
+      // Adelante del torso en eje local (Mixamo: +Z = frente)
+      deliveryPackage.position.set(0, 0, 0.5 / boneWorldScale);
+      deliveryPackage.rotation.set(0, 0, 0);
+      console.log(`Repartidor: paquete atado al hueso ${chestBone.name} (worldScale=${boneWorldScale.toFixed(4)})`);
+    } else {
+      // Fallback: root del modelo
+      model.add(deliveryPackage);
+      model.updateMatrixWorld(true);
+      const rootWorldScale = model.getWorldScale(new THREE.Vector3()).x;
+      deliveryPackage.scale.setScalar(1 / rootWorldScale);
+      deliveryPackage.position.set(0, 1.0 / rootWorldScale, 0.5 / rootWorldScale);
+      console.warn('Repartidor: no se encontró hueso del torso, paquete atado al root');
+    }
+    model.userData.packageMesh = deliveryPackage;
+
+    repartidorReady = true;
+    console.log("Repartidor listo. Escala:", scale, "size.y:", size.y);
+  },
+  undefined,
+  (error) => {
+    console.warn("No se encontró o no se pudo cargar repartidor.glb. Usando fallback procedural.", error);
+    repartidorReady = true;
+  }
+);
+
+// --- CARGA ASÍNCRONA DEL LADRÓN (CON FALLBACK PROCEDURAL) ---
+let ladronModel = null;
+let ladronMixer = null;
+let ladronReady = false;
+
+gltfLoader.load(
+  '/ladron.glb',
+  (gltf) => {
+    const model = gltf.scene;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) child.material.side = THREE.DoubleSide;
+      }
+    });
+    ladronModel = model;
+    room.add(model);
+    model.visible = false;
+    model.updateMatrixWorld(true);
+
+    if (gltf.animations && gltf.animations.length > 0) {
+      ladronMixer = new THREE.AnimationMixer(model);
+      model.userData.animations = gltf.animations;
+      model.userData.mixer = ladronMixer;
+      console.log("Ladrón: animaciones disponibles:", gltf.animations.map(a => a.name));
+
+      const validAnimations = gltf.animations.filter(a => {
+        const name = a.name.toLowerCase();
+        return !name.includes('tpose') &&
+               !name.includes('t-pose') &&
+               !name.includes('bind') &&
+               !name.includes('default') &&
+               !name.includes('pose') &&
+               a.duration > 0.05;
+      });
+
+      const idleClip = validAnimations.find(a => a.name.toLowerCase().includes('idle')) || validAnimations[0];
+      const attackClip =
+        validAnimations.find(a => {
+          const n = a.name.toLowerCase();
+          return n.includes('attack') || n.includes('hit') || n.includes('punch') || n.includes('assault') || n.includes('aggressive');
+        }) ||
+        validAnimations.find(a => a !== idleClip) ||
+        validAnimations[0];
+
+      model.userData.idleClip = idleClip || null;
+      model.userData.attackClip = attackClip || null;
+      console.log(`Ladrón: idle="${idleClip?.name || 'none'}", attack="${attackClip?.name || 'none'}"`);
+    } else {
+      model.userData.proceduralIdle = true;
+    }
+
+    const box = new THREE.Box3();
+    let hasMeshes = false;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.updateMatrixWorld(true);
+        box.expandByObject(child);
+        hasMeshes = true;
+      }
+    });
+    if (!hasMeshes) box.setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const min = box.min;
+
+    const targetHeight = 1.75;
+    let scale = targetHeight / Math.max(size.y, 0.001);
+
+    if (scale < 0.5 || scale > 3) {
+      console.warn(`Ladrón GLB con escala anómala (size.y=${size.y}, scale=${scale}). Se forzará escala 1.0.`);
+      scale = 1.0;
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      model.position.sub(center);
+      model.position.y -= min.y;
+    }
+
+    model.userData.scaleFactor = scale;
+    model.userData.baseOffset = min.y * scale;
+    model.userData.centerX = (box.min.x + box.max.x) / 2;
+    model.userData.centerZ = (box.min.z + box.max.z) / 2;
+    model.scale.setScalar(scale);
+    model.updateMatrixWorld(true);
+    ladronReady = true;
+    console.log("Ladrón listo. Escala:", scale, "size.y:", size.y);
+  },
+  undefined,
+  (error) => {
+    console.warn("No se encontró o no se pudo cargar ladron.glb. Usando fallback procedural.", error);
+    ladronReady = true;
+  }
+);
+
+// Placeholders procedurales para los personajes
+const repartidorPlaceholder = new THREE.Group();
+{
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.9, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x1e88e5, emissive: 0x1e88e5, emissiveIntensity: 0.4, roughness: 0.6 })
+  );
+  body.position.y = 0.55;
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffdbac, emissive: 0xffdbac, emissiveIntensity: 0.2, roughness: 0.6 })
+  );
+  head.position.y = 1.15;
+  const armL = new THREE.Mesh(
+    new THREE.BoxGeometry(0.15, 0.6, 0.15),
+    new THREE.MeshStandardMaterial({ color: 0x1e88e5, emissive: 0x1e88e5, emissiveIntensity: 0.4, roughness: 0.6 })
+  );
+  armL.position.set(-0.35, 0.7, 0);
+  const armR = armL.clone();
+  armR.position.x = 0.35;
+  const package_ = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.4, 0.25),
+    new THREE.MeshStandardMaterial({ color: 0xc68642, emissive: 0xc68642, emissiveIntensity: 0.3, roughness: 0.8 })
+  );
+  package_.position.set(0, 1.0, 0.25);
+  package_.visible = false;
+  repartidorPlaceholder.add(body, head, armL, armR, package_);
+  repartidorPlaceholder.userData.packageMesh = package_;
+  repartidorPlaceholder.visible = false;
+  room.add(repartidorPlaceholder);
+}
+
+const ladronPlaceholder = new THREE.Group();
+{
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.95, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0x550000, emissiveIntensity: 0.3, roughness: 0.7 })
+  );
+  body.position.y = 0.58;
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xb3826b, emissive: 0xb3826b, emissiveIntensity: 0.2, roughness: 0.6 })
+  );
+  head.position.y = 1.2;
+  const mask = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, 0.1, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x000000, emissiveIntensity: 0, roughness: 0.7 })
+  );
+  mask.position.set(0, 1.18, 0.15);
+  const armL = new THREE.Mesh(
+    new THREE.BoxGeometry(0.15, 0.6, 0.15),
+    new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0x550000, emissiveIntensity: 0.3, roughness: 0.7 })
+  );
+  armL.position.set(-0.35, 0.72, 0);
+  const armR = armL.clone();
+  armR.position.x = 0.35;
+  ladronPlaceholder.add(body, head, mask, armL, armR);
+  ladronPlaceholder.visible = false;
+  room.add(ladronPlaceholder);
+}
+
+// Esfera de debug: confirma que la posición de la cinemática es correcta
+const debugMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.2, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xff0000 })
+);
+debugMarker.position.set(0.72, 1, -7.5);
+debugMarker.visible = false;
+room.add(debugMarker);
+
+function playRepartidorClip(clipName, options = {}) {
+  if (!repartidorModel || !repartidorModel.userData.mixer) return;
+  const ud = repartidorModel.userData;
+  const clip = clipName === 'walk' ? ud.walkClip
+             : clipName === 'deliver' ? ud.deliverClip
+             : clipName === 'idle' ? ud.idleClip
+             : null;
+  if (!clip) return;
+  const { loop = THREE.LoopRepeat, clamp = false } = options;
+  ud.mixer.stopAllAction();
+  const action = ud.mixer.clipAction(clip);
+  action.setLoop(loop);
+  action.clampWhenFinished = clamp;
+  action.reset();
+  action.fadeIn(0.2).play();
+}
+
+function playLadronClip(clipName, options = {}) {
+  if (!ladronModel || !ladronModel.userData.mixer) return;
+  const ud = ladronModel.userData;
+  const clip = clipName === 'attack' ? ud.attackClip
+             : clipName === 'idle' ? ud.idleClip
+             : null;
+  if (!clip) return;
+  const { loop = THREE.LoopRepeat, clamp = false } = options;
+  ud.mixer.stopAllAction();
+  const action = ud.mixer.clipAction(clip);
+  action.setLoop(loop);
+  action.clampWhenFinished = clamp;
+  action.reset();
+  action.fadeIn(0.2).play();
+}
+
+function setDeliveryPackageVisible(visible) {
+  if (repartidorModel && repartidorModel.userData && repartidorModel.userData.packageMesh) {
+    repartidorModel.userData.packageMesh.visible = visible;
+  }
+  if (repartidorPlaceholder && repartidorPlaceholder.userData && repartidorPlaceholder.userData.packageMesh) {
+    repartidorPlaceholder.userData.packageMesh.visible = visible;
+  }
+}
+
+function hideDay4Characters() {
+  if (repartidorModel) repartidorModel.visible = false;
+  if (repartidorMixer) repartidorMixer.stopAllAction();
+  if (repartidorPlaceholder.parent === room) repartidorPlaceholder.visible = false;
+  if (ladronPlaceholder.parent === room) ladronPlaceholder.visible = false;
+  if (ladronModel) ladronModel.visible = false;
+  if (ladronMixer) ladronMixer.stopAllAction();
+  if (ladronModel && ladronModel.userData.clone1) ladronModel.userData.clone1.visible = false;
+  if (ladronModel && ladronModel.userData.clone2) ladronModel.userData.clone2.visible = false;
+  repartidorPlaceholder.visible = false;
+  ladronPlaceholder.visible = false;
+  if (repartidorActiveMesh) repartidorActiveMesh.visible = false;
+  setDeliveryPackageVisible(false);
+  debugMarker.visible = false;
+  repartidorActiveMesh = null;
+}
 
 function mesh(geometry, material, position, rotation = [0, 0, 0], cast = true, receive = true) {
   const m = new THREE.Mesh(geometry, material);
@@ -1511,7 +1898,7 @@ const cutsceneEntry = [
   },
   {
     duration: 3.5,
-    dialogue: { speaker: "Anciana", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
+    dialogue: { speaker: "Marta", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
     sound: { freq: 380, type: 'sine', duration: 0.3 },
     onStart: () => {
       // Activar la animación de conversación de Marta cuando habla
@@ -1635,7 +2022,7 @@ const cutsceneLiving = [
   },
   {
     duration: 3.5,
-    dialogue: { speaker: "Anciana", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
+    dialogue: { speaker: "Marta", text: "Ay hijo... ya sabes que a mí no me gustan para nada esas cosas modernas, me marean." },
     sound: { freq: 380, type: 'sine', duration: 0.3 },
     onStart: () => {
       // Activar la animación de conversación de Marta cuando habla
@@ -1935,6 +2322,668 @@ const day3WakeUpSequence = [
   }
 ];
 
+// --- DAY 4 WAKE-UP SEQUENCE ---
+const day4WakeUpSequence = [
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Al día siguiente…' },
+    onStart: () => {
+      camera.position.set(4.2, 0.72, 3.45);
+      camera.lookAt(4.2, 2.5, 3.45);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.transition = 'none';
+        ui.dayTransitionOverlay.style.opacity = '1';
+        ui.dayTransitionOverlay.setAttribute('aria-hidden', 'false');
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(1 - ease * 0.7);
+      }
+      camera.position.y = THREE.MathUtils.lerp(0.72, 0.78, ease);
+    }
+  },
+  {
+    duration: 3.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Hoy tengo que conseguirle la muñeca a Clara. ¡Manos a la obra!' },
+    sound: { freq: 320, type: 'sine', duration: 0.4 },
+    onStart: () => {
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = '0.3';
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(0.3 * (1 - ease));
+      }
+      const startTarget = new THREE.Vector3(4.2, 2.5, 3.45);
+      const endTarget = new THREE.Vector3(4.2, 1.4, 0);
+      const currentTarget = new THREE.Vector3().lerpVectors(startTarget, endTarget, ease);
+      camera.lookAt(currentTarget);
+      camera.position.y = THREE.MathUtils.lerp(0.78, 0.82, ease);
+    }
+  }
+];
+
+// --- DAY 5 WAKE-UP SEQUENCE ---
+const day5WakeUpSequence = [
+  {
+    duration: 2.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: 'Al día siguiente…' },
+    onStart: () => {
+      camera.position.set(4.2, 0.72, 3.45);
+      camera.lookAt(4.2, 2.5, 3.45);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.transition = 'none';
+        ui.dayTransitionOverlay.style.opacity = '1';
+        ui.dayTransitionOverlay.setAttribute('aria-hidden', 'false');
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(1 - ease * 0.7);
+      }
+      camera.position.y = THREE.MathUtils.lerp(0.72, 0.78, ease);
+    }
+  },
+  {
+    duration: 3.0,
+    autoAdvance: true,
+    dialogue: { speaker: '', text: '¡Hoy es el cumpleaños de Clara! Tengo que llegar a la fiesta.' },
+    sound: { freq: 320, type: 'sine', duration: 0.4 },
+    onStart: () => {
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = '0.3';
+      }
+    },
+    action: (progress) => {
+      const ease = progress * progress * (3 - 2 * progress);
+      if (ui.dayTransitionOverlay) {
+        ui.dayTransitionOverlay.style.opacity = String(0.3 * (1 - ease));
+      }
+      const startTarget = new THREE.Vector3(4.2, 2.5, 3.45);
+      const endTarget = new THREE.Vector3(4.2, 1.4, 0);
+      const currentTarget = new THREE.Vector3().lerpVectors(startTarget, endTarget, ease);
+      camera.lookAt(currentTarget);
+      camera.position.y = THREE.MathUtils.lerp(0.78, 0.82, ease);
+    }
+  }
+];
+
+// --- DAY 4: SECUENCIA DE ENTREGA (COMPRA REAL) ---
+// Puntos de cámara predefinidos para una transición fluida entre planos
+const DEL_CAM_WIDE          = new THREE.Vector3(2.4, 1.45, -5.0);
+const DEL_CAM_MEDIUM        = new THREE.Vector3(1.8, 1.40, -5.4);
+const DEL_CAM_BEHIND_MARTA  = new THREE.Vector3(1.5, 1.45, -4.5);
+const DEL_CAM_DELIVERY      = new THREE.Vector3(2.0, 1.35, -5.8);
+const DEL_CAM_LEAVE         = new THREE.Vector3(2.4, 1.45, -5.0);
+
+const DEL_LOOK_DOOR   = new THREE.Vector3(0.72, 1.25, -6.3);
+const DEL_LOOK_CENTER = new THREE.Vector3(0.72, 1.25, -6.9);
+const DEL_LOOK_VISITOR = new THREE.Vector3(0.72, 1.25, -7.5);
+
+const MARTA_DOOR_POS     = new THREE.Vector3(0.72, 0, -5.3); // y se completa con baseY
+const REPART_IDLE_POS    = new THREE.Vector3(0.72, 0, -8.5);
+const REPART_DELIVER_END = new THREE.Vector3(0.72, 0, -7.3);
+const REPART_LEAVE_END   = new THREE.Vector3(0.72, 0, -10.0);
+
+function smoothCamStep(start, end, lookAt) {
+  return (progress) => {
+    const ease = progress * progress * (3 - 2 * progress);
+    camera.position.lerpVectors(start, end, ease);
+    if (lookAt) camera.lookAt(lookAt);
+  };
+}
+
+function smoothMoveZStep(mesh, startZ, endZ) {
+  return (progress) => {
+    if (!mesh) return;
+    const ease = progress * progress * (3 - 2 * progress);
+    mesh.position.z = THREE.MathUtils.lerp(startZ, endZ, ease);
+  };
+}
+
+function placeMartaAtDoor() {
+  const baseY = (martaLoadedModel && martaLoadedModel.userData && martaLoadedModel.userData.baseY) || 0;
+  if (martaLoadedModel) {
+    martaModel.visible = true;
+    martaLoadedModel.visible = true;
+    martaLoadedModel.position.set(MARTA_DOOR_POS.x, baseY, MARTA_DOOR_POS.z);
+    martaLoadedModel.rotation.set(0, Math.PI, 0);
+  } else if (typeof oldWomanMesh !== 'undefined' && oldWomanMesh) {
+    oldWomanMesh.visible = true;
+    oldWomanMesh.position.set(MARTA_DOOR_POS.x, 1.25, MARTA_DOOR_POS.z);
+    oldWomanMesh.rotation.set(0, Math.PI, 0);
+  }
+}
+
+function playMartaTalk() {
+  if (martaLoadedModel && martaMixer && martaLoadedModel.userData.talkClip) {
+    martaMixer.stopAllAction();
+    const action = martaMixer.clipAction(martaLoadedModel.userData.talkClip);
+    action.reset();
+    action.fadeIn(0.2).play();
+  }
+}
+
+function hideMartaInCinematic() {
+  if (martaModel) martaModel.visible = false;
+  if (typeof oldWomanMesh !== 'undefined' && oldWomanMesh) oldWomanMesh.visible = false;
+  if (martaMixer) martaMixer.stopAllAction();
+}
+
+const deliverySequence = [
+  // Paso 0: Plano amplio estático — ambos visibles, puerta cerrada
+  {
+    duration: 1.6,
+    autoAdvance: true,
+    onStart: () => {
+      placeMartaAtDoor();
+      if (repartidorModel && repartidorReady) {
+        repartidorModel.visible = true;
+        repartidorModel.position.set(REPART_IDLE_POS.x, REPART_IDLE_POS.y, REPART_IDLE_POS.z);
+        repartidorModel.rotation.set(0, 0, 0);
+        repartidorActiveMesh = repartidorModel;
+        playRepartidorClip('idle');
+      } else if (repartidorPlaceholder) {
+        repartidorPlaceholder.visible = true;
+        repartidorPlaceholder.position.set(REPART_IDLE_POS.x, REPART_IDLE_POS.y, REPART_IDLE_POS.z);
+        repartidorPlaceholder.rotation.set(0, 0, 0);
+        repartidorActiveMesh = repartidorPlaceholder;
+      } else {
+        repartidorActiveMesh = null;
+      }
+      camera.position.copy(DEL_CAM_WIDE);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: smoothCamStep(DEL_CAM_WIDE, DEL_CAM_WIDE, DEL_LOOK_DOOR)
+  },
+  // Paso 1: Se abre la puerta — cámara estática
+  {
+    duration: 1.4,
+    autoAdvance: true,
+    onStart: () => {
+      doorState.living.open = true;
+      camera.position.copy(DEL_CAM_WIDE);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: smoothCamStep(DEL_CAM_WIDE, DEL_CAM_WIDE, DEL_LOOK_DOOR)
+  },
+  // Paso 2: Marta: "¿Hola?" — cámara se mueve detrás de Marta para ver al repartidor
+  {
+    duration: 1.8,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: '¿Hola?' },
+    onStart: () => {
+      playMartaTalk();
+      camera.position.copy(DEL_CAM_MEDIUM);
+      camera.lookAt(DEL_LOOK_CENTER);
+    },
+    action: smoothCamStep(DEL_CAM_MEDIUM, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 3: Repartidor: "Tengo un paquete..." — cámara detrás de Marta, mirando al repartidor
+  {
+    duration: 2.5,
+    autoAdvance: true,
+    dialogue: { speaker: 'Repartidor', text: 'Tengo un paquete para Marta Gómez.' },
+    onStart: () => {
+      if (martaMixer) martaMixer.stopAllAction();
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
+    },
+    action: smoothCamStep(DEL_CAM_BEHIND_MARTA, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 4: Marta: "Soy yo." — cámara detrás de Marta
+  {
+    duration: 1.6,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: 'Soy yo.' },
+    onStart: () => {
+      playMartaTalk();
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
+    },
+    action: smoothCamStep(DEL_CAM_BEHIND_MARTA, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 5: Repartidor entrega el paquete — cámara pasa al plano lateral
+  {
+    duration: 5.0,
+    autoAdvance: true,
+    dialogue: { speaker: 'Repartidor', text: 'Se lo entrego.' },
+    onStart: () => {
+      if (martaMixer) martaMixer.stopAllAction();
+      playRepartidorClip('deliver', { loop: THREE.LoopOnce, clamp: true });
+      setDeliveryPackageVisible(true);
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
+    },
+    action: (progress) => {
+      smoothMoveZStep(repartidorActiveMesh, REPART_IDLE_POS.z, REPART_DELIVER_END.z)(progress);
+      smoothCamStep(DEL_CAM_BEHIND_MARTA, DEL_CAM_DELIVERY, DEL_LOOK_DOOR)(progress);
+    }
+  },
+  // Paso 6: Marta: "Gracias." — el repartidor se da vuelta y se va caminando
+  {
+    duration: 2.8,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: 'Gracias.' },
+    onStart: () => {
+      playMartaTalk();
+      if (repartidorActiveMesh === repartidorModel) {
+        repartidorModel.rotation.y = Math.PI;
+      } else if (repartidorActiveMesh === repartidorPlaceholder) {
+        repartidorPlaceholder.rotation.y = Math.PI;
+      }
+      playRepartidorClip('walk');
+      setDeliveryPackageVisible(false);
+      camera.position.copy(DEL_CAM_DELIVERY);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: (progress) => {
+      smoothMoveZStep(repartidorActiveMesh, REPART_DELIVER_END.z, REPART_LEAVE_END.z)(progress);
+      smoothCamStep(DEL_CAM_DELIVERY, DEL_CAM_LEAVE, DEL_LOOK_DOOR)(progress);
+    }
+  }
+];
+
+// --- DAY 4: SECUENCIA DE ASALTO (COMPRA ESTAFA) ---
+const LADRON_IDLE_POS    = new THREE.Vector3(0.72, 0, -8.0);
+const LADRON_ATTACK_END  = new THREE.Vector3(0.72, 0, -5.5);
+const ASSAULT_CAM_WIDE   = DEL_CAM_WIDE;
+const ASSAULT_CAM_MEDIUM = DEL_CAM_MEDIUM;
+const ASSAULT_CAM_ATTACK = new THREE.Vector3(1.5, 1.30, -5.5);
+
+const assaultSequence = [
+  // Paso 0: Ladrón idle afuera, Marta adentro, puerta cerrada
+  {
+    duration: 1.4,
+    autoAdvance: true,
+    onStart: () => {
+      placeMartaAtDoor();
+      if (ladronModel && ladronReady) {
+        ladronModel.visible = true;
+        const offset = ladronModel.userData.baseOffset || 0;
+        ladronModel.position.set(LADRON_IDLE_POS.x, offset, LADRON_IDLE_POS.z);
+        ladronModel.rotation.set(0, 0, 0);
+        repartidorActiveMesh = ladronModel;
+        playLadronClip('idle');
+      } else if (ladronPlaceholder) {
+        ladronPlaceholder.visible = true;
+        ladronPlaceholder.position.set(LADRON_IDLE_POS.x, LADRON_IDLE_POS.y, LADRON_IDLE_POS.z);
+        ladronPlaceholder.rotation.set(0, 0, 0);
+        repartidorActiveMesh = ladronPlaceholder;
+      } else {
+        repartidorActiveMesh = null;
+      }
+      camera.position.copy(ASSAULT_CAM_WIDE);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: smoothCamStep(ASSAULT_CAM_WIDE, ASSAULT_CAM_WIDE, DEL_LOOK_DOOR)
+  },
+  // Paso 1: Marta abre la puerta
+  {
+    duration: 1.4,
+    autoAdvance: true,
+    onStart: () => {
+      doorState.living.open = true;
+      camera.position.copy(ASSAULT_CAM_WIDE);
+      camera.lookAt(DEL_LOOK_DOOR);
+    },
+    action: smoothCamStep(ASSAULT_CAM_WIDE, ASSAULT_CAM_MEDIUM, DEL_LOOK_CENTER)
+  },
+  // Paso 2: Marta: "Hola" — cámara se mueve detrás de Marta
+  {
+    duration: 1.8,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: 'Hola' },
+    onStart: () => {
+      playMartaTalk();
+      camera.position.copy(ASSAULT_CAM_MEDIUM);
+      camera.lookAt(DEL_LOOK_CENTER);
+    },
+    action: smoothCamStep(ASSAULT_CAM_MEDIUM, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 3: Ladrón: "¿Es usted, Marta Gómez?" — cámara detrás de Marta
+  {
+    duration: 2.5,
+    autoAdvance: true,
+    dialogue: { speaker: '???', text: '¿Es usted, Marta Gómez?' },
+    sound: { freq: 200, type: 'sawtooth', duration: 0.4 },
+    onStart: () => {
+      if (martaMixer) martaMixer.stopAllAction();
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
+    },
+    action: smoothCamStep(DEL_CAM_BEHIND_MARTA, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 4: Marta: "Sí" — cámara detrás de Marta
+  {
+    duration: 1.4,
+    autoAdvance: true,
+    dialogue: { speaker: 'Marta', text: 'Sí' },
+    onStart: () => {
+      playMartaTalk();
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
+    },
+    action: smoothCamStep(DEL_CAM_BEHIND_MARTA, DEL_CAM_BEHIND_MARTA, DEL_LOOK_VISITOR)
+  },
+  // Paso 5: El ladrón ataca — cámara pasa al plano de ataque con shake
+  {
+    duration: 1.5,
+    autoAdvance: true,
+    dialogue: { speaker: 'Ladrón', text: '¡ENTREGATE!' },
+    sound: { freq: 100, type: 'sawtooth', duration: 0.6 },
+    onStart: () => {
+      if (martaMixer) martaMixer.stopAllAction();
+      playLadronClip('attack', { loop: THREE.LoopOnce, clamp: true });
+      camera.position.copy(DEL_CAM_BEHIND_MARTA);
+      camera.lookAt(DEL_LOOK_VISITOR);
+    },
+    action: (progress) => {
+      smoothMoveZStep(repartidorActiveMesh, LADRON_IDLE_POS.z, LADRON_ATTACK_END.z)(progress);
+      const shake = Math.sin(progress * Math.PI * 22) * 0.18;
+      const from = DEL_CAM_BEHIND_MARTA;
+      const to = ASSAULT_CAM_ATTACK;
+      const x = THREE.MathUtils.lerp(from.x, to.x, progress) + shake;
+      const y = THREE.MathUtils.lerp(from.y, to.y, progress) - progress * 0.15;
+      const z = THREE.MathUtils.lerp(from.z, to.z, progress);
+      camera.position.set(x, y, z);
+      camera.lookAt(DEL_LOOK_DOOR);
+    }
+  }
+];
+
+function startDay4Delivery() {
+  hideDay4Characters();
+  doorState.living.open = false;
+  if (ui.damageOverlay) {
+    ui.damageOverlay.classList.remove('is-active');
+    void ui.damageOverlay.offsetWidth;
+    ui.damageOverlay.classList.add('is-active');
+  }
+  if (day4State.purchasedProduct && day4State.purchasedProduct.isScam) {
+    startCinematic(assaultSequence, () => {
+      day4State.deliveryResolved = true;
+      day4State.awaitingDelivery = false;
+      hideDay4Characters();
+      hideMartaInCinematic();
+      if (ui.postAssaultScamModal) {
+        ui.postAssaultScamModal.setAttribute('aria-hidden', 'false');
+      }
+    });
+  } else {
+    startCinematic(deliverySequence, () => {
+      day4State.deliveryResolved = true;
+      day4State.awaitingDelivery = false;
+      hideDay4Characters();
+      hideMartaInCinematic();
+      if (missionsState.currentMissionId === 'attendDelivery' && !missionsState.completed) {
+        completeMission('attendDelivery');
+      }
+      setTimeout(() => {
+        setMission('goToSleep', 'Ir a dormir', '¡Recibiste el regalo! Ahora descansá.');
+        setTimeOfDay('noche', 5.0);
+      }, 1500);
+    });
+  }
+}
+
+// --- DAY 4: APP CASINO SLOTS 8-BIT ---
+const CASINO_SYMBOLS = ['🍒', '🍋', '🍇', '7️⃣', '💎', '🍀'];
+let casinoReelInterval = null;
+
+function openCasinoApp() {
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+  updateCasinoUI();
+  switchPhoneView('phoneCasinoView');
+  playCasinoAmbientSound();
+}
+
+function updateCasinoUI() {
+  if (ui.casinoBalance) ui.casinoBalance.textContent = statsState.money.toLocaleString('es-AR');
+  if (ui.casinoBetAmount) ui.casinoBetAmount.textContent = casinoState.currentBet.toLocaleString('es-AR');
+  if (ui.casinoSpinBtn) ui.casinoSpinBtn.disabled = casinoState.spinning;
+  if (ui.casinoBetMinus) ui.casinoBetMinus.disabled = casinoState.spinning || casinoState.currentBet <= 5000;
+  if (ui.casinoBetPlus) ui.casinoBetPlus.disabled = casinoState.spinning;
+}
+
+function changeCasinoBet(delta) {
+  if (casinoState.spinning) return;
+  const newBet = casinoState.currentBet + delta;
+  if (newBet >= 5000) {
+    casinoState.currentBet = newBet;
+    updateCasinoUI();
+  }
+}
+
+function spinCasino() {
+  if (casinoState.spinning) return;
+  if (statsState.money < casinoState.currentBet) {
+    showToast('No tenés saldo suficiente');
+    return;
+  }
+
+  casinoState.spinning = true;
+  statsState.money = Math.max(0, statsState.money - casinoState.currentBet);
+  updateStats(0);
+  updateCasinoUI();
+
+  if (ui.casinoMessage) ui.casinoMessage.textContent = 'Girando...';
+  playCasinoSpinSound();
+
+  const reels = [ui.casinoReel1, ui.casinoReel2, ui.casinoReel3];
+  reels.forEach((r) => r && r.classList.add('spinning'));
+
+  let spins = 0;
+  if (casinoReelInterval) clearInterval(casinoReelInterval);
+  casinoReelInterval = setInterval(() => {
+    reels.forEach((r) => {
+      if (r) r.textContent = CASINO_SYMBOLS[Math.floor(Math.random() * CASINO_SYMBOLS.length)];
+    });
+    spins++;
+    if (spins >= 15) {
+      clearInterval(casinoReelInterval);
+      casinoReelInterval = null;
+      finishCasinoSpin();
+    }
+  }, 100);
+}
+
+function finishCasinoSpin() {
+  const won = Math.random() < 0.3;
+  const reels = [ui.casinoReel1, ui.casinoReel2, ui.casinoReel3];
+  reels.forEach((r) => r && r.classList.remove('spinning'));
+
+  const pickSymbol = () => CASINO_SYMBOLS[Math.floor(Math.random() * CASINO_SYMBOLS.length)];
+  const pickDifferent = (notSymbol) => {
+    let s = pickSymbol();
+    while (s === notSymbol) s = pickSymbol();
+    return s;
+  };
+
+  if (won) {
+    const matchSymbol = pickSymbol();
+    reels.forEach((r) => { if (r) r.textContent = matchSymbol; });
+    const winnings = casinoState.currentBet * 2;
+    statsState.money = statsState.money + winnings;
+    if (ui.casinoMessage) ui.casinoMessage.textContent = `¡Ganaste $${winnings.toLocaleString('es-AR')}!`;
+    playCasinoWinSound();
+  } else {
+    const r1 = pickSymbol();
+    let r2 = pickSymbol();
+    let r3 = pickSymbol();
+    if (r1 === r2 && r2 === r3) {
+      r3 = pickDifferent(r1);
+    }
+    if (reels[0]) reels[0].textContent = r1;
+    if (reels[1]) reels[1].textContent = r2;
+    if (reels[2]) reels[2].textContent = r3;
+    if (ui.casinoMessage) ui.casinoMessage.textContent = 'Perdiste. ¡Suerte la próxima!';
+    playCasinoLoseSound();
+  }
+
+  updateStats(0);
+  casinoState.spinning = false;
+  updateCasinoUI();
+
+  if (statsState.money <= 0) {
+    casinoState.bankrupt = true;
+    setTimeout(showCasinoBankruptModal, 1000);
+  }
+}
+
+function showCasinoBankruptModal() {
+  if (ui.casinoBankruptModal) {
+    ui.casinoBankruptModal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+// --- DEBUG CONSOLE (tecla L) ---
+let debugConsoleOpen = false;
+
+function logToConsole(msg, type = 'info') {
+  const log = document.getElementById('debugConsoleLog');
+  if (!log) return;
+  const line = document.createElement('div');
+  line.className = `log-${type}`;
+  line.textContent = `> ${msg}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearConsoleLog() {
+  const log = document.getElementById('debugConsoleLog');
+  if (log) log.innerHTML = '';
+}
+
+function toggleDebugConsole(force) {
+  const el = document.getElementById('debugConsole');
+  if (!el) return;
+  const next = typeof force === 'boolean' ? force : !debugConsoleOpen;
+  debugConsoleOpen = next;
+  if (debugConsoleOpen) {
+    if (document.pointerLockElement === canvas) {
+      document.exitPointerLock();
+    }
+    el.classList.add('is-open');
+    el.setAttribute('aria-hidden', 'false');
+    const input = document.getElementById('debugConsoleInput');
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+    logToConsole('Consola de debug abierta. Escribí "help" para ver comandos.', 'system');
+  } else {
+    el.classList.remove('is-open');
+    el.setAttribute('aria-hidden', 'true');
+    canvas.focus();
+  }
+}
+
+function startDay1() {
+  camera.position.set(-0.7, 1.48, -2.3);
+  lookEuler.set(0, -Math.PI / 2, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  setTimeOfDay('dia', 0.0);
+  doorState.living.open = false;
+  hideDay4Characters();
+
+  setMission('doorbell', 'Atiende la puerta', 'Alguien toca el timbre. Ve a abrir la puerta de entrada.');
+}
+
+function jumpToDay(day) {
+  cinematicState.active = false;
+  cinematicState.onEnd = null;
+  cinematicState.timer = 0;
+  cinematicState.currentStep = 0;
+  cinematicState.waitingForSpace = false;
+  cinematicState.sequence = null;
+  dayTransitionState.active = false;
+  dayTransitionState.progress = 0;
+  dayTransitionState.phase = 'fade-in';
+  document.body.classList.remove('cinematic-active');
+  if (ui.cinematicOverlay) ui.cinematicOverlay.setAttribute('aria-hidden', 'true');
+  if (ui.cinematicPrompt) ui.cinematicPrompt.classList.remove('is-visible');
+
+  if (phoneState.active) {
+    togglePhone();
+  }
+
+  if (ui.marketpl4ceHackModal) ui.marketpl4ceHackModal.setAttribute('aria-hidden', 'true');
+  if (ui.postAssaultScamModal) ui.postAssaultScamModal.setAttribute('aria-hidden', 'true');
+  if (ui.daysBlockedModal) ui.daysBlockedModal.setAttribute('aria-hidden', 'true');
+  if (ui.damageOverlay) ui.damageOverlay.classList.remove('is-active');
+  if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
+  if (ui.casinoBankruptModal) ui.casinoBankruptModal.setAttribute('aria-hidden', 'true');
+
+  hideDay4Characters();
+
+  gameState.currentDay = day;
+  if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + day;
+
+  try {
+    if (day === 1) {
+      startDay1();
+    } else if (day === 2) {
+      startDay2();
+    } else if (day === 3) {
+      startDay3();
+    } else if (day === 4) {
+      startDay4();
+    } else if (day === 5) {
+      startDay5();
+    }
+    logToConsole(`Cambiado al día ${day} (estado conservado)`, 'system');
+  } catch (e) {
+    logToConsole(`Error al cambiar de día: ${e.message}`, 'error');
+  }
+}
+
+function processConsoleCommand(raw) {
+  const text = raw.trim();
+  if (!text) return;
+  logToConsole(text);
+  const parts = text.split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+  const arg = parts[1];
+
+  if (cmd === 'day') {
+    const n = parseInt(arg, 10);
+    if (isNaN(n) || n < 1 || n > 5) {
+      logToConsole('Uso: day <1-5>', 'error');
+      return;
+    }
+    jumpToDay(n);
+    return;
+  }
+  if (cmd === 'help' || cmd === '?') {
+    logToConsole('Comandos disponibles:', 'system');
+    logToConsole('  day <1-5>  Cambia al día indicado (conserva estado)');
+    logToConsole('  clear      Limpia el log');
+    logToConsole('  help       Muestra esta ayuda');
+    return;
+  }
+  if (cmd === 'clear' || cmd === 'cls') {
+    clearConsoleLog();
+    return;
+  }
+  if (cmd === 'close' || cmd === 'exit') {
+    toggleDebugConsole(false);
+    return;
+  }
+  logToConsole(`Comando no reconocido: ${cmd}`, 'error');
+}
+
 function restartCurrentDay() {
   // Close game over modal
   if (ui.gameOverModal) ui.gameOverModal.setAttribute('aria-hidden', 'true');
@@ -2078,6 +3127,25 @@ function startIntro() {
 }
 
 function handleMoveKey(event, active) {
+  if (phoneState.active && (isUberMazeRunning() || isUberMapPinActive())) {
+    if (active && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
+      if (event.repeat) return;
+      event.preventDefault();
+      togglePhone();
+      return;
+    }
+    const dir = getMoveDirection(event);
+    if (dir) {
+      event.preventDefault();
+      const mazeDir = dir === 'forward' ? 'up' : dir === 'back' ? 'down' : dir;
+      if (isUberMazeRunning()) {
+        setMazeInput(mazeDir, active);
+      } else {
+        setMapPinInput(mazeDir, active);
+      }
+    }
+    return;
+  }
   if (cinematicState.active) {
     if (active && (event.code === 'Space' || event.key === ' ')) {
       if (event.repeat) return;
@@ -2095,6 +3163,10 @@ function handleMoveKey(event, active) {
   if (active && isDoorKey(event)) {
     if (event.repeat) return;
     event.preventDefault();
+    if (isNearUber) {
+      startDay5EndCinematic();
+      return;
+    }
     if (handleDoorKey()) return;
     if (handleSleepKey()) return;
     return;
@@ -2138,6 +3210,21 @@ initCinematicEngine({
 initDoors({
   doorPrompt: ui.doorPrompt,
   onOpenLivingDoor: () => {
+    if (
+      gameState.currentDay === 4 &&
+      day4State.awaitingDelivery &&
+      !day4State.deliveryResolved
+    ) {
+      startDay4Delivery();
+      return;
+    }
+    if (
+      missionsState.currentMissionId === 'openDoorUber' &&
+      !missionsState.completed
+    ) {
+      // Allow walking outside, the player will get in the Uber by pressing E near the car
+      return;
+    }
     startCinematic(cutsceneLiving, () => {
       tablePhoneGroup.visible = true;
       doorState.living.open = false;
@@ -2168,6 +3255,8 @@ initDayCycle({
   startCinematic,
   day2WakeUpSequence,
   day3WakeUpSequence,
+  day4WakeUpSequence,
+  day5WakeUpSequence,
   setDayRestarted,
   playNotificationSound,
   startClaraBirthdayMission,
@@ -2175,6 +3264,7 @@ initDayCycle({
   renderContactList,
   openContactChat,
   startClaraBirthdayFlow,
+  startUberMission,
 });
 
 initMissions({
@@ -2209,6 +3299,18 @@ initPhone({
     },
     onOpenMercad0LibreApp: () => {
       openFakeMLProducts();
+    },
+    onOpenMarketplaceApp: () => {
+      openMarketplaceProducts();
+    },
+    onOpenMarketpl4ceApp: () => {
+      triggerMarketpl4ceHack();
+    },
+    onOpenCasinoApp: () => {
+      openCasinoApp();
+    },
+    onOpenUberApp: () => {
+      openUberApp();
     },
     onOpenBrowserApp: () => {
       resetBrowserApp();
@@ -2292,14 +3394,14 @@ initPhone({
         );
         if (ui.phoneChatReplyBox) {
           ui.phoneChatReplyBox.classList.remove('is-hidden');
-          ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-camilo-ok="true">Responder 'Ok'</button>`;
+          ui.phoneChatReplyBox.innerHTML = `<button id="sendReplyBtn" class="phone-reply-btn" data-camilo-ok="true">Responder</button>`;
         }
       }, 1200);
     },
     onCamiloOk: (btn) => {
       btn.disabled = true;
       btn.style.opacity = '0.5';
-      addMessageToConversation('camilo', 'outgoing', `Ok`);
+      addMessageToConversation('camilo', 'outgoing', `Bueno, gracias!`);
       if (ui.phoneChatReplyBox) ui.phoneChatReplyBox.classList.add('is-hidden');
 
       if (missionsState.currentMissionId === 'readCamiloMessage' && !missionsState.completed) {
@@ -2349,6 +3451,233 @@ initPhone({
   },
 });
 
+initUberMaze({
+  onExitPointerLock: () => {
+    if (document.pointerLockElement === canvas) {
+      document.exitPointerLock();
+    }
+  },
+  onSwitchView: (viewId) => switchPhoneView(viewId),
+  onMazeCompleted: (elapsed) => {
+    startUberMapPin(elapsed);
+  },
+  onFail: () => {
+    statsState.calm = Math.max(0, statsState.calm - 20);
+    statsState.happiness = Math.max(0, statsState.happiness - 15);
+    updateStats(0);
+    if (ui.uberFailModal) {
+      setTimeout(() => {
+        ui.uberFailModal.setAttribute('aria-hidden', 'false');
+      }, 600);
+    }
+  },
+});
+
+let parkedUberCar = null;
+let isNearUber = false;
+let lastScoreDetails = null;
+
+initUberMapPin({
+  onWin: (score, elapsed) => {
+    if (missionsState.currentMissionId === 'orderUber' && !missionsState.completed) {
+      completeMission('orderUber');
+    }
+    
+    // Store elapsed time
+    uberState.elapsed = elapsed;
+    
+    // Update player stats
+    const tempScoreDetails = calculateScoreDetails(elapsed);
+    const scorePerformance = Math.min(100, Math.round(tempScoreDetails.totalScore / 70));
+    statsState.happiness = Math.min(100, statsState.happiness + Math.round(scorePerformance / 4));
+    statsState.calm = Math.min(100, statsState.calm + 12);
+    updateStats(0);
+
+    // Close the phone instead of showing modal immediately
+    if (phoneState.active) togglePhone();
+    
+    // Spawn parked Uber car
+    parkedUberCar = spawnParkedUber();
+    
+    // Set next mission to open the door
+    setMission('openDoorUber', 'Tomar el Uber', 'El Uber ya llegó y te está esperando afuera. Abrí la puerta principal para subir.');
+  },
+  onFail: () => {
+    statsState.calm = Math.max(0, statsState.calm - 20);
+    statsState.happiness = Math.max(0, statsState.happiness - 15);
+    updateStats(0);
+    if (ui.uberFailModal) {
+      setTimeout(() => {
+        ui.uberFailModal.setAttribute('aria-hidden', 'false');
+      }, 600);
+    }
+  },
+});
+
+attachUberListeners();
+
+if (ui.btnSaveUberScore) {
+  ui.btnSaveUberScore.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const nameInput = ui.uberPlayerName ? ui.uberPlayerName.value : 'Marta';
+    const finalName = nameInput.trim() || 'Marta';
+    
+    if (lastScoreDetails) {
+      const updatedBoard = saveScore(finalName, lastScoreDetails);
+      
+      // Hide submit form, show leaderboard rankings list
+      if (ui.uberLeaderboardForm) {
+        ui.uberLeaderboardForm.style.display = 'none';
+      }
+      if (ui.uberLeaderboardView) {
+        ui.uberLeaderboardView.style.display = 'block';
+      }
+      
+      // Render Table
+      if (ui.uberLeaderboardBody) {
+        renderLeaderboardTable(ui.uberLeaderboardBody, updatedBoard);
+      }
+    }
+  });
+}
+
+if (ui.btnUberNarrationNext) {
+  ui.btnUberNarrationNext.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.uberNarrationModal) {
+      ui.uberNarrationModal.style.display = 'none';
+      ui.uberNarrationModal.setAttribute('aria-hidden', 'true');
+    }
+
+    // Now calculate and show results modal (Success Modal with Leaderboard)
+    lastScoreDetails = calculateScoreDetails(uberState.elapsed);
+    if (ui.uberSuccessModal) {
+      if (ui.uberScoreBreakdown) {
+        renderScoreBreakdown(ui.uberScoreBreakdown, lastScoreDetails);
+      }
+
+      // Auto-save the score and show the leaderboard directly
+      const updatedBoard = saveScore('Marta', lastScoreDetails);
+      if (ui.uberLeaderboardForm) ui.uberLeaderboardForm.style.display = 'none';
+      if (ui.uberLeaderboardView) ui.uberLeaderboardView.style.display = 'block';
+      if (ui.uberLeaderboardBody) {
+        renderLeaderboardTable(ui.uberLeaderboardBody, updatedBoard);
+      }
+
+      ui.uberSuccessModal.setAttribute('aria-hidden', 'false');
+    }
+  });
+}
+
+if (ui.btnUberDownloadBoard) {
+  ui.btnUberDownloadBoard.addEventListener('click', (e) => {
+    e.stopPropagation();
+    downloadLeaderboard();
+  });
+}
+
+function getClaraReactionNarrative() {
+  const product = day4State.purchasedProduct;
+  if (!product || product.isScam) {
+    return "Marta no pudo llegar con la muñeca Barbie Mundial soñada debido a las frustrantes estafas que sufrió en línea. En su lugar, tuvo que entregarle un regalo alternativo comprado a las apuradas en el barrio.<br><br>Clara agradeció con un beso educado y un <em>'gracias abuela'</em>, pero la desilusión en sus ojitos fue evidente al no ver la Barbie Mundial de la Selección. Marta sintió una profunda mezcla de impotencia y frustración al ver cómo las trabas de la tecnología arruinaron el regalo perfecto.";
+  }
+  if (product.id === 'alta-real') {
+    return "¡La reacción de Clara fue espectacular! Al abrir el paquete y ver la Barbie Mundial nueva, original y en su caja sellada, sus ojos brillaron de alegría y empezó a saltar por toda la sala.<br><br>Corrió a abrazar a Marta con fuerza exclamando: <strong>'¡Sos la mejor abuela de todo el universo! ¡Te amo!'</strong>. A pesar de haber gastado $70.000 y lidiar con la odisea de la Play Store y los chats, la inmensa felicidad de su nieta pagó con creces cada dolor de cabeza digital.";
+  }
+  if (product.id === 'media-real') {
+    return "Clara se puso súper contenta cuando abrió el regalo. Aunque la muñeca no venía en su caja original y tenía el pelo un poco cepillado por su dueña anterior, Clara exclamó con una gran sonrisa: <strong>'¡Qué buena que está, abuela, muchas gracias! ¡Vamos a jugar ya!'</strong>.<br><br>Marta suspiró con alivio al ver que su esfuerzo por comprarla usada por $25.000 valió la pena y que Clara disfrutaba enormemente el regalo sin importarle el empaque.";
+  }
+  if (product.id === 'baja-real') {
+    return "Al abrir el paquete, Clara intentó forzar una sonrisa, pero se le notó un poco de desilusión. La muñeca venía sin caja, tenía el vestido algo desgastado y le faltaba uno de los zapatitos de fútbol.<br><br>Aunque abrazó a Marta cariñosamente y le dijo <em>'gracias'</em>, al rato la dejó a un lado para jugar con los regalos de sus amigos. Marta sintió que haber gastado solo $15.000 cuidó su jubilación, pero se quedó con la espinita de no haber podido darle a Clara lo que ella realmente soñaba.";
+  }
+  return "Marta entregó un regalo alternativo a Clara. Su nieta lo recibió con cariño, pero Marta no pudo evitar pensar en cómo la complejidad del mundo digital le impidió conseguir el regalo que tanto anhelaba para este día especial.";
+}
+
+function startDay5EndCinematic() {
+  if (!parkedUberCar) return;
+
+  // Stop pointer lock if active
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+
+  // Complete openDoorUber mission
+  completeMission('openDoorUber');
+
+  // Define end cinematic steps
+  const endSteps = [
+    {
+      duration: 3.5,
+      autoAdvance: true,
+      dialogue: { speaker: "Marta", text: "¡Ahí está el Uber! Menos mal, ya voy tarde..." },
+      sound: { freq: 440, type: 'sine', duration: 0.1 },
+      onStart: () => {
+        // Look at the car from close range (where the player is standing)
+        camera.position.set(2.0, 1.4, -10.0);
+        camera.lookAt(0.0, 1.1, -12.53);
+      }
+    },
+    {
+      duration: 3.5,
+      autoAdvance: true,
+      dialogue: { speaker: "Narrador", text: "Marta se sube al Uber..." },
+      onStart: () => {
+        // Hide Marta to simulate she left
+        if (martaLoadedModel) martaLoadedModel.visible = false;
+        oldWomanMesh.visible = false;
+      }
+    },
+    {
+      duration: 7.0,
+      autoAdvance: true,
+      dialogue: { speaker: "Narrador", text: "El auto arranca y se aleja por la calle, llevando a Marta al cumpleaños de su nieta Clara." },
+      onStart: () => {
+        // Exterior camera view looking at the car
+        camera.position.set(4.5, 1.3, -10.0);
+        camera.lookAt(-2.0, 1.1, -12.53);
+      },
+      action: (progress, dt) => {
+        // Move car to the left
+        if (parkedUberCar && parkedUberCar.mesh) {
+          parkedUberCar.mesh.position.x -= 8.0 * dt;
+          parkedUberCar.sound.updatePosition(parkedUberCar.mesh.position, camera.position);
+        }
+        // Fade to black in the second half
+        if (progress > 0.5) {
+          const fadeVal = (progress - 0.5) * 2;
+          if (ui.dayTransitionOverlay) {
+            ui.dayTransitionOverlay.style.transition = 'none';
+            ui.dayTransitionOverlay.style.opacity = String(fadeVal);
+            ui.dayTransitionOverlay.setAttribute('aria-hidden', 'false');
+          }
+        }
+      }
+    }
+  ];
+
+  startCinematic(endSteps, () => {
+    // Cinematic has ended
+    // Clean up sounds
+    if (parkedUberCar && parkedUberCar.sound) {
+      parkedUberCar.sound.stop();
+    }
+    
+    // Hide cinematic dialogue
+    if (ui.cinematicOverlay) {
+      ui.cinematicOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    // Populate and show the Narration modal
+    if (ui.uberNarrationText) {
+      ui.uberNarrationText.innerHTML = getClaraReactionNarrative();
+    }
+    if (ui.uberNarrationModal) {
+      ui.uberNarrationModal.style.display = 'flex';
+      ui.uberNarrationModal.setAttribute('aria-hidden', 'false');
+    }
+  });
+}
+
 function renderPlayStore(filterText) {
   const list = document.getElementById('playstoreAppList');
   if (!list) return;
@@ -2356,6 +3685,7 @@ function renderPlayStore(filterText) {
   const query = (filterText || '').toLowerCase();
   playstoreApps.forEach((app) => {
     if (installedApps[app.id]) return;
+    if (app.id === 'casino' && gameState.currentDay < 4) return;
     if (query && !app.name.toLowerCase().includes(query)) return;
     const card = document.createElement('div');
     card.className = 'playstore-card';
@@ -2390,6 +3720,19 @@ function installApp(appId, btn) {
     const app = playstoreApps.find((a) => a.id === appId);
     if (app) showToast(app.name + ' instalado');
     updatePhoneHomeApps();
+
+    if (appId === 'marketpl4ce') {
+      setTimeout(triggerMarketpl4ceHack, 500);
+      setTimeout(() => renderPlayStore(document.getElementById('playstoreSearchInput')?.value || ''), 500);
+      return;
+    }
+
+    if (appId === 'marketplace') {
+      if (missionsState.currentMissionId === 'downloadMarketplace' && !missionsState.completed) {
+        completeMission('downloadMarketplace');
+        setTimeout(() => startBuyMarketplaceMission(), 1500);
+      }
+    }
 
     if (appId === 'mercadolibre' || appId === 'mercad0libre') {
       if (missionsState.currentMissionId === 'downloadMercadoLibre' && !missionsState.completed) {
@@ -2594,7 +3937,15 @@ function renderMLProducts() {
     card.addEventListener('click', (e) => {
       e.stopPropagation();
       if (product.id === 'barbie') {
-        openMLCheckout();
+        if (gameState.currentDay >= 4) {
+          showToast('Sin stock disponible');
+          if (missionsState.currentMissionId === 'buyGiftDay4' && !missionsState.completed) {
+            completeMission('buyGiftDay4');
+            setTimeout(() => startDownloadMarketplaceMission(), 1500);
+          }
+        } else {
+          openMLCheckout();
+        }
       } else {
         showToast('Esta funcionalidad no está disponible');
       }
@@ -2684,6 +4035,259 @@ function completeMLPurchaseAndMission() {
     setMission('goToSleep', 'Ir a dormir', 'Ya es tarde y tuviste un día largo. Ve a la cama a descansar.');
     setTimeOfDay('noche', 5.0);
   }, 1500);
+}
+
+// --- DAY 4: MARKETPLACE ---
+let selectedMarketplaceProduct = null;
+
+function renderMarketplaceProducts() {
+  const list = ui.marketplaceProducts;
+  if (!list) return;
+  list.innerHTML = '';
+
+  marketplaceProducts.forEach((product) => {
+    const card = document.createElement('div');
+    card.className = 'marketplace-product-card';
+    card.innerHTML = `
+      <div class="marketplace-product-img" style="background:${product.gradient};"></div>
+      <div class="marketplace-product-info">
+        <span class="marketplace-product-price">$${product.price.toLocaleString('es-AR')}</span>
+        <span class="marketplace-product-title">${product.title}</span>
+        <span class="marketplace-product-quality quality-${product.quality.toLowerCase()}">Calidad: ${product.quality}</span>
+      </div>
+    `;
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openMarketplaceProductDetail(product);
+    });
+    list.appendChild(card);
+  });
+}
+
+function openMarketplaceProducts() {
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+  renderMarketplaceProducts();
+  switchPhoneView('phoneMarketplaceView');
+}
+
+function openMarketplaceProductDetail(product) {
+  selectedMarketplaceProduct = product;
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+
+  if (ui.marketplaceDetailContent) {
+    ui.marketplaceDetailContent.innerHTML = `
+      <div class="marketplace-detail-image" style="background:${product.gradient};"></div>
+      <div class="marketplace-detail-info">
+        <div class="marketplace-detail-title">${product.title}</div>
+        <div class="marketplace-detail-price">$${product.price.toLocaleString('es-AR')}</div>
+        <span class="marketplace-detail-quality quality-${product.quality.toLowerCase()}">Calidad: ${product.quality}</span>
+      </div>
+      <div class="marketplace-detail-section">
+        <span class="marketplace-detail-section-label">Descripción</span>
+        <p class="marketplace-detail-description">${product.description}</p>
+      </div>
+      <div class="marketplace-detail-section">
+        <span class="marketplace-detail-section-label">Vendedor</span>
+        <div class="marketplace-detail-seller">${product.seller}</div>
+        <div class="marketplace-detail-meta">${product.rating}</div>
+        <div class="marketplace-detail-meta">${product.accountAge}</div>
+      </div>
+      <button class="marketplace-detail-buy-btn" id="marketplaceDetailBuyBtn">Comprar</button>
+    `;
+
+    const buyBtn = document.getElementById('marketplaceDetailBuyBtn');
+    if (buyBtn) {
+      buyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openMarketplaceCheckout(product);
+      });
+    }
+  }
+
+  switchPhoneView('phoneMarketplaceProductDetailView');
+}
+
+function openMarketplaceCheckout(product) {
+  selectedMarketplaceProduct = product;
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+
+  if (ui.marketplaceCheckoutProduct) {
+    ui.marketplaceCheckoutProduct.innerHTML = `
+      <div class="marketplace-product-img" style="background:${product.gradient}; width:64px; height:64px; flex-shrink:0;"></div>
+      <div>
+        <div style="font-weight:700;color:#fff;font-size:0.95rem;">${product.title}</div>
+        <div style="color:#ffd700;font-weight:800;font-size:1.1rem;margin-top:4px;">$${product.price.toLocaleString('es-AR')}</div>
+        <div style="color:#9ca3af;font-size:0.75rem;margin-top:2px;">${product.quality} · ${product.seller}</div>
+      </div>
+    `;
+  }
+
+  if (ui.marketplaceCardNumber) ui.marketplaceCardNumber.value = '';
+  if (ui.marketplaceCardName) ui.marketplaceCardName.value = '';
+  if (ui.marketplaceCardExp) ui.marketplaceCardExp.value = '';
+  if (ui.marketplaceCardCvv) ui.marketplaceCardCvv.value = '';
+  if (ui.marketplaceLoadCardBtn) {
+    ui.marketplaceLoadCardBtn.disabled = false;
+    ui.marketplaceLoadCardBtn.style.opacity = '1';
+    ui.marketplaceLoadCardBtn.textContent = 'Cargar datos de tarjeta';
+  }
+  if (ui.marketplaceConfirmBtn) {
+    ui.marketplaceConfirmBtn.disabled = true;
+    ui.marketplaceConfirmBtn.style.opacity = '0.5';
+    ui.marketplaceConfirmBtn.textContent = 'Confirmar compra';
+  }
+
+  switchPhoneView('phoneMarketplaceCheckoutView');
+}
+
+function loadMarketplaceCardData() {
+  if (ui.marketplaceCardNumber) ui.marketplaceCardNumber.value = '4509 9535 6623 4188';
+  if (ui.marketplaceCardName) ui.marketplaceCardName.value = 'MARTA GOMEZ';
+  if (ui.marketplaceCardExp) ui.marketplaceCardExp.value = '08/29';
+  if (ui.marketplaceCardCvv) ui.marketplaceCardCvv.value = '324';
+  if (ui.marketplaceLoadCardBtn) {
+    ui.marketplaceLoadCardBtn.disabled = true;
+    ui.marketplaceLoadCardBtn.style.opacity = '0.5';
+    ui.marketplaceLoadCardBtn.textContent = 'Datos cargados';
+  }
+  if (ui.marketplaceConfirmBtn) {
+    ui.marketplaceConfirmBtn.disabled = false;
+    ui.marketplaceConfirmBtn.style.opacity = '1';
+  }
+}
+
+function confirmMarketplacePurchase() {
+  if (!selectedMarketplaceProduct || !ui.marketplaceConfirmBtn || ui.marketplaceConfirmBtn.disabled) return;
+
+  if (statsState.money < selectedMarketplaceProduct.price) {
+    showToast('No tenés saldo suficiente');
+    return;
+  }
+
+  ui.marketplaceConfirmBtn.disabled = true;
+  ui.marketplaceConfirmBtn.style.opacity = '0.5';
+  ui.marketplaceConfirmBtn.textContent = 'Procesando...';
+
+  setTimeout(() => {
+    statsState.money = Math.max(0, statsState.money - selectedMarketplaceProduct.price);
+    day4State.purchasedProduct = { ...selectedMarketplaceProduct };
+    updateStats(0);
+    showMarketplaceSuccessModal(selectedMarketplaceProduct);
+    if (missionsState.currentMissionId === 'buyInMarketplace' && !missionsState.completed) {
+      completeMission('buyInMarketplace');
+    }
+  }, 2000);
+}
+
+function showMarketplaceScamModal(product) {
+  if (!ui.marketplaceScamModal) return;
+  if (ui.marketplaceScamText) {
+    ui.marketplaceScamText.textContent = `Pagaste $${product.price.toLocaleString('es-AR')} al vendedor "${product.seller}", pero nunca envió el producto.`;
+  }
+  if (ui.marketplaceScamImpact) {
+    ui.marketplaceScamImpact.innerHTML = `
+      <span class="impact-badge neg">Dinero -$${product.price.toLocaleString('es-AR')}</span>
+      <span class="impact-badge neg">Calma -20%</span>
+      <span class="impact-badge neg">Felicidad -10%</span>
+    `;
+  }
+  ui.marketplaceScamModal.setAttribute('aria-hidden', 'false');
+  selectedMarketplaceProduct = null;
+}
+
+function showMarketplaceSuccessModal(product) {
+  if (!ui.marketplaceSuccessModal) return;
+  if (ui.marketplaceSuccessText) {
+    ui.marketplaceSuccessText.textContent = `Compraste la muñeca de calidad ${product.quality} por $${product.price.toLocaleString('es-AR')}. El pedido llegará pronto.`;
+  }
+  ui.marketplaceSuccessModal.setAttribute('aria-hidden', 'false');
+  selectedMarketplaceProduct = null;
+}
+
+function triggerMarketpl4ceHack() {
+  day4State.wasHacked = true;
+  statsState.calm = Math.max(0, statsState.calm - 30);
+  statsState.happiness = Math.max(0, statsState.happiness - 20);
+  updateStats(0);
+  if (ui.marketpl4ceHackModal) {
+    ui.marketpl4ceHackModal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function restartDay4() {
+  if (ui.marketpl4ceHackModal) ui.marketpl4ceHackModal.setAttribute('aria-hidden', 'true');
+  if (ui.postAssaultScamModal) ui.postAssaultScamModal.setAttribute('aria-hidden', 'true');
+  if (ui.fraudOverlay) ui.fraudOverlay.classList.remove('is-active');
+  if (ui.damageOverlay) ui.damageOverlay.classList.remove('is-active');
+
+  cinematicState.active = false;
+  cinematicState.onEnd = null;
+  dayTransitionState.active = false;
+
+  statsState.fatigue = 0;
+  statsState.money = day4InitialMoney.value;
+  statsState.happiness = 80;
+  statsState.calm = 75;
+  updateStats(0);
+
+  missionsState.currentMissionId = null;
+  missionsState.active = false;
+  missionsState.completed = false;
+  if (ui.missionsContainer) ui.missionsContainer.setAttribute('aria-hidden', 'true');
+
+  day4State.purchasedProduct = null;
+  day4State.wasHacked = false;
+  day4State.awaitingDelivery = false;
+  day4State.deliveryResolved = false;
+
+  casinoState.currentBet = 5000;
+  casinoState.spinning = false;
+  casinoState.bankrupt = false;
+  if (ui.casinoBankruptModal) ui.casinoBankruptModal.setAttribute('aria-hidden', 'true');
+
+  installedApps.marketplace = false;
+  installedApps.marketpl4ce = false;
+  installedApps.mercadolibre = false;
+  installedApps.playstore = false;
+  installedApps.casino = false;
+  updatePhoneHomeApps();
+
+  phoneState.active = false;
+  phoneState.progress = 0;
+  phoneState.wakeTimer = 0;
+  phoneState.sleepTimer = 0;
+  switchPhoneView('phoneHomeView');
+  if (ui.phoneUI) {
+    ui.phoneUI.classList.remove('is-visible');
+    ui.phoneUI.setAttribute('aria-hidden', 'true');
+  }
+  if (ui.phonePrompt) {
+    ui.phonePrompt.textContent = 'T Coger teléfono';
+    ui.phonePrompt.classList.remove('is-active');
+  }
+
+  doorState.living.open = false;
+  hideDay4Characters();
+  selectedMarketplaceProduct = null;
+
+  setTimeOfDay('dia', 0.0);
+  camera.position.set(4.2, 0.72, 3.45);
+  lookEuler.set(0, 0, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  if (typeof sleepToNextDayFn === 'function') {
+    setTimeout(() => {
+      gameState.currentDay = 4;
+      if (ui.dayCounter) ui.dayCounter.textContent = 'Día 4';
+      startDay4();
+    }, 400);
+  }
 }
 
 function startFraudDrain() {
@@ -2829,10 +4433,11 @@ function submitBrowserSearch(query) {
 function updateStats(dt) {
   if (!visualFatigueDisabled) {
     if (phoneState.active) {
-      statsState.fatigue += dt;
+      const fatigueRate = isUberMazeRunning() ? 0.4 : 1;
+      statsState.fatigue += dt * fatigueRate;
       statsState.fatigue = Math.min(60, statsState.fatigue);
     } else {
-      statsState.fatigue -= dt * 2;
+      statsState.fatigue -= dt * 6;
       statsState.fatigue = Math.max(0, statsState.fatigue);
     }
   }
@@ -2861,6 +4466,24 @@ function updateStats(dt) {
   if (ui.phoneUI) ui.phoneUI.style.filter = filterVal;
 }
 
+function updateUberInteraction() {
+  if (gameState.currentDay === 5 && missionsState.currentMissionId === 'openDoorUber' && parkedUberCar) {
+    const carPos = parkedUberCar.mesh.position;
+    const dist = Math.hypot(camera.position.x - carPos.x, camera.position.z - carPos.z);
+    if (dist < 3.2) {
+      if (ui.doorPrompt) {
+        ui.doorPrompt.textContent = "E Subirse al Uber";
+        ui.doorPrompt.classList.add('is-visible');
+      }
+      isNearUber = true;
+    } else {
+      isNearUber = false;
+    }
+  } else {
+    isNearUber = false;
+  }
+}
+
 function animate() {
   const dt = clock.getDelta();
   updateFirstPerson(dt);
@@ -2877,6 +4500,10 @@ function animate() {
   updateCinematic(dt);
   updateFraudDrain(dt);
   updateTimeOfDay(dt);
+  updateUberMaze(dt);
+  updateUberMapPin(dt);
+  updateTraffic(dt, camera);
+  updateUberInteraction();
 
   // Actualizar mezcladores de animación esquelética
   if (martaMixer) {
@@ -2884,6 +4511,12 @@ function animate() {
   }
   if (sonMixer) {
     sonMixer.update(dt);
+  }
+  if (repartidorMixer) {
+    repartidorMixer.update(dt);
+  }
+  if (ladronMixer) {
+    ladronMixer.update(dt);
   }
 
   // Sincronizar visibilidad y animar a Marta en 3D importada
@@ -2935,6 +4568,73 @@ function animate() {
 }
 
 // --- GAME START FLOW ---
+// Parse day from query param (e.g. ?day=2) to allow easy developer testing
+const urlParams = new URLSearchParams(window.location.search);
+const dayParam = urlParams.get('day');
+const INITIAL_DAY = dayParam ? parseInt(dayParam, 10) : 1;
+
+function startGameAtDay(day) {
+  // Deshabilitar el botón y quitarle el foco
+  if (ui.startBtn) {
+    ui.startBtn.disabled = true;
+    ui.startBtn.blur();
+  }
+
+  // Fade out intro overlay
+  if (ui.introOverlay) {
+    ui.introOverlay.classList.add('is-hidden');
+    setTimeout(() => {
+      ui.introOverlay.style.display = 'none';
+    }, 1000);
+  }
+
+  martaModel.visible = false;
+  doorState.living.open = false;
+
+  // Situar la cámara de juego (POV) en los ojos de Marta al despertar
+  camera.position.set(4.2, 1.48, 3.8);
+  lookEuler.set(0, 0, 0);
+  camera.quaternion.setFromEuler(lookEuler);
+
+  // Fade from white back to scene
+  if (ui.introFade) {
+    ui.introFade.style.transition = 'opacity 1.2s ease';
+    ui.introFade.style.opacity = '0';
+  }
+
+  // Remove intro-active class to show HUD
+  setTimeout(() => {
+    document.body.classList.remove('intro-active');
+  }, 800);
+
+  // Set the day state
+  gameState.currentDay = day;
+  if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + day;
+
+  // Configure app states based on day
+  if (day >= 3) {
+    installedApps.browser = true;
+  }
+  if (day >= 4) {
+    installedApps.playstore = true;
+    installedApps.mercadolibre = true;
+    installedApps.browser = true;
+  }
+  updatePhoneHomeApps();
+
+  // Call the wake up function
+  if (day === 2) {
+    startDay2();
+  } else if (day === 3) {
+    startDay3();
+  } else if (day === 4) {
+    startDay4();
+  }
+}
+
+// Expose jumpToDay globally for console testing
+window.jumpToDay = jumpToDay;
+
 // Add intro-active class immediately to hide HUD
 document.body.classList.add('intro-active');
 
@@ -2942,7 +4642,18 @@ document.body.classList.add('intro-active');
 if (ui.startBtn) {
   ui.startBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    startIntro();
+    
+    // Initialize AudioContext on user interaction
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (err) {}
+
+    if (INITIAL_DAY > 1) {
+      startGameAtDay(INITIAL_DAY);
+    } else {
+      startIntro();
+    }
   });
 }
 
@@ -3119,14 +4830,167 @@ if (ui.btnContinuePhishing) {
   ui.btnContinuePhishing.addEventListener('click', (e) => {
     e.stopPropagation();
     if (ui.phishingModal) ui.phishingModal.setAttribute('aria-hidden', 'true');
-    
+
     day3Scammed.value = true;
     setMission('fixBankCard', 'Buscar sitio oficial', 'Vuelve a buscar "Banco Nación" en Google, pero esta vez ingresa únicamente al sitio web oficial (www.bna.com.ar).');
-    
+
     resetBrowserApp();
     switchPhoneView('phoneBrowserView');
   });
 }
+
+// --- DAY 4 EVENT LISTENERS ---
+if (ui.marketplaceLoadCardBtn) {
+  ui.marketplaceLoadCardBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    loadMarketplaceCardData();
+  });
+}
+
+if (ui.marketplaceConfirmBtn) {
+  ui.marketplaceConfirmBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    confirmMarketplacePurchase();
+  });
+}
+
+if (ui.btnMarketplaceScamContinue) {
+  ui.btnMarketplaceScamContinue.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.marketplaceScamModal) ui.marketplaceScamModal.setAttribute('aria-hidden', 'true');
+    openMarketplaceProducts();
+  });
+}
+
+if (ui.btnMarketplaceSuccessContinue) {
+  ui.btnMarketplaceSuccessContinue.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.marketplaceSuccessModal) ui.marketplaceSuccessModal.setAttribute('aria-hidden', 'true');
+    setMission('awaitingDelivery', 'Esperar el timbre', 'Esperá el timbre: el pedido de Marketplace está en camino.');
+    day4State.awaitingDelivery = true;
+
+    if (document.pointerLockElement === canvas) {
+      document.requestPointerLock();
+    }
+
+    setTimeout(() => {
+      playDoorbellSound();
+      setMission('attendDelivery', 'Atender la puerta', '¡Timbre! Abrí la puerta para recibir tu pedido.');
+    }, 5000);
+  });
+}
+
+if (ui.btnPostAssaultRestart) {
+  ui.btnPostAssaultRestart.addEventListener('click', (e) => {
+    e.stopPropagation();
+    restartDay4();
+  });
+}
+
+if (ui.btnMarketpl4ceRewind) {
+  ui.btnMarketpl4ceRewind.addEventListener('click', (e) => {
+    e.stopPropagation();
+    restartDay4();
+  });
+}
+
+// --- DAY 4: CASINO EVENT LISTENERS ---
+if (ui.casinoBetMinus) {
+  ui.casinoBetMinus.addEventListener('click', (e) => {
+    e.stopPropagation();
+    changeCasinoBet(-5000);
+  });
+}
+
+if (ui.casinoBetPlus) {
+  ui.casinoBetPlus.addEventListener('click', (e) => {
+    e.stopPropagation();
+    changeCasinoBet(5000);
+  });
+}
+
+if (ui.casinoSpinBtn) {
+  ui.casinoSpinBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    spinCasino();
+  });
+}
+
+if (ui.btnCasinoBankruptRestart) {
+  ui.btnCasinoBankruptRestart.addEventListener('click', (e) => {
+    e.stopPropagation();
+    restartDay4();
+  });
+}
+
+if (ui.btnUberSuccessContinue) {
+  ui.btnUberSuccessContinue.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.uberSuccessModal) ui.uberSuccessModal.setAttribute('aria-hidden', 'true');
+    resetUberMaze();
+    resetUberMapPin();
+    switchPhoneView('phoneHomeView');
+    if (phoneState.active) togglePhone();
+
+    // Hide success modal and show game complete modal
+    if (ui.uberSuccessModal) ui.uberSuccessModal.setAttribute('aria-hidden', 'true');
+    if (ui.gameCompleteModal) ui.gameCompleteModal.setAttribute('aria-hidden', 'false');
+  });
+}
+
+if (ui.btnGameCompleteRestart) {
+  ui.btnGameCompleteRestart.addEventListener('click', (e) => {
+    e.stopPropagation();
+    window.location.href = window.location.pathname;
+  });
+}
+
+if (ui.btnUberFailRestart) {
+  ui.btnUberFailRestart.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (ui.uberFailModal) ui.uberFailModal.setAttribute('aria-hidden', 'true');
+    resetUberMaze();
+    resetUberMapPin();
+    uberState.attempts = (uberState.attempts || 1) + 1;
+    openUberApp();
+  });
+}
+
+// Debug skip: ?day=5 inicia directo en el día 5 (solo desarrollo)
+(function debugSkipDay() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const day = parseInt(params.get('day'), 10);
+    if (!(day >= 2 && day <= 5)) return;
+
+    // Saltar intro
+    if (ui.introOverlay) {
+      ui.introOverlay.classList.add('is-hidden');
+      ui.introOverlay.style.display = 'none';
+    }
+    if (ui.introFade) ui.introFade.style.opacity = '0';
+    document.body.classList.remove('intro-active');
+    if (martaLoadedModel) martaLoadedModel.visible = false;
+    doorState.living.open = false;
+
+    camera.position.set(-0.7, 1.48, -2.3);
+    lookEuler.set(0, -Math.PI / 2, 0);
+    camera.quaternion.setFromEuler(lookEuler);
+
+    gameState.currentDay = day - 1;
+    if (ui.dayCounter) ui.dayCounter.textContent = 'Día ' + (day - 1);
+    missionsState.completed = true;
+
+    setTimeout(() => {
+      sleepToNextDayFn();
+    }, 200);
+  } catch (err) {
+    console.warn('debug skip failed', err);
+  }
+})();
+
+// Initialize traffic system (asynchronously loads GLB in background)
+initTraffic(scene);
 
 // Start the render loop (scene renders behind intro overlay)
 animate();
